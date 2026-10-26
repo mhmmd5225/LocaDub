@@ -25,16 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Eklenti: LocaDub/ klasörü içinde ZIP (çıkarınca seçilecek klasör doğrudan oluşur)
+      # Eklenti ZIP'i ve version.json (Netlify ile aynı betik)
       - name: Eklenti ZIP'ini hazırla
-        run: |
-          mkdir -p build/LocaDub
-          cp -r extension/. build/LocaDub/
-          (cd build && zip -qr -9 ../site/LocaDub.zip LocaDub)
-          version=$(jq -r .version extension/manifest.json)
-          bytes=$(stat -c %s site/LocaDub.zip)
-          printf '{"version":"%s","bytes":%s,"commit":"%s"}\n' "$version" "$bytes" "${GITHUB_SHA::7}" > site/version.json
-          cat site/version.json
+        run: python3 tools/site/build.py
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

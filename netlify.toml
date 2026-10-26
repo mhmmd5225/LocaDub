@@ -1,0 +1,15 @@
+# Tanıtım sayfası (site/) ve indirilebilir eklenti paketi — https://localdub.mhmmd.app
+[build]
+  publish = "site"
+  command = "python3 tools/site/build.py"
+
+[[headers]]
+  for = "/LocaDub.zip"
+  [headers.values]
+    Content-Disposition = "attachment; filename=LocaDub.zip"
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-cache"
