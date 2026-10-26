@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocaDub — YouTube'u Türkçe dinleyin</title>
+  <meta name="description" content="İngilizce altyazılı YouTube videolarını bilgisayarınızda Türkçeye çeviren ve seslendiren Chrome eklentisi. Metin ve ses hiçbir sunucuya gitmez.">
+  <link rel="icon" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f2f3f6;
+      --ink: #171b2e;
+      --red: #d7262e;
+      --night: #1e2440;
+      --mist: #6a7089;
+      --line: #d9dce5;
+      --white: #ffffff;
+      --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+      --text: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --paper: #151827;
+        --ink: #e9ebf3;
+        --red: #ff4b4f;
+        --night: #0f1222;
+        --mist: #9aa0b8;
+        --line: #2b3047;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 17px/1.6 var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    :focus-visible { outline: 3px solid var(--red); outline-offset: 3px; border-radius: 4px; }
+    .wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+
+    /* Üst çubuk */
+    .bar { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+    .logo { display: flex; align-items: center; gap: 10px; font: 800 22px/1 var(--display); text-decoration: none; letter-spacing: -0.01em; }
+    .logo img { width: 34px; height: 34px; }
+    .bar nav { display: flex; gap: 22px; font-weight: 500; }
+    .bar nav a { text-decoration: none; color: var(--mist); }
+    .bar nav a:hover { color: var(--ink); }
+
+    /* Hero */
+    .hero { padding: 40px 0 72px; }
+    h1 {
+      font: 800 clamp(44px, 8.4vw, 112px)/0.92 var(--display);
+      letter-spacing: -0.035em;
+      margin: 0;
+      max-width: 11ch;
+    }
+    .lede { max-width: 54ch; font-size: 20px; color: var(--mist); margin: 26px 0 30px; }
+    .lede strong { color: var(--ink); font-weight: 600; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 22px; border-radius: 999px;
+      font: 600 16px/1 var(--text); text-decoration: none;
+      border: 2px solid var(--ink);
+    }
+    .btn.primary { background: var(--red); border-color: var(--red); color: #fff; }
+    .btn.primary:hover { filter: brightness(1.08); }
+    .btn.ghost:hover { background: var(--ink); color: var(--paper); }
+
+    /* Oynatıcı sahnesi */
+    .stage {
+      margin: 56px 0 0;
+      position: relative;
+      aspect-ratio: 16 / 8.2;
+      border-radius: 18px;
+      overflow: hidden;
+      background:
+        radial-gradient(40% 55% at 30% 38%, rgba(255, 196, 120, 0.32), transparent 70%),
+        radial-gradient(35% 50% at 72% 30%, rgba(120, 150, 255, 0.28), transparent 70%),
+        radial-gradient(60% 40% at 50% 100%, rgba(215, 38, 46, 0.22), transparent 70%),
+        var(--night);
+      box-shadow: 0 30px 80px -30px rgba(23, 27, 46, 0.55);
+      color: #fff;
+    }
+    .speaker {
+      position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+      width: 26%; aspect-ratio: 1 / 1.15;
+      background:
+        radial-gradient(circle at 50% 24%, rgba(255,255,255,0.20) 0 17%, transparent 17.5%),
+        radial-gradient(ellipse 50% 46% at 50% 100%, rgba(255,255,255,0.14) 0 99%, transparent 100%);
+    }
+    .caption {
+      position: absolute; left: 50%; bottom: 17%; transform: translateX(-50%);
+      width: min(84%, 860px); text-align: center;
+    }
+    .caption p {
+      display: inline; margin: 0;
+      font: 600 clamp(16px, 2.3vw, 30px)/1.45 var(--text);
+      background: rgba(8, 10, 20, 0.78);
+      padding: 0.12em 0.4em;
+      box-decoration-break: clone; -webkit-box-decoration-break: clone;
+      transition: opacity 0.35s;
+    }
+    .caption .en { color: rgba(255,255,255,0.62); font-weight: 500; }
+    .caption.swap p { opacity: 0; }
+    .wave {
+      margin-left: auto;
+      display: flex; gap: 3px; align-items: center; height: 18px; opacity: 0.25; transition: opacity 0.3s;
+    }
+    .wave i { width: 3px; border-radius: 2px; background: #2ecc71; height: 25%; }
+    .stage.speaking .wave { opacity: 1; }
+    .stage.speaking .wave i { animation: talk 0.9s ease-in-out infinite; }
+    .wave i:nth-child(2) { animation-delay: -0.2s; } .wave i:nth-child(3) { animation-delay: -0.5s; }
+    .wave i:nth-child(4) { animation-delay: -0.1s; } .wave i:nth-child(5) { animation-delay: -0.7s; }
+    .wave i:nth-child(6) { animation-delay: -0.35s; } .wave i:nth-child(7) { animation-delay: -0.6s; }
+    @keyframes talk { 0%, 100% { height: 18%; } 50% { height: 100%; } }
+
+    .controls {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; gap: 16px;
+      padding: 10px 18px 14px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.55));
+      font-size: 14px;
+    }
+    .scrub { position: absolute; left: 18px; right: 18px; top: 0; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; }
+    .scrub span { display: block; height: 100%; width: 34%; background: #ff2f37; border-radius: 2px; }
+    .play { width: 0; height: 0; border-left: 14px solid #fff; border-top: 9px solid transparent; border-bottom: 9px solid transparent; }
+    .time { opacity: 0.85; font-variant-numeric: tabular-nums; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      height: 28px; padding: 0 12px 0 5px; border-radius: 14px;
+      background: rgba(255,255,255,0.13); font: 500 13px/1 var(--text);
+      transition: background 0.3s;
+    }
+    .pill b {
+      display: inline-flex; align-items: center; justify-content: center;
+      height: 18px; padding: 0 5px; border-radius: 9px; border: 1.5px solid #6aa5ff; color: #6aa5ff;
+      font: 700 11px/1 var(--text);
+    }
+    .pill .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: spin 0.8s linear infinite; }
+    .pill.on { background: rgba(46, 204, 113, 0.24); }
+    .pill.on b { background: #2ecc71; border-color: #2ecc71; color: #062b14; }
+    .pill.on .spin { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Bölümler */
+    section { padding: 88px 0; border-top: 1px solid var(--line); }
+    h2 {
+      font: 700 clamp(32px, 4.6vw, 56px)/1.02 var(--display);
+      letter-spacing: -0.025em;
+      margin: 0 0 18px;
+      max-width: 18ch;
+    }
+    .intro { max-width: 60ch; color: var(--mist); margin: 0 0 44px; }
+
+    /* İşleyiş hattı */
+    .flow { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; counter-reset: s; }
+    .flow li { padding: 0 28px 0 0; counter-increment: s; position: relative; }
+    .flow li + li { padding-left: 28px; border-left: 1px solid var(--line); }
+    .flow li::before {
+      content: counter(s);
+      display: block; font: 800 64px/1 var(--display); color: var(--red); margin-bottom: 14px;
+    }
+    .flow h3 { font: 700 23px/1.2 var(--display); margin: 0 0 8px; }
+    .flow p { margin: 0 0 16px; color: var(--mist); }
+    .sample { font-size: 15px; padding: 12px 14px; border-radius: 10px; background: var(--white); border: 1px solid var(--line); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sample { background: #1c2034; } }
+    .sample q { quotes: none; }
+
+    /* Gizlilik */
+    .split { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: start; }
+    .stays, .goes { margin: 0; padding: 0; list-style: none; }
+    .stays li, .goes li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .stays li strong, .goes li strong { display: block; font-weight: 600; }
+    .stays li span, .goes li span { color: var(--mist); font-size: 15.5px; }
+    .col h3 { font: 700 21px/1.2 var(--display); margin: 0 0 6px; }
+    .goes { margin-top: 0; }
+
+    /* Modeller */
+    table { width: 100%; border-collapse: collapse; font-size: 16px; }
+    caption { text-align: left; font: 700 21px/1.2 var(--display); padding: 0 0 10px; }
+    th, td { text-align: left; padding: 13px 14px 13px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-weight: 600; color: var(--mist); font-size: 14px; }
+    td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tables { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+    .tag { display: inline-block; font-size: 12.5px; font-weight: 600; color: var(--red); margin-left: 6px; }
+
+    /* Kurulum */
+    .steps { counter-reset: k; list-style: none; margin: 0; padding: 0; max-width: 760px; }
+    .steps li { counter-increment: k; display: grid; grid-template-columns: 56px 1fr; gap: 6px 18px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+    .steps li::before {
+      content: counter(k);
+      grid-row: span 2;
+      width: 44px; height: 44px; border-radius: 50%;
+      display: grid; place-items: center;
+      background: var(--ink); color: var(--paper); font: 700 18px/1 var(--display);
+    }
+    .steps strong { font-weight: 600; font-size: 18px; }
+    .steps span { color: var(--mist); }
+    code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 0.9em; background: var(--white); border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px; color: var(--ink); }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) code { background: #1c2034; } }
+
+    .limits { max-width: 760px; margin: 40px 0 0; padding: 20px 22px; border-radius: 14px; border: 1.5px dashed var(--line); color: var(--mist); }
+    .limits strong { color: var(--ink); }
+    .limits ul { margin: 8px 0 0; padding-left: 20px; }
+
+    footer { padding: 48px 0 64px; border-top: 1px solid var(--line); color: var(--mist); font-size: 15px; }
+    footer p { margin: 0 0 8px; max-width: 70ch; }
+
+    @media (max-width: 860px) {
+      .flow { grid-template-columns: 1fr; gap: 36px; }
+      .flow li, .flow li + li { padding: 0; border: 0; }
+      .split, .tables { grid-template-columns: 1fr; gap: 36px; }
+      .bar nav a:not(.gh) { display: none; }
+      section { padding: 64px 0; }
+      .stage { aspect-ratio: 4 / 3.3; border-radius: 14px; }
+      .speaker { width: 44%; }
+      .caption { bottom: 22%; width: 92%; }
+      .time { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .stage.speaking .wave i, .pill .spin { animation: none; }
+      .caption p { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="wrap bar">
+    <a class="logo" href="#"><img src="icon.png" alt="">LocaDub</a>
+    <nav>
+      <a href="#nasil">Nasıl çalışır</a>
+      <a href="#gizlilik">Gizlilik</a>
+      <a href="#kurulum">Kurulum</a>
+      <a class="gh" href="https://github.com/mhmmd5225/LocaDub">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <h1>YouTube'u Türkçe dinleyin.</h1>
+      <p class="lede">LocaDub, İngilizce altyazılı videoları <strong>kendi bilgisayarınızda</strong> Türkçeye çevirir ve Türkçe seslendirir. Orijinal ses kısılır, Türkçe ses videoyla aynı anda konuşur. Metin ve ses hiçbir sunucuya gitmez.</p>
+      <div class="actions">
+        <a class="btn primary" href="#kurulum">Kurulumu göster</a>
+        <a class="btn ghost" href="https://github.com/mhmmd5225/LocaDub">Kaynak kodu GitHub'da</a>
+      </div>
+
+      <figure class="stage" id="stage" aria-label="Örnek: İngilizce altyazı Türkçeye çevrilip seslendiriliyor">
+        <div class="speaker" aria-hidden="true"></div>
+        <div class="caption" id="caption" aria-live="polite"><p class="en">if you like this video please subscribe and hit the bell icon</p></div>
+        <div class="controls" aria-hidden="true">
+          <div class="scrub"><span></span></div>
+          <span class="play"></span>
+          <span class="time">4:47 / 14:03</span>
+          <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="pill" id="pill"><b>TR</b><span class="spin"></span><span id="pillText">Hazırlanıyor</span></span>
+        </div>
+      </figure>
+    </div>
+
+    <section id="nasil">
+      <div class="wrap">
+        <h2>Altyazıdan sese, üç adımda</h2>
+        <p class="intro">Oynatıcıdaki TR düğmesine bastığınızda LocaDub videonun biraz ilerisini önceden hazırlar. Siz izlerken her cümle zamanında Türkçe konuşulur.</p>
+        <ol class="flow">
+          <li>
+            <h3>Altyazıyı alır</h3>
+            <p>Videonun İngilizce altyazısını (elle yazılmış ya da otomatik) okur ve cümlelere ayırır.</p>
+            <div class="sample"><q>so what i'm gonna do is open up the terminal and type this command</q></div>
+          </li>
+          <li>
+            <h3>Türkçeye çevirir</h3>
+            <p>Çeviri, Chrome'un cihaz üzerindeki çevirmeniyle ya da indirilen OPUS-MT modeliyle yapılır.</p>
+            <div class="sample"><q>Yani yapacağım şey terminali açmak ve bu komutu yazmak.</q></div>
+          </li>
+          <li>
+            <h3>Türkçe seslendirir</h3>
+            <p>Erkek ya da kadın sesle okunur. Sayılar, saatler ve kısaltmalar Türkçe okunuşuyla söylenir; uzun cümleler videoya yetişecek kadar hızlandırılır.</p>
+            <div class="sample">“%12,5” → <q>yüzde on iki buçuk</q></div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="gizlilik">
+      <div class="wrap split">
+        <div>
+          <h2>İzlediğiniz şey sizde kalır</h2>
+          <p class="intro">Çeviri ve seslendirme tarayıcının içinde, işlemcinizde çalışır. Bir hesap, API anahtarı ya da abonelik gerekmez.</p>
+        </div>
+        <div class="col">
+          <h3>Bilgisayarınızdan çıkmayanlar</h3>
+          <ul class="stays">
+            <li><strong>Altyazı metni ve çeviriler</strong><span>Hiçbir çeviri servisine gönderilmez.</span></li>
+            <li><strong>Üretilen Türkçe ses</strong><span>Bellekte oluşturulur, video kapanınca silinir.</span></li>
+            <li><strong>Hangi videoları izlediğiniz</strong><span>Eklenti hiçbir yere kayıt göndermez.</span></li>
+          </ul>
+          <h3 style="margin-top:28px">İnternetin gerektiği tek an</h3>
+          <ul class="goes">
+            <li><strong>Modellerin ilk indirilmesi</strong><span>HuggingFace'ten bir kez iner, tarayıcıda saklanır. İndirmeden önce boyut gösterilir ve onayınız istenir.</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="modeller">
+      <div class="wrap">
+        <h2>Hangi modeli kullanacağınızı siz seçersiniz</h2>
+        <p class="intro">Ayarlar sayfasından modelleri tek tek indirebilir, silebilir ve aralarında geçiş yapabilirsiniz.</p>
+        <div class="tables">
+          <table>
+            <caption>Çeviri</caption>
+            <thead><tr><th>Model</th><th>İndirme</th></tr></thead>
+            <tbody>
+              <tr><td>Chrome'un yerleşik çevirmeni<span class="tag">hazırsa varsayılan</span></td><td class="num">dil paketi</td></tr>
+              <tr><td>OPUS-MT tc-big İngilizce → Türkçe</td><td class="num">≈ 300 MB</td></tr>
+            </tbody>
+          </table>
+          <table>
+            <caption>Seslendirme</caption>
+            <thead><tr><th>Ses</th><th>İndirme</th></tr></thead>
+            <tbody>
+              <tr><td>Antalia Mini, erkek<span class="tag">varsayılan</span></td><td class="num">23 MB</td></tr>
+              <tr><td>Ahenk Cep, kadın</td><td class="num">17 MB</td></tr>
+              <tr><td>Windows'un Türkçe sistem sesi</td><td class="num">yok</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="kurulum">
+      <div class="wrap">
+        <h2>Beş dakikada kurulum</h2>
+        <p class="intro">LocaDub henüz Chrome Web Mağazası'nda değil. Geliştirici modunda şöyle yüklenir:</p>
+        <ol class="steps">
+          <li><strong>Kaynak kodu indirin</strong><span>GitHub sayfasında <code>Code</code> → <code>Download ZIP</code>, sonra klasöre çıkarın.</span></li>
+          <li><strong>Chrome'da eklentiler sayfasını açın</strong><span>Adres çubuğuna <code>chrome://extensions</code> yazın ve sağ üstten <em>Geliştirici modu</em>nu açın.</span></li>
+          <li><strong>Eklentiyi yükleyin</strong><span><em>Paketlenmemiş öğe yükle</em>'ye basın ve indirdiğiniz klasördeki <code>extension</code> klasörünü seçin.</span></li>
+          <li><strong>Modelleri indirin</strong><span>Eklenti simgesi → <em>Tüm ayarlar ve modeller</em> → <em>Seçili modelleri indir</em>.</span></li>
+          <li><strong>Bir videoda TR düğmesine basın</strong><span>İngilizce altyazılı herhangi bir YouTube videosunda oynatıcı çubuğundaki TR düğmesi dublajı başlatır.</span></li>
+        </ol>
+        <div class="limits">
+          <strong>Şimdilik desteklenmeyenler</strong>
+          <ul>
+            <li>İngilizce altyazısı olmayan videolar (konuşmadan yazıya çevirme yok).</li>
+            <li>Shorts, canlı yayınlar ve başka sitelere gömülü videolar.</li>
+            <li>Mobil Chrome ve diğer tarayıcılar; masaüstü Chrome 116 ve üstü gerekir.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>LocaDub, Türkçe çeviri ve seslendirme yaklaşımını <a href="https://github.com/ozcancelik/harfiyen">harfiyen</a> projesinden (MIT) uyarlar. Modeller: Helsinki-NLP OPUS-MT (CC BY 4.0), Antalia Mini (Apache-2.0), Ahenk Cep (CC BY 4.0, ozgurguler). Çalışma ortamı: onnxruntime-web (MIT).</p>
+    <p>Üretilen Türkçe ses yapay zekâ ile sentezlenir.</p>
+  </footer>
+
+  <script>
+    // Hero: altyazı İngilizceden Türkçeye döner, ses "konuşur", TR düğmesi aktifleşir.
+    const lines = [
+      ['if you like this video please subscribe and hit the bell icon', 'Bu videoyu beğendiyseniz lütfen abone olun ve çan simgesine basın.'],
+      ['we have about 30 minutes left so let me quickly show you the results', 'Yaklaşık 30 dakikamız kaldı, size sonuçları hızlıca göstereyim.'],
+      ["it's not about how fast you go it's about how consistent you are", 'Ne kadar hızlı gittiğinle ilgili değil, ne kadar tutarlı olduğunla ilgili.'],
+      ['do you know what happens when you mix these two chemicals', 'Bu iki kimyasalı karıştırdığınızda ne olur biliyor musunuz?'],
+    ];
+    const stage = document.getElementById('stage');
+    const cap = document.getElementById('caption');
+    const pill = document.getElementById('pill');
+    const pillText = document.getElementById('pillText');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    function setLine(text, cls) {
+      const p = document.createElement('p');
+      p.textContent = text;
+      if (cls) p.className = cls;
+      cap.replaceChildren(p);
+    }
+
+    if (reduce) {
+      setLine(lines[0][1]);
+      pill.classList.add('on');
+      pillText.textContent = 'Dublaj aktif';
+    } else {
+      (async () => {
+        await wait(1400);
+        pill.classList.add('on');
+        pillText.textContent = 'Dublaj aktif';
+        for (let i = 0; ; i = (i + 1) % lines.length) {
+          const [en, tr] = lines[i];
+          if (i) { setLine(en, 'en'); await wait(1500); }
+          cap.classList.add('swap');
+          await wait(350);
+          setLine(tr);
+          cap.classList.remove('swap');
+          stage.classList.add('speaking');
+          await wait(3600);
+          stage.classList.remove('speaking');
+          cap.classList.add('swap');
+          await wait(400);
+          cap.classList.remove('swap');
+        }
+      })();
+    }
+  </script>
+</body>
+</html>

@@ -31,6 +31,7 @@ Ayrıntılar: [extension/README.md](extension/README.md).
 | `extension/` | Eklentinin kendisi (derleme adımı yok, düz ES module JS) |
 | `tests/extension/` | Eklenti birim testleri: `node --test tests/extension/` |
 | `tests/mt/`, `tests/tts/` | Çeviri ve ses motoru testleri (`npm install && npm test`; uçtan uca testler modelleri indirir) |
+| `site/` | Tanıtım web sayfası (tek dosya, GitHub Pages ile yayınlanabilir) |
 | `tools/` | Model indirme, simge üretme ve sayfa önizleme araçları |
 | `docs/CONTRACT.md` | Bileşenler arası sözleşme (mesajlar, motor API'leri) |
 
