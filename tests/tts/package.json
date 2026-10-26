@@ -1,0 +1,14 @@
+{
+  "name": "yt-tr-dub-tts-tests",
+  "private": true,
+  "type": "module",
+  "description": "Node tests for extension/engines/tts (normalization unit tests + onnxruntime-node synthesis)",
+  "scripts": {
+    "test": "node --test unit/",
+    "models": "node ../../tools/tts/fetch-models.mjs",
+    "synth": "node synth.mjs"
+  },
+  "dependencies": {
+    "onnxruntime-node": "1.22.0"
+  }
+}

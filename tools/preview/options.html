@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ayarlar önizleme</title>
+  <link rel="stylesheet" href="../../extension/options/options.css">
+</head>
+<body>
+<script type="module">
+// Ayarlar sayfasını eklenti dışında görmek için chrome.* taklidi (yalnızca geliştirme).
+const store = {};
+const changeFns = [];
+const msgFns = [];
+const voices = [
+  { id: 'antalia-mini', label: 'Antalia Mini (erkek, hızlı)', gender: 'male', sizeMB: 23.4, license: 'Apache-2.0', available: true, cached: true, default: true, cachePrefix: 'x/antalia/' },
+  { id: 'ahenk-cep', label: 'Ahenk Cep (kadın)', gender: 'female', sizeMB: 17.4, license: 'CC-BY-4.0', available: true, cached: false, cachePrefix: 'x/ahenk/',
+    attribution: 'Ahenk Cep by ozgurguler (CC BY 4.0)' },
+  { id: 'system', label: 'Sistem sesi', system: true, available: true },
+];
+const backends = [
+  { id: 'chrome-translator', label: 'Chrome yerleşik çevirmen (cihaz üzerinde)', sizeMB: 0, available: true, status: 'available' },
+  { id: 'opus-mt', label: 'OPUS-MT tc-big EN→TR (yerel, çevrimdışı)', sizeMB: 300.2, available: true, downloaded: false, license: 'CC-BY-4.0', cachePrefix: 'x/opus/' },
+];
+globalThis.chrome = {
+  storage: {
+    local: {
+      async get() { return { ...store }; },
+      async set(p) {
+        const changes = {};
+        for (const [k, v] of Object.entries(p)) { changes[k] = { oldValue: store[k], newValue: v }; store[k] = v; }
+        changeFns.forEach((f) => f(changes, 'local'));
+      },
+    },
+    session: { async get() { return {}; } },
+    onChanged: { addListener: (f) => changeFns.push(f), removeListener() {} },
+  },
+  runtime: {
+    async sendMessage(m) {
+      if (m.type === 'engine.list') return { ok: true, result: { backends, voices, errors: {} } };
+      if (m.type === 'engine.status') return { ok: true, result: { mt: { ready: true, backend: 'chrome-translator' }, tts: { ready: true, voice: 'antalia-mini' }, crossOriginIsolated: true, webgpu: true, hardwareConcurrency: 16 } };
+      if (m.type === 'engine.init') {
+        for (let i = 1; i <= 10; i++) {
+          await new Promise((r) => setTimeout(r, 150));
+          msgFns.forEach((f) => f({ type: 'engine.progress', engine: m.engine, loaded: i * 1.74e6, total: 17.4e6 }));
+        }
+        if (m.engine === 'tts') voices[1].cached = true;
+        msgFns.forEach((f) => f({ type: 'engine.progress', engine: m.engine, done: true }));
+        return { ok: true, result: {} };
+      }
+      return { ok: true, result: {} };
+    },
+    onMessage: { addListener: (f) => msgFns.push(f) },
+    openOptionsPage() {},
+  },
+  tts: { async getVoices() { return [{ voiceName: 'Microsoft Tolga - Turkish (Turkey)', lang: 'tr-TR' }]; } },
+};
+const html = await (await fetch('../../extension/options/options.html')).text();
+const doc = new DOMParser().parseFromString(html, 'text/html');
+doc.querySelectorAll('script').forEach((s) => s.remove());
+document.body.append(...doc.body.childNodes);
+await import('../../extension/options/options.js');
+</script>
+</body>
+</html>

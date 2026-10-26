@@ -1,0 +1,84 @@
+# Üçüncü Taraf Bildirimleri
+
+Bu eklenti aşağıdaki üçüncü taraf yazılımları ve modelleri içerir veya kullanır.
+
+## Paketlenmiş yazılımlar
+
+### onnxruntime-web 1.22.0 — `lib/ort/`
+
+- Kaynak: https://github.com/microsoft/onnxruntime (npm: `onnxruntime-web@1.22.0`)
+- Lisans: MIT
+- Dosyalar: `ort.wasm.min.mjs`, `ort.webgpu.min.mjs`, `ort-wasm-simd-threaded.mjs`,
+  `ort-wasm-simd-threaded.wasm`, `ort-wasm-simd-threaded.jsep.mjs`, `ort-wasm-simd-threaded.jsep.wasm`
+
+```
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+onnxruntime-web, kendi bağımlılıklarının bildirimlerini
+https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresinde yayımlar.
+
+## Çeviri motoru (`engines/mt/`)
+
+### Kod — harfiyen (MIT)
+
+- Kaynak: https://github.com/ozcancelik/harfiyen — Copyright (c) Ozcan Celik, MIT Lisansı.
+- `spm.js`, `marian.js`, `worker.js` bu projeden uyarlanmıştır (atıflar dosya başlarında).
+  MIT lisans metni yukarıdaki onnxruntime-web bölümündekiyle aynıdır; telif satırı
+  "Copyright (c) Ozcan Celik" olarak geçerlidir.
+
+### Model — opus-mt-tc-big-en-tr (CC-BY 4.0)
+
+- Model: Helsinki-NLP/opus-mt-tc-big-en-tr — Tatoeba-Challenge / OPUS-MT, Helsinki Üniversitesi.
+  https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-tr
+- ONNX dönüşümü: https://huggingface.co/onnx-community/opus-mt-tc-big-en-tr
+  (commit `ce128ea834a090aca240e4e113e7756e06cc78e0`)
+- Lisans: Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/).
+  Model ağırlıkları eklentiye paketlenmez; ilk kullanımda HuggingFace'ten indirilir.
+  Eklenti, decoder'ın yinelenen fp32 embedding tablosunu kendi uint8 kopyasından yeniden kurar
+  (değişiklik bildirimi).
+- İsteğe bağlı: Chrome yerleşik Translator API (Google, cihaz üzerinde) — ayrı lisans gerektirmez.
+
+## Seslendirme motoru (`engines/tts/`)
+
+### Kod
+
+- **harfiyen** — https://github.com/ozcancelik/harfiyen — MIT, Copyright (c) 2026 Özcan Çelik
+  (commit `981902ceaef804fdb7a4edb782078c766e3b53c2`). `trnorm/*.js` (src/tts/trnorm),
+  `ahenk.js` (src/tts/ahenk.ts + ema.ts portu), `dsp.js` trimSilence, `antalia.js` yapısı.
+- **trnorm / Ahenk demo** — https://github.com/ozguradmin/ahenk-turkish-tts — Apache-2.0.
+- **Antalia-2 Mini web demo** — https://huggingface.co/spaces/cloud0day3/antalia-mini
+  (`js/tts.js`, `js/frontend.js` @ `2c24b406`) — Apache-2.0, Copyright 2026 PatientDesk AI.
+  `frontend-data.json.gz`, CMU Pronouncing Dictionary verisini içerir (BSD-2-Clause).
+
+### Ses modelleri (eklentiye paketlenmez, ilk kullanımda HuggingFace'ten indirilir)
+
+- **Antalia-2 Mini** (varsayılan, erkek) — https://huggingface.co/cloud0day3/antalia-mini — Apache-2.0.
+- **Ahenk Cep** (kadın) — https://huggingface.co/ozgurguler/ahenk-cep-tr — CC BY 4.0, ozgurguler;
+  EMA Lightning (Apache-2.0) türevi, Alania verileri (CC BY 4.0, PatientDesk AI).
+  Atıf: "Ses: Ahenk Cep (ozgurguler), CC BY 4.0". Üretilen ses yapaydır (yapay zekâ ile sentezlenmiştir).
+
+## Referans proje
+
+- harfiyen — https://github.com/ozcancelik/harfiyen (MIT). Kod alındıysa ilgili motor
+  bölümünde telif satırıyla birlikte belirtilir.

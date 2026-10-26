@@ -1,0 +1,124 @@
+/* YT TR Dub — overlay ve TR düğmesi */
+.yt-tr-dub-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  --yt-tr-dub-fs: 20px;
+}
+.yt-tr-dub-sub {
+  position: absolute;
+  left: 50%;
+  bottom: 14%;
+  transform: translateX(-50%);
+  max-width: 84%;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ytp-autohide .yt-tr-dub-sub { bottom: 7%; }
+.yt-tr-dub-sub.visible { opacity: 1; }
+.yt-tr-dub-sub span {
+  display: inline;
+  padding: 0.1em 0.4em;
+  font: 500 var(--yt-tr-dub-fs)/1.35 "YouTube Noto", Roboto, Arial, sans-serif;
+  color: #fff;
+  background: rgba(8, 8, 8, 0.75);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  border-radius: 3px;
+}
+.yt-tr-dub-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  max-width: 60%;
+  padding: 6px 10px;
+  font: 13px/1.35 Roboto, Arial, sans-serif;
+  color: #fff;
+  background: rgba(20, 20, 20, 0.82);
+  border-left: 3px solid #3ea6ff;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.yt-tr-dub-status.visible { opacity: 1; }
+.yt-tr-dub-status[data-kind="warn"] { border-left-color: #f2b01e; }
+.yt-tr-dub-status[data-kind="error"] { border-left-color: #ff4e45; }
+.yt-tr-dub-bar {
+  display: none;
+  margin-top: 6px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.yt-tr-dub-bar.visible { display: block; }
+.yt-tr-dub-bar > div {
+  height: 100%;
+  width: 0;
+  background: #3ea6ff;
+  transition: width 0.25s linear;
+}
+
+/* Oynatıcı düğmesi: "TR + durum" hapı. YouTube'un .ytp-button kurallarını (yeni "delhi" arayüzü dahil) ezer. */
+#movie_player .ytp-button.yt-tr-dub-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: 48px;
+  height: 100% !important;
+  padding: 0 6px !important;
+  vertical-align: top;
+  float: none;
+  opacity: 1;
+}
+.yt-tr-dub-btn .yt-tr-dub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px 0 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: 500 12px/1 Roboto, Arial, sans-serif;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.yt-tr-dub-btn:hover .yt-tr-dub-pill { background: rgba(255, 255, 255, 0.22); }
+.yt-tr-dub-btn .yt-tr-dub-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  border: 1.5px solid currentColor;
+  box-sizing: border-box;
+}
+.yt-tr-dub-btn .yt-tr-dub-spin {
+  display: none;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: yt-tr-dub-spin 0.8s linear infinite;
+}
+@keyframes yt-tr-dub-spin { to { transform: rotate(360deg); } }
+
+.yt-tr-dub-btn[data-state="off"] .yt-tr-dub-pill { color: rgba(255, 255, 255, 0.75); }
+.yt-tr-dub-btn[data-state="preparing"] .yt-tr-dub-spin { display: inline-block; }
+.yt-tr-dub-btn[data-state="preparing"] .yt-tr-dub-badge { border-color: #3ea6ff; color: #3ea6ff; }
+.yt-tr-dub-btn[data-state="active"] .yt-tr-dub-pill { background: rgba(46, 204, 113, 0.22); }
+.yt-tr-dub-btn[data-state="active"] .yt-tr-dub-badge { background: #2ecc71; border-color: #2ecc71; color: #062b14; }
+.yt-tr-dub-btn[data-state="warn"] .yt-tr-dub-badge { border-color: #f2b01e; color: #f2b01e; }
+.yt-tr-dub-btn[data-state="error"] .yt-tr-dub-badge { border-color: #ff4e45; color: #ff4e45; }
+
+/* Dar oynatıcıda yalnızca rozet (ve dönen gösterge) kalsın. */
+.ytp-small-mode .yt-tr-dub-btn .yt-tr-dub-label { display: none; }

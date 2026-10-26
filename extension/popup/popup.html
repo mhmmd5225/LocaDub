@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YT TR Dub</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><img src="../icons/icon-32.png" alt="" width="20" height="20"> Türkçe Dublaj</div>
+    <label class="switch" title="Dublajı aç/kapa">
+      <input type="checkbox" id="enabled">
+      <span class="slider" aria-hidden="true"></span>
+      <span class="sr">Dublaj açık</span>
+    </label>
+  </header>
+
+  <section class="state" id="state" data-kind="info">
+    <div class="state-title" id="stateTitle">Durum okunuyor…</div>
+    <div class="state-detail" id="stateDetail"></div>
+    <div class="pbar" id="stateBar" hidden><div></div></div>
+    <button type="button" id="stateAction" hidden></button>
+  </section>
+
+  <section>
+    <label class="row select">
+      <span>Seslendirme</span>
+      <select id="voice"></select>
+    </label>
+    <label class="row range">
+      <span>Dublaj ses seviyesi <output id="ttsVolumeOut"></output></span>
+      <input type="range" id="ttsVolume" min="0" max="2" step="0.05">
+    </label>
+    <label class="row range">
+      <span>Orijinal ses (konuşurken) <output id="originalVolumeOut"></output></span>
+      <input type="range" id="originalVolume" min="0" max="1" step="0.05">
+    </label>
+  </section>
+
+  <section>
+    <button type="button" id="openOptions" class="secondary wide">Tüm ayarlar ve modeller</button>
+  </section>
+
+  <footer>Çeviri ve seslendirme bu bilgisayarda yapılır.</footer>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

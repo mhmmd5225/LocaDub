@@ -1,0 +1,186 @@
+{
+  "threads": 1,
+  "steps": null,
+  "report": [
+    {
+      "voice": "antalia-mini",
+      "i": 1,
+      "speed": 1,
+      "seconds": 4.453375,
+      "compute": 0.4846233999999999,
+      "rtf": 0.10882160159429644,
+      "path": "antalia-mini_01.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 2,
+      "speed": 1,
+      "seconds": 4.6523125,
+      "compute": 0.4114036000000001,
+      "rtf": 0.08842991523032903,
+      "path": "antalia-mini_02.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 3,
+      "speed": 1,
+      "seconds": 4.248895833333333,
+      "compute": 0.3696061,
+      "rtf": 0.08698874119256474,
+      "path": "antalia-mini_03.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 4,
+      "speed": 1,
+      "seconds": 5.8123125,
+      "compute": 0.5214036999999998,
+      "rtf": 0.0897067561319182,
+      "path": "antalia-mini_04.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 5,
+      "speed": 1,
+      "seconds": 5.2374583333333335,
+      "compute": 0.5610081,
+      "rtf": 0.10711457052164297,
+      "path": "antalia-mini_05.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 6,
+      "speed": 1,
+      "seconds": 8.153458333333333,
+      "compute": 0.9794159,
+      "rtf": 0.12012275772550503,
+      "path": "antalia-mini_06.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 7,
+      "speed": 1,
+      "seconds": 6.8580625,
+      "compute": 0.721232,
+      "rtf": 0.1051655624310802,
+      "path": "antalia-mini_07.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 2,
+      "speed": 1,
+      "seconds": 4.6523125,
+      "compute": 0.49616380000000027,
+      "rtf": 0.10664885473621995,
+      "path": "antalia-mini_speed_1.0.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 2,
+      "speed": 1.4,
+      "seconds": 3.3508333333333336,
+      "compute": 0.33053960000000004,
+      "rtf": 0.09864399900522258,
+      "path": "antalia-mini_speed_1.4.wav"
+    },
+    {
+      "voice": "antalia-mini",
+      "i": 2,
+      "speed": 2,
+      "seconds": 2.3375,
+      "compute": 0.4042925999999998,
+      "rtf": 0.17295940106951863,
+      "path": "antalia-mini_speed_2.0.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 1,
+      "speed": 1,
+      "seconds": 4.32,
+      "compute": 0.6041979000000001,
+      "rtf": 0.13986062500000002,
+      "path": "ahenk-cep_01.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 2,
+      "speed": 1,
+      "seconds": 4.56,
+      "compute": 0.5780195999999996,
+      "rtf": 0.12675868421052625,
+      "path": "ahenk-cep_02.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 3,
+      "speed": 1,
+      "seconds": 4.48,
+      "compute": 0.6714159000000008,
+      "rtf": 0.14986962053571445,
+      "path": "ahenk-cep_03.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 4,
+      "speed": 1,
+      "seconds": 5.76,
+      "compute": 0.8180828999999994,
+      "rtf": 0.1420282812499999,
+      "path": "ahenk-cep_04.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 5,
+      "speed": 1,
+      "seconds": 5.35775,
+      "compute": 0.8608325999999997,
+      "rtf": 0.16067054267183048,
+      "path": "ahenk-cep_05.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 6,
+      "speed": 1,
+      "seconds": 7.832375,
+      "compute": 1.065002699999999,
+      "rtf": 0.13597442665858045,
+      "path": "ahenk-cep_06.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 7,
+      "speed": 1,
+      "seconds": 6.24,
+      "compute": 0.8795488999999997,
+      "rtf": 0.1409533493589743,
+      "path": "ahenk-cep_07.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 2,
+      "speed": 1,
+      "seconds": 4.56,
+      "compute": 0.6819690000000009,
+      "rtf": 0.1495546052631581,
+      "path": "ahenk-cep_speed_1.0.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 2,
+      "speed": 1.4,
+      "seconds": 3.16,
+      "compute": 0.39341289999999934,
+      "rtf": 0.12449775316455675,
+      "path": "ahenk-cep_speed_1.4.wav"
+    },
+    {
+      "voice": "ahenk-cep",
+      "i": 2,
+      "speed": 2,
+      "seconds": 2.3125,
+      "compute": 0.37322669999999925,
+      "rtf": 0.1613953297297294,
+      "path": "ahenk-cep_speed_2.0.wav"
+    }
+  ]
+}

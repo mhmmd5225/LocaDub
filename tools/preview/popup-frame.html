@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <base href="../../extension/popup/">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<script type="module">
+// Açılır pencereyi eklenti dışında görmek için chrome.* taklidi (yalnızca geliştirme).
+const s = new URLSearchParams(location.search).get('s');
+const store = { enabled: s !== 'nomodels', modelsApproved: s !== 'nomodels' };
+const msgFns = [];
+globalThis.chrome = {
+  storage: {
+    local: { async get() { return { ...store }; }, async set(p) { Object.assign(store, p); } },
+    session: { async get() { return {}; } },
+    onChanged: { addListener() {}, removeListener() {} },
+  },
+  runtime: {
+    async sendMessage(m) {
+      if (m.type === 'engine.status') return { ok: true, result: { mt: {}, tts: {} } };
+      if (m.type === 'engine.list') return { ok: true, result: {
+        backends: [{ id: 'chrome-translator', label: 'Chrome yerleşik çevirmen (cihaz üzerinde)', available: true }],
+        voices: [
+          { id: 'antalia-mini', label: 'Antalia Mini (erkek, hızlı)', gender: 'male', default: true, cached: true, sizeMB: 23.4 },
+          { id: 'ahenk-cep', label: 'Ahenk Cep (kadın)', gender: 'female', cached: s === 'ok', sizeMB: 17.4 },
+          { id: 'system', label: 'Sistem sesi', system: true },
+        ] } };
+      return { ok: true, result: {} };
+    },
+    onMessage: { addListener: (f) => msgFns.push(f) },
+    openOptionsPage() {}, getURL: (p) => p,
+  },
+  tabs: { create() {} },
+  tts: { async getVoices() { return [{ voiceName: 'Microsoft Tolga - Turkish (Turkey)', lang: 'tr-TR' }]; } },
+};
+const html = await (await fetch('popup.html')).text();
+const doc = new DOMParser().parseFromString(html, 'text/html');
+doc.querySelectorAll('script').forEach((x) => x.remove());
+document.body.append(...doc.body.childNodes);
+await import('./popup.js');
+if (s === 'dl') setTimeout(() => msgFns.forEach((f) => f({ type: 'engine.progress', engine: 'mt', loaded: 120e6, total: 300e6 })), 300);
+</script>
+</body>
+</html>

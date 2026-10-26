@@ -1,0 +1,13 @@
+{
+  "name": "yt-tr-dub-mt-tests",
+  "private": true,
+  "type": "module",
+  "description": "Node tests for extension/engines/mt (same tokenizer + decode code, onnxruntime-node).",
+  "scripts": {
+    "test": "node --test tokenizer.test.mjs preprocess.test.mjs index.test.mjs",
+    "translate": "node translate.node.mjs"
+  },
+  "devDependencies": {
+    "onnxruntime-node": "1.22.0"
+  }
+}

@@ -1,0 +1,17 @@
+# Bağımlılıklar ve indirilen test modelleri (yeniden üretilebilir)
+node_modules/
+.models/
+.vendor-tmp/
+
+# Test çıktıları
+tests/tts/out/*.wav
+
+# Paketlenmiş arşivler
+*.rar
+*.zip
+*.crx
+*.pem
+
+# Sistem
+.DS_Store
+Thumbs.db

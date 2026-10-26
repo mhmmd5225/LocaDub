@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YT TR Dub — Ayarlar</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <div class="brand"><img src="../icons/icon-48.png" alt="" width="28" height="28"> YouTube Türkçe Dublaj <span class="muted">· Ayarlar</span></div>
+      <label class="switch-row">
+        <span id="enabledLabel">Dublaj kapalı</span>
+        <span class="switch">
+          <input type="checkbox" id="enabled">
+          <span class="slider" aria-hidden="true"></span>
+        </span>
+      </label>
+    </div>
+    <nav class="wrap tabs" aria-label="Bölümler">
+      <a href="#genel">Genel</a>
+      <a href="#ses">Ses</a>
+      <a href="#modeller">Modeller</a>
+      <a href="#depolama">Depolama</a>
+      <a href="#durum">Durum</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <section id="genel" class="card">
+      <h2>Genel</h2>
+      <label class="row check">
+        <input type="checkbox" id="showSubtitles">
+        <span><b>Türkçe altyazıyı göster</b><small>Seslendirmeyle birlikte çeviri metni videonun altında görünür.</small></span>
+      </label>
+      <label class="row range">
+        <span><b>Önceden hazırlama süresi</b> <output id="lookaheadSecOut"></output></span>
+        <input type="range" id="lookaheadSec" min="10" max="120" step="5">
+        <small>Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği. Uzun süre, ileri sarınca daha az bekleme ama daha fazla işlemci kullanımı demek.</small>
+      </label>
+      <label class="row check">
+        <input type="checkbox" id="mock">
+        <span><b>Test motoru</b><small>Model indirmeden denemek için sahte çeviri ve bip sesi kullanır.</small></span>
+      </label>
+      <div class="buttons">
+        <button type="button" id="resetSettings" class="secondary">Ayarları varsayılana döndür</button>
+      </div>
+    </section>
+
+    <section id="ses" class="card">
+      <h2>Ses</h2>
+      <label class="row range">
+        <span><b>Konuşma hızı</b> <output id="ttsSpeedOut"></output></span>
+        <input type="range" id="ttsSpeed" min="0.8" max="2" step="0.05">
+        <small>Uzun cümleler videoya yetişmek için bu hızın üstüne otomatik hızlandırılır.</small>
+      </label>
+      <label class="row range">
+        <span><b>Dublaj ses seviyesi</b> <output id="ttsVolumeOut"></output></span>
+        <input type="range" id="ttsVolume" min="0" max="2" step="0.05">
+        <small>YouTube'un ses düğmesiyle birlikte ölçeklenir.</small>
+      </label>
+      <label class="row range">
+        <span><b>Orijinal ses (dublaj konuşurken)</b> <output id="originalVolumeOut"></output></span>
+        <input type="range" id="originalVolume" min="0" max="1" step="0.05">
+      </label>
+    </section>
+
+    <section id="modeller" class="card">
+      <h2>Modeller</h2>
+      <p class="lead">Çeviri ve seslendirme bu bilgisayarda yapılır. Modeller bir kez indirilir, tarayıcıda saklanır ve sonra internetsiz çalışır. Dublajın kullanacağı modeli <b>Kullan</b> ile seçin.</p>
+      <div class="note err" id="listError" hidden></div>
+      <div class="buttons" id="prepareBox" hidden>
+        <button type="button" id="prepareSelected">Seçili modelleri indir</button>
+        <span class="note" id="prepareNote"></span>
+      </div>
+
+      <h3>Çeviri</h3>
+      <div class="models" id="mtModels"></div>
+
+      <h3>Seslendirme</h3>
+      <div class="models" id="ttsModels"></div>
+    </section>
+
+    <section id="depolama" class="card">
+      <h2>Depolama</h2>
+      <div class="storage">
+        <div><span class="big" id="cacheTotal">—</span><small>indirilen modeller</small></div>
+        <div><span class="big" id="usageTotal">—</span><small>eklentinin toplam depolaması</small></div>
+        <div><span class="big" id="cacheFiles">—</span><small>dosya</small></div>
+      </div>
+      <div class="buttons">
+        <button type="button" id="clearAll" class="danger">Tüm modelleri sil</button>
+      </div>
+      <div class="note" id="storageNote"></div>
+    </section>
+
+    <section id="durum" class="card">
+      <h2>Durum</h2>
+      <div class="status" id="status">Durum okunuyor…</div>
+      <div class="buttons">
+        <button type="button" id="refreshStatus" class="secondary">Yenile</button>
+      </div>
+    </section>
+
+    <footer>
+      Metin ve ses hiçbir sunucuya gönderilmez. Kullanılan modellerin lisansları ve atıflar:
+      <a href="../THIRD_PARTY_NOTICES.md" target="_blank">üçüncü taraf bildirimleri</a>.
+    </footer>
+  </main>
+
+  <dialog id="confirm">
+    <form method="dialog">
+      <p id="confirmText"></p>
+      <div class="buttons end">
+        <button value="no" class="secondary">Vazgeç</button>
+        <button value="yes" id="confirmYes">Tamam</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

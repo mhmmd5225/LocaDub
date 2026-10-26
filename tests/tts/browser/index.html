@@ -1,0 +1,66 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TTS engine browser test</title>
+<style>body{font:14px system-ui;margin:16px}textarea{width:100%;height:4em}pre{white-space:pre-wrap}</style>
+<h1>engines/tts — browser test (onnxruntime-web WASM)</h1>
+<p>Query: <code>?voice=antalia-mini|ahenk-cep&amp;threads=1&amp;device=wasm|webgpu&amp;auto=1</code></p>
+<textarea id="t">Toplantı saat 14:30'da başlayacak ve yaklaşık 45 dakika sürecek.</textarea>
+<button id="go">Seslendir</button> <button id="bench">Benchmark</button>
+<pre id="log"></pre>
+<script type="module">
+import * as tts from '../../../extension/engines/tts/index.js';
+const q = new URLSearchParams(location.search);
+const voice = q.get('voice') || 'antalia-mini';
+const log = (s) => { document.getElementById('log').textContent += s + '\n'; console.log(s); };
+const SENT = [
+  'Merhaba arkadaşlar, bugün yapay zekânın geleceği hakkında konuşacağız.',
+  "Toplantı saat 14:30'da başlayacak ve yaklaşık 45 dakika sürecek.",
+  "Şirketin geliri %12,5 artarak 3,5 milyar TL'ye ulaştı.",
+  'Dr. Ahmet Yılmaz, 3. bölümde NASA ve AI konularını vb. örneklerle anlattı.',
+  "Elon Musk, SpaceX'in 2026 yılında Mars'a 1.000 kişi göndereceğini söyledi.",
+];
+let ready;
+async function setup() {
+  if (ready) return ready;
+  log('voices: ' + JSON.stringify(await tts.listVoices()));
+  const t0 = performance.now();
+  ready = tts.init({ voice, threads: Number(q.get('threads')) || 0, device: q.get('device') || 'wasm', steps: Number(q.get('steps')) || 0,
+    onProgress: (p) => p.loaded === p.total && log(`  got ${p.url.split('/').pop()} ${(p.total / 1e6).toFixed(2)} MB${p.cached ? ' (cache)' : ''}`) });
+  const info = await ready;
+  log(`init ${((performance.now() - t0) / 1000).toFixed(2)} s: ${JSON.stringify(info)}`);
+  return ready;
+}
+async function play(pcm, rate) {
+  const ctx = new AudioContext();
+  const b = ctx.createBuffer(1, pcm.length, rate); b.copyToChannel(pcm, 0);
+  const s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start();
+}
+document.getElementById('go').onclick = async () => {
+  await setup();
+  const r = await tts.synthesize(document.getElementById('t').value, { voice, speed: 1 });
+  log(`${r.stats.seconds.toFixed(2)} s audio, RTF ${r.stats.rtf.toFixed(3)} — ${r.stats.normalized}`);
+  play(r.pcm, r.sampleRate);
+};
+async function bench() {
+  await setup();
+  let A = 0, C = 0;
+  for (const s of SENT) {
+    const t0 = performance.now();
+    const r = await tts.synthesize(s, { voice, speed: 1 });
+    const wall = (performance.now() - t0) / 1000, sec = r.pcm.length / r.sampleRate;
+    A += sec; C += wall;
+    log(`${sec.toFixed(2)} s audio, ${wall.toFixed(2)} s wall, RTF ${(wall / sec).toFixed(3)} @${r.sampleRate}`);
+  }
+  // abort check
+  const ac = new AbortController();
+  const p = tts.synthesize(SENT.join(' '), { voice, signal: ac.signal });
+  setTimeout(() => ac.abort(), 50);
+  const aborted = await p.then(() => 'not aborted', (e) => e.name);
+  const sys = await tts.synthesize('x', { voice: 'system' });
+  const fast = await tts.synthesize(SENT[1], { voice, speed: 2 });
+  log(`TOTAL RTF ${(C / A).toFixed(3)} (${A.toFixed(2)} s audio) | abort: ${aborted} | system: ${JSON.stringify(sys)} | speed2: ${(fast.pcm.length / fast.sampleRate).toFixed(2)} s`);
+  window.__result = { rtf: C / A, audio: A, aborted, sys };
+}
+document.getElementById('bench').onclick = bench;
+if (q.get('auto')) bench().catch((e) => { log('ERROR ' + e.stack); window.__result = { error: String(e) }; });
+</script>
