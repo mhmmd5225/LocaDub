@@ -15,3 +15,8 @@ tests/tts/out/*.wav
 # Sistem
 .DS_Store
 Thumbs.db
+
+# Yayın iş akışının ürettikleri
+site/LocaDub.zip
+site/version.json
+build/
