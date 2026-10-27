@@ -15,18 +15,23 @@ Derleme adımı yoktur: düz ES module JavaScript.
 ## Kullanım
 
 1. Eklenti simgesine tıklayın. Modeller indirilmemişse **Modelleri indir** düğmesi ayarlar sayfasını açar.
-2. Ayarlar sayfasında (**Tüm ayarlar ve modeller**) **Seçili modelleri indir**'e ya da tek tek modellerin
+2. Ayarlar sayfasında **İndirme** menüsünde **Seçili modelleri indir**'e ya da tek tek modellerin
    **İndir** düğmesine basın. Boyut önceden gösterilir; indirme onayınızla başlar. Chrome yerleşik
-   çevirmeni için **Dil paketini hazırla** düğmesine basın (EN→TR paketi kullanıcı tıklamasıyla iner).
+   çevirmeni için **AI Model** menüsündeki **Dil paketini hazırla** düğmesine basın (EN→TR paketi kullanıcı tıklamasıyla iner).
 3. Bir YouTube videosu açın ve oynatıcı çubuğundaki **TR** düğmesine (ya da açılır penceredeki anahtara)
    basın. Düğme durumu gösterir: Dublaj kapalı / Hazırlanıyor / Dublaj aktif / Dikkat / Hata.
 
 **Açılır pencere:** aç/kapa, durum kartı, seslendirme seçimi, dublaj ve orijinal ses seviyesi.
 
-**Ayarlar sayfası** (`options/`): Genel (Türkçe altyazı, önceden hazırlama süresi, sürüm denetimi, test motoru),
-Ses (konuşma hızı, dublaj ses seviyesi, orijinal ses, konuşmacılara farklı ses), Sözlük, Modeller (her model için
-İndir / Sil / Kullan, ilerleme), Depolama, Durum (motor durumu, **Tanılama bilgisini kopyala**: sürümler, ayarlar,
-motorlar, indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`).
+**Ayarlar sayfası** (`options/`): kaydırmasız, dört menü (`#indirme`, `#seslendirme`, `#ai-model`, `#diger`; eski
+`#modeller`, `#ses`, `#genel`, `#sozluk`, `#depolama`, `#durum` bağlantıları eşlenir; sol/sağ ok tuşlarıyla gezilir).
+**İndirme**: OPUS-MT, Antalia, Ahenk ve noktalama modeli için İndir / Sil, toplu indirme, model ve çeviri önbelleğini
+temizleme. **Seslendirme**: ses seçimi, konuşma hızı, dublaj ve orijinal ses seviyesi, konuşmacılara farklı ses.
+**AI Model**: çeviri motoru (Otomatik / OPUS-MT / Chrome çevirmeni), noktalama düzeltme. **Diğer**: Türkçe altyazı,
+sürüm denetimi, önceden hazırlama süresi, sözlük, **Tanılama bilgisini kopyala** (sürümler, ayarlar, motorlar,
+indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), varsayılana
+döndürme. Motor/model hatası olursa menü çubuğunun altında bir şerit görünür. Test motoru yalnızca `options.html#gelistirici`
+ya da `?dev=1` ile (veya motor zaten test modundaysa) "Diğer" menüsünde görünür.
 
 Ayarlar (`chrome.storage.local`):
 
@@ -42,7 +47,7 @@ Ayarlar (`chrome.storage.local`):
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
 | Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
-| Otomatik altyazıda noktalama | İsteğe bağlı model (Ayarlar → Modeller, 210 MB, HuggingFace): YouTube'un otomatik (küçük harfli, noktasız) altyazısına çeviriden önce noktalama ve büyük harf ekler; kıyasta chrF 51.1 → 53.1 (`engines/mt/punct.js`, `restore-engine.js`; `docs/MT-KIYAS.md`). Elle yazılmış altyazıya dokunmaz; indirme bitince kendiliğinden açılır |
+| Otomatik altyazıda noktalama | İsteğe bağlı model (Ayarlar → İndirme, 210 MB, HuggingFace): YouTube'un otomatik (küçük harfli, noktasız) altyazısına çeviriden önce noktalama ve büyük harf ekler; kıyasta chrF 51.1 → 53.1 (`engines/mt/punct.js`, `restore-engine.js`; `docs/MT-KIYAS.md`). Elle yazılmış altyazıya dokunmaz; indirme bitince kendiliğinden açılır |
 | Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, indirme yok |
 
 ## Mimari

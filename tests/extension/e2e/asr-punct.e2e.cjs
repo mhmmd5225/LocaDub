@@ -61,7 +61,7 @@ async function watch(ctx, id) {
     assert.equal(await watch(ctx, 'asrbefore01'), `[TR] ${TEXT}`);
 
     // 2) Ayarlar sayfasındaki karttan indir: ayar kendiliğinden açılır
-    await opt.goto(`chrome-extension://${id}/options/options.html#modeller`);
+    await opt.goto(`chrome-extension://${id}/options/options.html#indirme`);
     await opt.evaluate(() => chrome.storage.local.set({ fixAsrPunct: false }));
     await opt.waitForSelector('#punctModels .model');
     assert.match(await opt.textContent('#punctModels .model .name'), /İndirilmedi/);

@@ -47,7 +47,7 @@ or audio leaves the browser.
 **Destek:** https://github.com/mhmmd5225/LocaDub/issues
 
 **Görseller (hazırlanacak):** 128×128 simge (`extension/icons/icon-128.png`), en az bir 1280×800 ekran görüntüsü
-(oynatıcıda TR düğmesi + Türkçe altyazı; açılır pencere; ayarlar → modeller), isteğe bağlı 440×280 tanıtım görseli.
+(oynatıcıda TR düğmesi + Türkçe altyazı; açılır pencere; ayarlar → indirme), isteğe bağlı 440×280 tanıtım görseli.
 
 ## Gizlilik sekmesi
 

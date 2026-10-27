@@ -19,7 +19,7 @@ projesinden uyarlanmıştır.
 1. Bu depoyu indirin.
 2. Chrome'da `chrome://extensions` → **Geliştirici modu** → **Paketlenmemiş öğe yükle** → `extension/`
    klasörünü seçin.
-3. Eklenti simgesi → **Tüm ayarlar ve modeller** → **Seçili modelleri indir**.
+3. Eklenti simgesi → ayarlar → **İndirme** menüsü → **Seçili modelleri indir**.
 4. İngilizce altyazılı bir YouTube videosunda oynatıcıdaki **TR** düğmesine basın.
 
 Ayrıntılar: [extension/README.md](extension/README.md).
