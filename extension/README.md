@@ -40,6 +40,7 @@ Ayarlar (`chrome.storage.local`):
 | Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde iki ses sırayla konuşur (`speakerVoices`, `voice2`; varsayılan ikinci ses birincinin karşıt cinsiyetlisi) |
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
+| Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
 | Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, indirme yok |
 
 ## Mimari
@@ -95,7 +96,11 @@ Uçtan uca (gerçek Chromium + eklenti, sahte YouTube sayfası, test motoru; Pla
 xvfb-run -a node tests/extension/e2e/transcript-cache.e2e.cjs
 xvfb-run -a node tests/extension/e2e/speaker-voices.e2e.cjs
 xvfb-run -a node tests/extension/e2e/glossary.e2e.cjs
+xvfb-run -a node tests/extension/e2e/update-banner.e2e.cjs
 ```
+
+**Sürüm yayınlama:** `manifest.json` → `version` artırılıp `main`'e birleştirilince site yeni ZIP'i ve
+`version.json`'ı yayınlar; kurulu eklentiler 12 saat içinde şeridi gösterir.
 
 ## Bilinen sınırlamalar
 

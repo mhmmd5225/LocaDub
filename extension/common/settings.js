@@ -16,6 +16,7 @@ export const DEFAULTS = Object.freeze({
   ttsSpeed: 1.0,           // temel TTS hızı (0.8..2.0)
   showSubtitles: true,     // Türkçe altyazı overlay'i
   lookaheadSec: 30,        // ileri-bakış penceresi
+  checkUpdates: true,      // günde iki kez sitedeki version.json'a bak (common/version.js)
 });
 
 export const LIMITS = Object.freeze({
@@ -37,6 +38,7 @@ export function normalizeSettings(raw = {}) {
   s.showSubtitles = !!s.showSubtitles;
   s.modelsApproved = !!s.modelsApproved;
   s.speakerVoices = !!s.speakerVoices;
+  s.checkUpdates = !!s.checkUpdates;
   s.glossaryMt = String(s.glossaryMt ?? '').slice(0, 20000);
   s.glossaryTts = String(s.glossaryTts ?? '').slice(0, 20000);
   s.engineMode = s.engineMode === 'mock' ? 'mock' : 'real';

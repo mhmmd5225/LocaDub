@@ -94,6 +94,7 @@ function renderBasics() {
   $('enabled').checked = settings.enabled;
   $('enabledLabel').textContent = settings.enabled ? 'Dublaj açık' : 'Dublaj kapalı';
   $('showSubtitles').checked = settings.showSubtitles;
+  $('checkUpdates').checked = settings.checkUpdates;
   $('mock').checked = settings.engineMode === 'mock';
   for (const [id, fmt] of Object.entries(RANGES)) {
     if (document.activeElement !== $(id)) $(id).value = settings[id];
@@ -103,6 +104,7 @@ function renderBasics() {
 
 $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
+$('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
 $('mock').addEventListener('change', async (e) => {
   await setSettings({ engineMode: e.target.checked ? 'mock' : 'real', mtBackend: null, voice: null });
   await refreshModels();
