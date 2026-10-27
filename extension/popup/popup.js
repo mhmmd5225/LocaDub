@@ -1,6 +1,7 @@
 // Açılır pencere: dublajı aç/kapa, kısa durum, hızlı ses ayarları. Ayrıntılar ve modeller ayarlar sayfasında.
 
 import { getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
+import { DOWNLOAD_URL, INSTALL_URL, updateFrom } from '../common/version.js';
 
 const $ = (id) => document.getElementById(id);
 let settings = await getSettings();
@@ -19,6 +20,34 @@ function openOptions(hash = '') {
   if (!hash) { chrome.runtime.openOptionsPage(); return; }
   chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html' + hash) });
 }
+
+// ---------- Güncelleme ----------
+// Arka plan sitedeki sürümü chrome.storage.local → update'e yazar; burada kurulu sürümle karşılaştırılır.
+
+const STALE_MS = 12 * 3600 * 1000;
+
+async function renderUpdate() {
+  const { update, updateDismissed } = await chrome.storage.local.get(['update', 'updateDismissed']);
+  const u = settings.checkUpdates ? updateFrom(update?.latest, chrome.runtime.getManifest().version) : null;
+  $('update').hidden = !u || updateDismissed === u.version;
+  if (u) $('updateTitle').textContent = `Yeni sürüm: LocaDub ${u.version}${u.sizeMB ? ` (${u.sizeMB} MB)` : ''}`;
+  return update;
+}
+
+$('updateDownload').addEventListener('click', () => chrome.tabs.create({ url: DOWNLOAD_URL }));
+$('updateHow').addEventListener('click', () => chrome.tabs.create({ url: INSTALL_URL }));
+$('updateLater').addEventListener('click', async () => {
+  const { update } = await chrome.storage.local.get('update');
+  await chrome.storage.local.set({ updateDismissed: update?.latest?.version || null });
+  $('update').hidden = true;
+});
+
+renderUpdate().then((update) => {
+  // Son denetim eskiyse (ya da hiç yapılmadıysa) şimdi denetle.
+  if (settings.checkUpdates && !(Date.now() - (update?.checkedAt || 0) < STALE_MS)) {
+    bg({ type: 'update.check' }).then(() => renderUpdate());
+  }
+});
 
 // ---------- Ayarlar ----------
 

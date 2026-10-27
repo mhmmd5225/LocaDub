@@ -5,9 +5,10 @@
   "version": "0.1.0",
   "description": "YouTube videolarının İngilizce altyazısını tarayıcıda yerel olarak Türkçeye çevirir ve seslendirir.",
   "minimum_chrome_version": "116",
-  "permissions": ["offscreen", "storage", "tts", "unlimitedStorage"],
+  "permissions": ["alarms", "offscreen", "storage", "tts", "unlimitedStorage"],
   "host_permissions": [
     "https://www.youtube.com/*",
+    "https://localdub.mhmmd.app/*",
     "https://huggingface.co/*",
     "https://*.huggingface.co/*",
     "https://*.hf.co/*",

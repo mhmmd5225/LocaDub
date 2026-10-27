@@ -21,6 +21,8 @@ async function launch({ videos, settings = {}, onTimedtext } = {}) {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'locadub-prof-')), {
     headless: false,
     args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--autoplay-policy=no-user-gesture-required'],
+    // Vekil sunucu gerektiren ortamlarda gerçek ağ istekleri (ör. sitedeki version.json) için
+    proxy: process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost' } : undefined,
   });
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
   const id = sw.url().split('/')[2];

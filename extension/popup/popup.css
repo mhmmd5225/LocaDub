@@ -59,6 +59,9 @@ section { padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .state-detail { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-word; }
 .state-detail:empty { display: none; }
 .state button { margin-top: 10px; }
+.update { background: color-mix(in srgb, var(--accent) 10%, var(--card)); border-left: 3px solid var(--accent); }
+.update-title { font-weight: 600; }
+.update-actions { display: flex; gap: 6px; margin-top: 8px; }
 .pbar { height: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 8px; }
 .pbar > div { height: 100%; width: 0; background: var(--info); transition: width 0.2s linear; }
 

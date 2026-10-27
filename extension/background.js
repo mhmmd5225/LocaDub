@@ -1,6 +1,7 @@
 // Service worker: offscreen yönetimi, mesaj yönlendirme, ilerleme yayını, chrome.tts (sistem sesi).
 
 import { getSettings } from './common/settings.js';
+import { VERSION_URL } from './common/version.js';
 
 const OFFSCREEN_URL = 'offscreen.html';
 const FORWARD = new Set([
@@ -125,6 +126,33 @@ async function systemVoices() {
     .map((v) => ({ voiceName: v.voiceName, lang: v.lang || '', remote: !!v.remote }));
 }
 
+// ---------- Güncelleme denetimi ----------
+// Sitedeki version.json okunur ve chrome.storage.local → update'e yazılır; açılır pencere kurulu sürümle karşılaştırır.
+
+const UPDATE_ALARM = 'update-check';
+const UPDATE_PERIOD_MIN = 12 * 60;
+
+async function checkUpdate() {
+  if (!(await getSettings()).checkUpdates) return null;
+  try {
+    const res = await fetch(VERSION_URL, { cache: 'no-store', credentials: 'omit' });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const latest = { version: String(j.version || ''), bytes: Number(j.bytes) || 0 };
+    await chrome.storage.local.set({ update: { latest, checkedAt: Date.now() } });
+    return latest;
+  } catch {
+    return null; // çevrimdışı: sessizce geç
+  }
+}
+
+function scheduleUpdateCheck() {
+  chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: UPDATE_PERIOD_MIN });
+}
+
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === UPDATE_ALARM) checkUpdate(); });
+chrome.runtime.onStartup.addListener(scheduleUpdateCheck);
+
 // ---------- Mesajlar ----------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -155,6 +183,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chrome.tts.resume();
       sendResponse({ ok: true });
       return false;
+    case 'update.check':
+      checkUpdate().then((result) => sendResponse({ ok: true, result }));
+      return true;
     case 'tts.system.voices':
       systemVoices().then((result) => sendResponse({ ok: true, result }), (e) => sendResponse({ ok: false, error: e.message }));
       return true;
@@ -170,4 +201,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.session.remove('progress').catch(() => {});
+  scheduleUpdateCheck();
 });
