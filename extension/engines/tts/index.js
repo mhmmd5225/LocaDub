@@ -4,13 +4,14 @@
 //
 //   listVoices() -> [{ id, label, gender, sizeMB, license, available, cached?, default?, system? }]
 //   init({ voice, onProgress, device?, threads?, steps?, outputRate? })
-//   synthesize(text, { voice, speed = 1.0, signal }) -> { pcm: Float32Array, sampleRate } | { system: true }
+//   synthesize(text, { voice, speed = 1.0, tone, signal }) -> { pcm: Float32Array, sampleRate } | { system: true }
 //   dispose()
 //
 // Voices: 'antalia-mini' (male, Apache-2.0, default), 'ahenk-cep' (female, CC BY 4.0), 'system' (chrome.tts /
 // speechSynthesis fallback, played by the extension). See README.md in this folder.
 
 import { fetchModel, isCached } from '../common/model-cache.js';
+import { normalizeTone } from './styles.js';
 import { DEFAULT_VOICE, SYSTEM_VOICE, VOICES, voiceById, voiceBytes } from './voices.js';
 
 export const id = 'tts';
@@ -158,8 +159,9 @@ export async function init({ voice, onProgress, device, threads, steps, outputRa
 /**
  * Turkish text -> mono PCM. Normalization (numbers, %, times, money, abbreviations, English names) happens inside.
  * speed: 0.8–2.0 (clamped to 0.5–3); up to 1.6 the model's duration control is used, beyond that time-stretch.
+ * tone: { style: 'natural'|'lively'|'calm', pitch: semitones, quality: 'fast'|'high' } (styles.js); invalid -> defaults.
  */
-export async function synthesize(text, { voice, speed = 1.0, signal } = {}) {
+export async function synthesize(text, { voice, speed = 1.0, tone, signal } = {}) {
   const v = voice || currentVoice || DEFAULT_VOICE;
   if (v === 'system') return { system: true };
   if (signal?.aborted) throw abortError();
@@ -167,7 +169,7 @@ export async function synthesize(text, { voice, speed = 1.0, signal } = {}) {
   if (!t) return { pcm: new Float32Array(0), sampleRate: options.outputRate };
   await loadVoice(v, undefined, signal);
   currentVoice = v;
-  const res = await request({ type: 'synth', voiceId: v, text: t, speed: Number(speed) || 1, outputRate: options.outputRate }, [], signal);
+  const res = await request({ type: 'synth', voiceId: v, text: t, speed: Number(speed) || 1, outputRate: options.outputRate, tone: normalizeTone(tone) }, [], signal);
   return { pcm: res.pcm, sampleRate: res.sampleRate, stats: res.stats };
 }
 

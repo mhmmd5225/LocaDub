@@ -51,6 +51,30 @@ export function resample(x, ratio) {
   return y;
 }
 
+/**
+ * Perde kaydırma (süre değişmeden): önce metni `speed / k` ile sentezleyin (k kat uzun çıkar), sonra çıktıyı k oranında
+ * yeniden örnekleyin: k > 1 → hem kısalır hem perde k kat yükselir, yani süre başlangıç hızındaki süreye döner.
+ * (Doğrusal aradeğerleme; ±4 yarım tonda yeterli. Biçimlenti de aynı oranda kayar, bu yüzden küçük tutulur.)
+ * Zaman esnetmeden (WSOLA) farklı olarak ek hesap yükü yoktur. k = 2 ** (yarımTon / 12).
+ */
+export function shiftPitch(x, k) {
+  if (!x.length || !(k > 0)) return x;
+  return resample(x, k);
+}
+
+/**
+ * Yumuşak sınırlayıcı: |x| eşiğin altında dokunulmaz, üstü tanh ile tavana (<= ceiling) yaklaşır; hiçbir örnek
+ * ceiling'i aşmaz. Taşmaya karşı güvenlik; yerinde değiştirir.
+ */
+export function softLimit(x, ceiling = 0.98, threshold = 0.89) {
+  const room = ceiling - threshold;
+  for (let i = 0; i < x.length; i++) {
+    const a = Math.abs(x[i]);
+    if (a > threshold) x[i] = Math.sign(x[i]) * (threshold + room * Math.tanh((a - threshold) / room));
+  }
+  return x;
+}
+
 /** Windowed-sinc low-pass taps (Blackman), cutoff as a fraction of the sample rate. */
 function lowpassTaps(cutoff, n) {
   const h = new Float32Array(n);

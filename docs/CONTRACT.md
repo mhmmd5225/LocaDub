@@ -85,7 +85,7 @@ export const id = 'tts';
 export async function listVoices()
   // → [{ id, label, gender:'female'|'male'|'unknown', sizeMB, license, available }]
 export async function init({ voice, onProgress })
-export async function synthesize(text /* TR */, { voice, speed = 1.0, signal } = {})
+export async function synthesize(text /* TR */, { voice, speed = 1.0, tone /* { style, pitch, quality }, styles.js */, signal } = {})
   // → Promise<{ pcm: Float32Array, sampleRate: number }>  (mono)
 export async function dispose()
 ```
@@ -102,7 +102,7 @@ content → background → offscreen, `chrome.runtime.sendMessage` ile:
 
 ```
 { type:'mt.translate', sentences:[...] }      → { ok, result:string[] } | { ok:false, error }
-{ type:'tts.synthesize', text, voice, speed } → { ok, result:{ pcmBase64 | audioUrl, sampleRate } }
+{ type:'tts.synthesize', text, voice, speed, tone } → { ok, result:{ pcmBase64 | audioUrl, sampleRate } }
 { type:'engine.init', engine:'mt'|'tts', options } ; ilerleme: { type:'engine.progress', engine, loaded, total }
 { type:'engine.status' }                      → { mt:{ready,backend}, tts:{ready,voice} }
 ```

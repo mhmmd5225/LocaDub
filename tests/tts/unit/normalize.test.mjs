@@ -93,7 +93,7 @@ test('splitText: packs sentences, splits long ones at clauses', () => {
 });
 
 test('speedPlan: native up to 1.6, rest stretched', () => {
-  assert.deepEqual(speedPlan(1), { speed: 1, native: 1, stretch: 1 });
+  assert.deepEqual(speedPlan(1), { speed: 1, native: 1, model: 1, stretch: 1 });
   assert.equal(speedPlan(1.4).native, 1.4);
   const p = speedPlan(2);
   assert.equal(p.native, 1.6);

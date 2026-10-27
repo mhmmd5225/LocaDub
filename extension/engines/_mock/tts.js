@@ -20,8 +20,12 @@ export async function init({ voice, onProgress } = {}) {
   ready = true;
 }
 
-export async function synthesize(text, { voice = 'mock-beep', speed = 1.0, signal } = {}) {
+export async function synthesize(text, { voice = 'mock-beep', speed = 1.0, tone, signal } = {}) {
   if (!ready) await init();
+  globalThis.__lastTtsTone = tone ?? null; // e2e: motorun aldığı son ton ({ style, pitch, quality })
+  globalThis.__ttsToneCalls = (globalThis.__ttsToneCalls || 0) + 1;
+  // e2e: offscreen belgesine doğrudan erişilemez; ton, eklenti sayfalarının dinleyebileceği bir iletiyle de yayımlanır
+  try { chrome.runtime.sendMessage({ type: 'mock.tts.tone', tone: tone ?? null, text: String(text || '') }).catch(() => {}); } catch { /* chrome yok (Node) */ }
   if (signal?.aborted) throw new DOMException('İptal edildi', 'AbortError');
   const chars = String(text || '').replace(/^\[TR\]\s*/, '').length;
   const sec = Math.max(0.3, chars / CHARS_PER_SEC / Math.max(0.5, speed));

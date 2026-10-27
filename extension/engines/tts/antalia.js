@@ -17,6 +17,7 @@ export class Antalia {
     this.engine = engine;
     this.frontend = frontend;
     this.sampleRate = 48000;
+    this.styles = []; // Antalia'da stil gömmesi yok; üslup yalnızca sıcaklık olarak uygulanır
   }
 
   /** buffers: { manifest (object), text, cond, flow, vocoder (bytes), frontend (gz bytes) } */
@@ -43,12 +44,16 @@ export class Antalia {
     return this.frontend.modelText(normalized ? text : normalizeText(text));
   }
 
-  /** Text -> 48 kHz mono audio. speed > 1 speaks faster (relative to the release's own 0.95 pace). */
-  async speak(text, { speed = 1, seed = 0, isCancelled, normalized = false } = {}) {
+  /**
+   * Text -> 48 kHz mono audio. speed > 1 speaks faster (relative to the release's own 0.95 pace).
+   * temperature: noise scale (lower = flatter/steadier, higher = more varied intonation; default: manifest's 0.6);
+   * steps: flow steps for this call (default: manifest's 8). Both go straight to antalia/tts.js speak().
+   */
+  async speak(text, { speed = 1, seed = 0, isCancelled, normalized = false, temperature, steps } = {}) {
     const modelText = this.modelText(text, normalized);
     if (!/\p{L}/u.test(modelText)) return new Float32Array(0);
     const out = [];
-    for await (const { audio } of antaliaSpeak(this.engine, modelText, { seed, speed: this.engine.defaults.speed * speed })) {
+    for await (const { audio } of antaliaSpeak(this.engine, modelText, { seed, speed: this.engine.defaults.speed * speed, temperature, steps })) {
       out.push(audio);
       if (isCancelled && isCancelled()) throw new DOMException('Aborted', 'AbortError');
     }

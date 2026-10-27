@@ -1,6 +1,7 @@
 // YouTube içerik uygulaması: altyazı → çeviri → seslendirme → senkron çalma.
 
 import { getSettings, setSettings, onSettingsChanged, voiceForSpeaker } from '../common/settings.js';
+import { toneFromSettings, styleSpeed } from '../engines/tts/styles.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
 import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
@@ -51,8 +52,13 @@ function trKey(s) {
 }
 function audioKey(s) {
   return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${s.speakerVoices ? s.voice2 || '2' : ''}` +
-    `|${s.glossaryMt}|${s.glossaryTts}`;
+    `|${s.glossaryMt}|${s.glossaryTts}` +
+    // üslup/perde/kalite sistem sesinde etkisizdir; yalnızca motor sesinde üretilmiş sesleri geçersiz kılar
+    (s.voice === 'system' ? '' : `|${s.style}|${s.pitch}|${s.quality}`);
 }
+
+// Üslubun hız çarpanı temel hıza katılır (sığdırma hesabı bunu bilir); sistem sesinde üslup yok.
+const baseSpeed = () => settings.ttsSpeed * (settings.voice === 'system' ? 1 : styleSpeed(settings.style));
 
 // Çeviri ham olarak saklanır; sözlük kullanımda uygulanır (sözlük değişince yeniden çeviri gerekmez).
 const mtRules = glossaryCompiler();
@@ -442,10 +448,10 @@ class Session {
     const gen = this.audioGen;
     const slot = slotSec(S, i);
     const text = spokenText(s);
-    const speed = chooseSynthSpeed(text, slot, { base: settings.ttsSpeed });
+    const speed = chooseSynthSpeed(text, slot, { base: baseSpeed() });
     s.auPending = true;
     const res = await sendBg({
-      type: 'tts.synthesize', text, voice: voiceForSpeaker(settings, s.speaker), speed, tag: this.tag,
+      type: 'tts.synthesize', text, voice: voiceForSpeaker(settings, s.speaker), speed, tone: toneFromSettings(settings), tag: this.tag,
     });
     s.auPending = false;
     if (!this.alive || gen !== this.audioGen) return;

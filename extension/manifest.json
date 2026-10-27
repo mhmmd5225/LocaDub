@@ -56,7 +56,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content/*.js", "common/*.js"],
+      "resources": ["content/*.js", "common/*.js", "engines/tts/styles.js"],
       "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/*"]
     }
   ],

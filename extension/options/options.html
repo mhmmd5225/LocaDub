@@ -66,6 +66,15 @@
           <select id="systemVoice"></select>
         </div>
         <p class="note" id="voiceNote"></p>
+        <div class="style-row">
+          <span class="lbl" id="styleLabel">Üslup</span>
+          <div class="seg" id="styleChoice" role="radiogroup" aria-labelledby="styleLabel">
+            <label><input type="radio" name="style" value="natural"><span>Doğal</span></label>
+            <label><input type="radio" name="style" value="lively"><span>Canlı</span></label>
+            <label><input type="radio" name="style" value="calm"><span>Sakin</span></label>
+          </div>
+          <small id="styleNote"></small>
+        </div>
       </div>
 
       <div class="group">
@@ -86,6 +95,23 @@
           <output id="originalVolumeOut" for="originalVolume"></output>
         </div>
       </div>
+
+      <details class="adv" id="toneBlock">
+        <summary>Gelişmiş</summary>
+        <div class="slider-row">
+          <label for="pitch">Perde <small>yarım ton</small></label>
+          <input type="range" id="pitch" min="-3" max="3" step="0.5">
+          <output id="pitchOut" for="pitch"></output>
+        </div>
+        <div class="style-row">
+          <span class="lbl" id="qualityLabel">Kalite</span>
+          <div class="seg" id="qualityChoice" role="radiogroup" aria-labelledby="qualityLabel">
+            <label><input type="radio" name="quality" value="fast"><span>Hızlı</span></label>
+            <label><input type="radio" name="quality" value="high"><span>Yüksek</span></label>
+          </div>
+          <small id="qualityNote">Yüksek kalite daha yavaş hazırlanır.</small>
+        </div>
+      </details>
 
       <details class="adv" id="speakerBlock">
         <summary>Konuşmacılara farklı ses</summary>
