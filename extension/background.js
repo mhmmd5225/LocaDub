@@ -76,10 +76,15 @@ async function sendToOffscreen(msg) {
 
 // ---------- İlerleme yayını ----------
 
+// İçerik betiğinin çalıştığı sekmeler: YouTube sekmeleri ve gömülü YouTube oynatıcısı olan başka siteler.
+// Service worker yeniden başlarsa küme boşalır; YouTube sekmeleri adresten de bulunur.
+const contentTabs = new Set();
+
 async function broadcastToTabs(msg) {
   try {
-    const tabs = await chrome.tabs.query({ url: 'https://www.youtube.com/*' });
-    for (const t of tabs) chrome.tabs.sendMessage(t.id, msg).catch(() => {});
+    const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
+    const ids = new Set([...contentTabs, ...tabs.map((t) => t.id)]);
+    for (const id of ids) chrome.tabs.sendMessage(id, msg).catch(() => contentTabs.delete(id));
   } catch { /* yoksay */ }
 }
 
@@ -172,6 +177,7 @@ chrome.runtime.onStartup.addListener(scheduleUpdateCheck);
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object' || msg.target === 'offscreen') return false;
+  if (sender.tab?.id != null) contentTabs.add(sender.tab.id);
 
   switch (msg.type) {
     case 'offscreen.ready': {

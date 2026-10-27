@@ -8,6 +8,7 @@
   "permissions": ["alarms", "offscreen", "storage", "tts", "unlimitedStorage"],
   "host_permissions": [
     "https://www.youtube.com/*",
+    "https://www.youtube-nocookie.com/*",
     "https://localdub.mhmmd.app/*",
     "https://huggingface.co/*",
     "https://*.huggingface.co/*",
@@ -39,22 +40,24 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.youtube.com/*"],
+      "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/embed/*"],
       "js": ["content/main-world.js"],
       "world": "MAIN",
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     },
     {
-      "matches": ["https://www.youtube.com/*"],
+      "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/embed/*"],
       "js": ["content/loader.js"],
       "css": ["content/overlay.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["content/*.js", "common/*.js"],
-      "matches": ["https://www.youtube.com/*"]
+      "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/*"]
     }
   ],
   "content_security_policy": {
