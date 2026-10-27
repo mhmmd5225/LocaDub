@@ -131,7 +131,14 @@
       <div class="status" id="status">Durum okunuyor…</div>
       <div class="buttons">
         <button type="button" id="refreshStatus" class="secondary">Yenile</button>
+        <button type="button" id="copyDiag" class="secondary">Tanılama bilgisini kopyala</button>
+        <span class="note" id="diagNote"></span>
       </div>
+      <details class="diag">
+        <summary>Kopyalanacak bilgiyi göster</summary>
+        <p class="note">Sorun bildirirken GitHub'daki konuya yapıştırın. Video adresi, altyazı ve çeviri metni yer almaz.</p>
+        <pre id="diagText"></pre>
+      </details>
     </section>
 
     <footer>

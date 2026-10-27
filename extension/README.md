@@ -23,9 +23,10 @@ Derleme adımı yoktur: düz ES module JavaScript.
 
 **Açılır pencere:** aç/kapa, durum kartı, seslendirme seçimi, dublaj ve orijinal ses seviyesi.
 
-**Ayarlar sayfası** (`options/`): Genel (Türkçe altyazı, önceden hazırlama süresi, test motoru),
-Ses (konuşma hızı, dublaj ses seviyesi, orijinal ses), Modeller (her model için İndir / Sil / Kullan,
-ilerleme), Depolama, Durum.
+**Ayarlar sayfası** (`options/`): Genel (Türkçe altyazı, önceden hazırlama süresi, sürüm denetimi, test motoru),
+Ses (konuşma hızı, dublaj ses seviyesi, orijinal ses, konuşmacılara farklı ses), Sözlük, Modeller (her model için
+İndir / Sil / Kullan, ilerleme), Depolama, Durum (motor durumu, **Tanılama bilgisini kopyala**: sürümler, ayarlar,
+motorlar, indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`).
 
 Ayarlar (`chrome.storage.local`):
 
@@ -97,6 +98,7 @@ xvfb-run -a node tests/extension/e2e/transcript-cache.e2e.cjs
 xvfb-run -a node tests/extension/e2e/speaker-voices.e2e.cjs
 xvfb-run -a node tests/extension/e2e/glossary.e2e.cjs
 xvfb-run -a node tests/extension/e2e/update-banner.e2e.cjs
+xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
 ```
 
 **Sürüm yayınlama:** `manifest.json` → `version` artırılıp `main`'e birleştirilince site yeni ZIP'i ve
