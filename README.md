@@ -7,7 +7,7 @@ metin ve ses hiçbir sunucuya gönderilmez.
 - **Çeviri:** Chrome'un cihaz üzerindeki çevirmeni ya da
   [OPUS-MT tc-big EN→TR](https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-tr) (ONNX, ≈300 MB)
 - **Seslendirme:** [Antalia Mini](https://huggingface.co/cloud0day3/antalia-mini) (erkek, varsayılan),
-  [Ahenk Cep](https://huggingface.co/ozgurguler/ahenk-cep-tr) (kadın) ya da Windows'un Türkçe sistem sesi
+  [Ahenk Cep](https://huggingface.co/ozgurguler/ahenk-cep-tr) ve [EMA Lightning](https://huggingface.co/canberkkkkkk/ema-lightning) (kadın) ya da Windows'un Türkçe sistem sesi
 - **Çalışma ortamı:** [onnxruntime-web](https://github.com/microsoft/onnxruntime) (WASM), Chrome MV3
   offscreen belgesi
 

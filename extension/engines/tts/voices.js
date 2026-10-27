@@ -6,6 +6,8 @@
 const AHENK = 'https://huggingface.co/ozgurguler/ahenk-cep-tr/resolve/345c4cbb934815fa96ffd0d5061fd913237544bc/onnx/';
 const ANTALIA = 'https://huggingface.co/spaces/cloud0day3/antalia-mini/resolve/2c24b406fedada11bd731a2ec9f4535bfd354f03/';
 
+const EMA = 'https://huggingface.co/ozcancelik/ema-lightning-onnx/resolve/13c431d/';
+
 /** @typedef {{ name:string, url:string, bytes:number, kind:'onnx'|'json'|'bin' }} VoiceFile */
 
 export const VOICES = [
@@ -45,6 +47,23 @@ export const VOICES = [
       { name: 'cond', url: AHENK + 'cond.f16.onnx', bytes: 428024, kind: 'onnx' },
       { name: 'step', url: AHENK + 'step.f16.onnx', bytes: 8486846, kind: 'onnx' },
       { name: 'decoder', url: AHENK + 'decoder.f16.onnx', bytes: 6092374, kind: 'onnx' },
+    ],
+  },
+  {
+    id: 'ema-lightning',
+    label: 'EMA Lightning (kadın)',
+    gender: 'female',
+    license: 'Apache-2.0',
+    model: 'ema',
+    sampleRate: 48000,
+    homepage: 'https://huggingface.co/canberkkkkkk/ema-lightning',
+    // fp32 graphs (the fp16 sound graph is 9.6 MB smaller but was not measured); the four flow steps are inside sound.onnx
+    attribution: 'EMA Lightning by canberkkkkkk (Apache-2.0), ONNX export by ozcancelik',
+    files: [
+      { name: 'manifest', url: EMA + 'meta.json', bytes: 357, kind: 'json' },
+      { name: 'text', url: EMA + 'text.onnx', bytes: 4806400, kind: 'onnx' },
+      { name: 'sound', url: EMA + 'sound.onnx', bytes: 18120655, kind: 'onnx' },
+      { name: 'decoder', url: EMA + 'decoder.onnx', bytes: 12031945, kind: 'onnx' },
     ],
   },
 ];

@@ -7,7 +7,7 @@
 //   synthesize(text, { voice, speed = 1.0, tone, signal }) -> { pcm: Float32Array, sampleRate } | { system: true }
 //   dispose()
 //
-// Voices: 'antalia-mini' (male, Apache-2.0, default), 'ahenk-cep' (female, CC BY 4.0), 'system' (chrome.tts /
+// Voices: 'antalia-mini' (male, Apache-2.0, default), 'ahenk-cep' (female, CC BY 4.0), 'ema-lightning' (female, Apache-2.0), 'system' (chrome.tts /
 // speechSynthesis fallback, played by the extension). See README.md in this folder.
 
 import { fetchModel, isCached } from '../common/model-cache.js';

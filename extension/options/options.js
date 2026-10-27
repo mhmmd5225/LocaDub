@@ -225,7 +225,7 @@ function progressBar(dl) {
 }
 
 // Kısa adlar: satırlarda ve seçimlerde ayrıntı yerine yalnızca ad görünür.
-const SHORT = { 'opus-mt': 'OPUS-MT', 'antalia-mini': 'Antalia Mini', 'ahenk-cep': 'Ahenk Cep' };
+const SHORT = { 'opus-mt': 'OPUS-MT', 'antalia-mini': 'Antalia Mini', 'ahenk-cep': 'Ahenk Cep', 'ema-lightning': 'EMA Lightning' };
 const isMock = () => settings.engineMode === 'mock';
 const shortName = (m) => SHORT[m.id] || m.label.replace(/\s*\(.*\)\s*$/, '');
 // Parantez içindeki açıklama ("erkek, hızlı") ikinci satır olur.

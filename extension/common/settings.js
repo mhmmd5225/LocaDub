@@ -62,11 +62,12 @@ export function normalizeSettings(raw = {}) {
 }
 
 // İkinci konuşmacının varsayılan sesi: birinci ses kadınsa erkek, değilse kadın.
-const FEMALE = 'ahenk-cep';
+const FEMALES = ['ahenk-cep', 'ema-lightning'];
+const FEMALE = FEMALES[0];
 const MALE = 'antalia-mini';
 export function secondVoice(s) {
   if (s.voice2 && s.voice2 !== s.voice) return s.voice2;
-  return s.voice === FEMALE ? MALE : FEMALE;
+  return FEMALES.includes(s.voice) ? MALE : FEMALE;
 }
 
 // Cümleyi seslendirecek ses (undefined → motorun varsayılanı). Sistem sesinde konuşmacı ayrımı yapılmaz.
