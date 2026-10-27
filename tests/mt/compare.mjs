@@ -4,11 +4,14 @@
 //   cd tests/mt && ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm install
 //   node ../../tools/mt/download-test-models.mjs int8-slim          # OPUS-MT dosyaları
 //   pip install sacrebleu                                            # puanlama ve WMT18 verisi
-//   node compare.mjs [--n 100] [--systems opus,gemma] [--threads 4]
+//   node compare.mjs [--n 100] [--systems opus,gemma] [--threads 4] [--restore none,rules,model,model-int8]
 //
 // Veri: WMT18 haber testi EN→TR (sacrebleu indirir, .data/ altına), ≤ 25 sözcüklü ilk N cümle. Her cümle iki biçimde
 // çevrilir: "metin" (özgün) ve "asr" (küçük harf, noktalamasız — YouTube otomatik altyazısına benzer). Gemma modeli
 // (≈3.1 GB, q4) ilk çalıştırmada indirilir. Çıktılar .out/ altına yazılır.
+// --restore: "asr" girdisine çeviriden önce noktalama/büyük harf geri kazanımı uygulanır ve "asr+<yöntem>" satırı
+// eklenir (rules: engines/mt/restore.js; model/model-int8: engines/mt/punct.js, dosyalar .models/punct-en/ altında —
+// model: punct_cap_seg_en.onnx + spe_32k_lc_en.model HF'ten; model-int8: onnxruntime quantize_dynamic ile üretilir).
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -19,6 +22,8 @@ import { MarianTokenizer } from '../../extension/engines/mt/spm.js';
 import { fillDequantized } from '../../extension/engines/mt/onnx-patch.js';
 import { VARIANTS, DEFAULT_VARIANT } from '../../extension/engines/mt/models.js';
 import { prepareBatch, finishBatch } from '../../extension/engines/mt/preprocess.js';
+import { restoreRules } from '../../extension/engines/mt/restore.js';
+import { PunctRestorer } from '../../extension/engines/mt/punct.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (name, def) => {
@@ -27,6 +32,7 @@ const arg = (name, def) => {
 };
 const N = Number(arg('n', '100'));
 const SYSTEMS = arg('systems', 'opus,gemma').split(',');
+const RESTORE = arg('restore', 'none').split(',').filter((r) => r !== 'none');
 const THREADS = Number(arg('threads', '4'));
 const DATA = join(here, '.data');
 const OUT = join(here, '.out');
@@ -54,7 +60,30 @@ function loadData() {
 }
 
 // Otomatik altyazı biçimi: küçük harf, noktalama yok (kesme işareti kalır).
-const asrify = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}'\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+const asrify = (s) => s.toLowerCase().replace(/[’‘]/g, "'").replace(/[^\p{L}\p{N}'\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+
+// Geri kazanım yöntemleri → { texts, ms } (cümle başına süre)
+async function restoreSet(method, list) {
+  const t0 = performance.now();
+  let texts;
+  if (method === 'rules') texts = list.map(restoreRules);
+  else {
+    const ort = (await import('onnxruntime-node')).default;
+    const dir = join(here, '.models', 'punct-en');
+    const r = await PunctRestorer.create(ort, {
+      onnx: readFileSync(join(dir, method === 'model-int8' ? 'punct_cap_seg_en.int8.onnx' : 'punct_cap_seg_en.onnx')),
+      spm: readFileSync(join(dir, 'spe_32k_lc_en.model')),
+      sessionOptions: { executionProviders: ['cpu'], intraOpNumThreads: THREADS },
+    });
+    await r.restore('hello there');
+    const t1 = performance.now();
+    texts = [];
+    for (const x of list) texts.push(await r.restore(x));
+    await r.release();
+    return { texts, ms: (performance.now() - t1) / list.length };
+  }
+  return { texts, ms: (performance.now() - t0) / list.length };
+}
 
 // ---------- Sistemler ----------
 
@@ -117,7 +146,8 @@ function score(hypFile, refFile) {
 // süreçte yüklenince paylaşılan kütüphane çakışır.
 
 const pairs = loadData();
-const sets = { metin: pairs.map((p) => p.en), asr: pairs.map((p) => asrify(p.en)) };
+let sets = { metin: pairs.map((p) => p.en), asr: pairs.map((p) => asrify(p.en)) };
+const SETS_FILE = join(OUT, 'sets.json');
 const refFile = join(OUT, 'ref.tr');
 
 async function runOne(key) {
@@ -146,9 +176,16 @@ async function runOne(key) {
 }
 
 if (process.argv.includes('--child')) {
+  sets = JSON.parse(readFileSync(SETS_FILE, 'utf8'));
   await runOne(SYSTEMS[0]);
 } else {
   writeFileSync(refFile, pairs.map((p) => p.tr).join('\n') + '\n');
+  for (const m of RESTORE) {
+    const r = await restoreSet(m, sets.asr);
+    sets[`asr+${m}`] = r.texts;
+    console.log(`geri kazanım ${m}: ${r.ms.toFixed(1)} ms/cümle`);
+  }
+  writeFileSync(SETS_FILE, JSON.stringify(sets));
   console.log(`${pairs.length} cümle (WMT18 haber, EN→TR), ${THREADS} iş parçacığı\n`);
   const results = [];
   for (const key of SYSTEMS) {
@@ -159,10 +196,14 @@ if (process.argv.includes('--child')) {
   const rows = results.flatMap((r) => r.rows);
   console.log('\n| Sistem | Girdi | chrF | BLEU | ms/cümle (CPU) |\n|---|---|---|---|---|');
   for (const r of rows) console.log(`| ${r.sys} | ${r.set} | ${r.chrf.toFixed(1)} | ${r.bleu.toFixed(1)} | ${r.ms.toFixed(0)} |`);
-  console.log('\nÖrnekler (asr girdisi):');
+  console.log('\nÖrnekler (asr girdisi ve geri kazanılmış hâlleri):');
+  const asrSets = Object.keys(sets).filter((k) => k.startsWith('asr'));
   for (let i = 0; i < Math.min(5, pairs.length); i++) {
-    console.log(`\nEN : ${sets.asr[i]}\nREF: ${pairs[i].tr}`);
-    for (const r of results) console.log(`${r.name.split(' ')[0].padEnd(15)}: ${r.hyps.asr[i]}`);
+    console.log(`\nREF: ${pairs[i].tr}`);
+    for (const k of asrSets) {
+      console.log(`  [${k}] EN: ${sets[k][i]}`);
+      for (const r of results) if (r.hyps[k]) console.log(`  [${k}] ${r.name.split(' ')[0]}: ${r.hyps[k][i]}`);
+    }
   }
   writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ n: pairs.length, threads: THREADS, rows }, null, 2));
 }
