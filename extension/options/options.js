@@ -2,6 +2,7 @@
 
 import { DEFAULTS, getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
 import { listCached, deleteByPrefix } from '../engines/common/model-cache.js';
+import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 
 const $ = (id) => document.getElementById(id);
 let settings = await getSettings();
@@ -355,10 +356,20 @@ async function refreshCache() {
     $('cacheFiles').textContent = String(cached.length);
     const est = navigator.storage?.estimate ? await navigator.storage.estimate() : null;
     $('usageTotal').textContent = est ? fmtMB(bytesMB(est.usage || 0)) : '—';
+    const tr = await transcriptStats(chrome.storage.local);
+    $('trVideos').textContent = String(tr.videos);
+    $('trVideos').title = tr.bytes ? fmtMB(bytesMB(tr.bytes)) : '';
+    $('clearTranscripts').disabled = !tr.videos;
   } catch (e) {
     $('storageNote').textContent = 'Önbellek okunamadı: ' + e.message;
   }
 }
+
+$('clearTranscripts').addEventListener('click', async () => {
+  const n = await clearTranscripts(chrome.storage.local);
+  $('storageNote').textContent = `${n} videonun saklanan çevirisi silindi. Bu videolar yeniden çevrilecek.`;
+  await refreshCache();
+});
 
 $('clearAll').addEventListener('click', async () => {
   if (!(await confirmBox('İndirilen tüm modeller silinecek. Dublaj için yeniden indirmeniz gerekecek.', 'Tümünü sil'))) return;
