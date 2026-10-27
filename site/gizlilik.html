@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocaDub — Gizlilik politikası</title>
+  <meta name="description" content="LocaDub Chrome eklentisinin gizlilik politikası: hangi verinin nerede işlendiği ve eklentinin hangi adreslere bağlandığı.">
+  <meta name="theme-color" content="#171b2e">
+  <link rel="icon" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f2f3f6; --surface: #ffffff; --ink: #171b2e; --red: #d7262e; --mist: #5f667f; --line: #d9dce5;
+      --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+      --text: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --paper: #151827; --surface: #1c2034; --ink: #e9ebf3; --red: #ff4b4f; --mist: #9aa0b8; --line: #2b3047; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.65 var(--text); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    :focus-visible { outline: 3px solid var(--red); outline-offset: 3px; border-radius: 6px; }
+    .wrap { width: min(760px, 100% - 32px); margin-inline: auto; }
+    header { border-bottom: 1px solid var(--line); }
+    header .wrap { height: 64px; display: flex; align-items: center; }
+    .logo { display: flex; align-items: center; gap: 10px; font: 800 21px/1 var(--display); text-decoration: none; }
+    .logo img { width: 30px; height: 30px; }
+    main { padding: 40px 0 72px; }
+    h1 { font: 800 clamp(34px, 6vw, 52px)/1 var(--display); letter-spacing: -0.03em; margin: 0 0 10px; }
+    h2 { font: 700 23px/1.25 var(--display); margin: 40px 0 10px; }
+    .meta { color: var(--mist); font-size: 15px; margin: 0 0 28px; }
+    .lede { font-size: 19px; }
+    table { width: 100%; border-collapse: collapse; font-size: 15.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    tr:last-child td { border-bottom: 0; }
+    th { font-weight: 600; background: color-mix(in srgb, var(--ink) 5%, transparent); }
+    td:first-child { white-space: nowrap; }
+    code { font-size: 0.9em; }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    td { overflow-wrap: anywhere; }
+    @media (max-width: 600px) { table { font-size: 14px; } td:first-child { white-space: normal; } th, td { padding: 8px 8px; } }
+    footer { border-top: 1px solid var(--line); padding: 24px 0 40px; color: var(--mist); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <header><div class="wrap"><a class="logo" href="./"><img src="icon.png" alt="" width="30" height="30">LocaDub</a></div></header>
+  <main class="wrap">
+    <h1>Gizlilik politikası</h1>
+    <p class="meta">LocaDub Chrome eklentisi · Son güncelleme: 27 Ekim 2026</p>
+
+    <p class="lede"><strong>LocaDub hiçbir kişisel veri toplamaz, saklamaz ya da paylaşmaz.</strong> İzlediğiniz videoların altyazısı,
+      çevirisi ve Türkçe sesi yalnızca kendi bilgisayarınızda, tarayıcınızın içinde işlenir. Eklentinin bir sunucusu, hesabı,
+      reklamı ya da kullanım ölçümü (analitik) yoktur.</p>
+
+    <h2>Bilgisayarınızda işlenenler</h2>
+    <ul>
+      <li>Açtığınız YouTube videosunun İngilizce altyazısı, Türkçe çevirisi ve seslendirmesi.</li>
+      <li>Ayarlarınız ve kişisel sözlüğünüz (<code>chrome.storage.local</code>).</li>
+      <li>İndirilen çeviri ve ses modelleri (tarayıcının Cache Storage alanı).</li>
+      <li>Son izlediğiniz 50 videonun cümleleri ve çevirileri, aynı video yeniden açıldığında beklememek için. Ayarlar → Depolama'dan silinebilir.</li>
+      <li>Son 10 hata mesajı, tarayıcı kapanınca silinir. Yalnızca siz "Tanılama bilgisini kopyala" düğmesine basarsanız panoya kopyalanır; bu metinde video adresi, altyazı ya da çeviri yer almaz.</li>
+    </ul>
+    <p>Bu veriler bilgisayarınızdan dışarı gönderilmez. Eklentiyi kaldırdığınızda Chrome hepsini siler.</p>
+
+    <h2>Eklentinin bağlandığı adresler</h2>
+    <table>
+      <thead><tr><th>Adres</th><th>Ne zaman, neden</th><th>Gönderilen</th></tr></thead>
+      <tbody>
+        <tr><td>youtube.com</td><td>Dublaj açıkken, izlediğiniz videonun altyazısını almak için. YouTube oynatıcısının kendi yaptığı istekle aynıdır.</td><td>Video kimliği, YouTube'un kendi çerezleri</td></tr>
+        <tr><td>huggingface.co</td><td>Yalnızca siz onay verdiğinizde, çeviri ve ses modellerini bir kez indirmek için.</td><td>Hiçbir kişisel bilgi; standart indirme isteği</td></tr>
+        <tr><td>localdub.mhmmd.app</td><td>Günde iki kez, yeni sürüm olup olmadığını öğrenmek için <code>version.json</code> dosyası okunur. Ayarlar → Genel'den kapatılabilir.</td><td>Hiçbir kişisel bilgi; standart dosya isteği</td></tr>
+      </tbody>
+    </table>
+    <p>Her ağ isteğinde olduğu gibi, bağlanılan sunucu IP adresinizi görebilir. LocaDub bu sunuculara altyazı, çeviri ya da ses metni göndermez.</p>
+
+    <h2>Sizin seçiminize bağlı durumlar</h2>
+    <ul>
+      <li><strong>Chrome yerleşik çevirmeni:</strong> Seçerseniz çeviri Chrome'un cihaz üzerindeki çevirmeniyle yapılır; dil paketini Chrome indirir ve yönetir.</li>
+      <li><strong>Sistem sesi:</strong> Seçtiğiniz işletim sistemi/Chrome sesi "çevrimiçi" bir sesse (ör. Google sesleri), seslendirilecek Türkçe metin o sesin sağlayıcısına gidebilir. Eklentinin kendi sesleri (Antalia Mini, Ahenk Cep) tamamen bilgisayarınızda çalışır.</li>
+    </ul>
+
+    <h2>İzinler</h2>
+    <p>Eklentinin istediği her iznin gerekçesi açık kaynak kodla birlikte
+      <a href="https://github.com/mhmmd5225/LocaDub/blob/main/docs/STORE.md">docs/STORE.md</a> dosyasında yazılıdır.</p>
+
+    <h2>Değişiklikler ve iletişim</h2>
+    <p>Bu politika değişirse bu sayfa ve tarih güncellenir. Sorularınız için
+      <a href="https://github.com/mhmmd5225/LocaDub/issues">GitHub'da bir konu açabilirsiniz</a>.</p>
+  </main>
+  <footer><div class="wrap"><a href="./">LocaDub</a> · <a href="https://github.com/mhmmd5225/LocaDub">Kaynak kod</a></div></footer>
+</body>
+</html>

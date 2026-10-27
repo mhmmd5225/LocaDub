@@ -1,4 +1,4 @@
-# YT TR Dub — YouTube Türkçe Dublaj (Chrome MV3)
+# LocaDub — YouTube Türkçe Dublaj (Chrome MV3)
 
 İngilizce altyazısı (manuel ya da otomatik) olan YouTube videolarını **tarayıcıda, yerel olarak**
 Türkçeye çevirir ve seslendirir. Modeller ilk kullanımda bir kez indirilir; sonrasında internetsiz
