@@ -56,6 +56,9 @@ offscreen.js                  engines/mt/index.js + engines/tts/index.js (dinami
 - **Altyazı**: `captionTracks` içinden İngilizce manuel parça, yoksa otomatik (`kind:'asr'`), yoksa
   çevrilebilir parça `tlang=en`. `&fmt=json3` ile çekilir. YouTube boş yanıt verirse (yeni `pot` belirteci)
   oynatıcının kendi timedtext isteği yakalanır; gerekirse altyazı modülü bir anlığına açılıp kapatılır.
+- **Çeviri önbelleği** (`common/transcript-store.js`): cümleler ve çeviriler `chrome.storage.local`'da
+  (`tr:<videoId>:<motor>`, son 50 video). Aynı video yeniden açılınca altyazı çekilmez, çeviri beklenmez.
+  15 sn'de bir ve sekme kapanırken yazılır; Ayarlar → Depolama'dan temizlenir.
 - **Cümleler** (`content/captions.js`): noktalama, > 700 ms duraklama, konuşmacı değişimi (`>>`),
   en fazla ~12 sn (mümkünse virgülde bölünür). Parça içi cümle sonları zamana orantılı bölünür.
 - **Zamanlama** (`content/timing.js`): cümle süresi = sonraki cümleye kadar (en fazla bitiş + 0.8 sn).
@@ -79,8 +82,15 @@ offscreen.js                  engines/mt/index.js + engines/tts/index.js (dinami
 node --test tests/extension/
 ```
 
-Saf modüller (`content/captions.js`, `content/timing.js`, `common/pcm.js`, `common/settings.js`),
+Saf modüller (`content/captions.js`, `content/timing.js`, `common/pcm.js`, `common/settings.js`,
+`common/transcript-store.js`),
 `engines/common/model-cache.js` (sahte Cache Storage/fetch ile) ve sahte motorlar sınanır.
+
+Uçtan uca (gerçek Chromium + eklenti, sahte YouTube sayfası, test motoru; Playwright ve ffmpeg gerekir):
+
+```
+xvfb-run -a node tests/extension/e2e/transcript-cache.e2e.cjs
+```
 
 ## Bilinen sınırlamalar
 

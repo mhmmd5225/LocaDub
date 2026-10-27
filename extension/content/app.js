@@ -2,6 +2,7 @@
 
 import { getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
+import { loadTranscript, saveTranscript } from '../common/transcript-store.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -18,6 +19,7 @@ const TR_BATCH = 8;
 const KEEP_BEHIND_SEC = 90;
 const KEEP_AHEAD_EXTRA_SEC = 120;
 const CACHE_VIDEOS = 5;
+const PERSIST_MS = 15000;
 
 let settings = null;
 let session = null;
@@ -123,6 +125,9 @@ class Session {
     if (!this.alive) return;
     this.overlay.clearStatus();
     this._tick = setInterval(() => this.tick(), TICK_MS);
+    // Çeviriler kalıcı önbelleğe yazılır (sekme kapanırsa da kaybolmasın).
+    this._persistTimer = setInterval(() => this._persist(), PERSIST_MS);
+    this._on(window, 'pagehide', () => this._persist());
     await this.initEngines();
     this.loop();
   }
@@ -131,6 +136,7 @@ class Session {
     if (!this.alive) return;
     this.alive = false;
     clearInterval(this._tick);
+    clearInterval(this._persistTimer);
     this._wakeUp();
     for (const [el, ev, fn] of this._listeners) el.removeEventListener(ev, fn);
     this._listeners = [];
@@ -142,8 +148,13 @@ class Session {
     this._dropAudio();
   }
 
+  _on(el, ev, fn) {
+    el.addEventListener(ev, fn);
+    this._listeners.push([el, ev, fn]);
+  }
+
   _bindVideo() {
-    const on = (el, ev, fn) => { el.addEventListener(ev, fn); this._listeners.push([el, ev, fn]); };
+    const on = (el, ev, fn) => this._on(el, ev, fn);
     const v = this.video;
     on(v, 'seeking', () => { this.stopSpeech(); this._wakeUp(); });
     on(v, 'seeked', () => {
@@ -186,9 +197,24 @@ class Session {
 
   async loadCaptions() {
     const cached = transcriptCache.get(this.videoId);
+    if (cached?.trKey === this._trKey) {
+      this.sentences = cached.sentences.map((s, i) => ({ ...s, i, audio: null }));
+      return;
+    }
+    // Daha önce izlenen video: altyazı ve çeviriler kalıcı önbellekten.
+    try {
+      const stored = await loadTranscript(chrome.storage.local, this.videoId, this._trKey);
+      if (stored && this.alive) {
+        this.sentences = stored.map((s, i) => ({ ...s, i, audio: null }));
+        this._savedCount = stored.filter((s) => s.tr != null).length;
+        console.info(LOG, `${stored.length} cümle önbellekten (${this._savedCount} çevrili)`);
+        return;
+      }
+    } catch (e) {
+      console.warn(LOG, 'Önbellek okunamadı', e);
+    }
     if (cached) {
-      const sameTr = cached.trKey === this._trKey;
-      this.sentences = cached.sentences.map((s, i) => ({ ...s, i, tr: sameTr ? s.tr : null, audio: null }));
+      this.sentences = cached.sentences.map((s, i) => ({ ...s, i, tr: null, audio: null }));
       return;
     }
     let info = null;
@@ -240,7 +266,17 @@ class Session {
     }
   }
 
+  // Yeni çeviri varsa kalıcı önbelleğe yaz.
+  _persist() {
+    const n = this.sentences.reduce((k, s) => k + (s.tr != null ? 1 : 0), 0);
+    if (!n || n === this._savedCount) return;
+    this._savedCount = n;
+    saveTranscript(chrome.storage.local, this.videoId, this._trKey, this.sentences)
+      .catch((e) => console.warn(LOG, 'Önbelleğe yazılamadı', e));
+  }
+
   _saveTranscript() {
+    this._persist();
     if (!this.sentences.length) return;
     transcriptCache.delete(this.videoId);
     transcriptCache.set(this.videoId, {
@@ -427,6 +463,8 @@ class Session {
     this.stopSpeech();
     if (audio || translations) { this.audioGen++; this._dropAudio(); }
     if (translations) {
+      this._persist(); // eski motorun çevirileri kendi anahtarıyla kalsın
+      this._savedCount = 0;
       this.trGen++;
       for (const s of this.sentences) { s.tr = null; s.trPending = false; s.trFail = 0; }
       this.firstBatchDone = false;
