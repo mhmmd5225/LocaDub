@@ -1,0 +1,22 @@
+[
+  { "id": 1, "tur": "kisa", "text": "Şimdi başlayalım." },
+  { "id": 2, "tur": "kisa", "text": "Bu çok önemli bir nokta." },
+  { "id": 3, "tur": "tepki", "text": "Evet, kesinlikle." },
+  { "id": 4, "tur": "orta", "text": "Geçen hafta yeni bir telefon aldım ve ilk izlenimlerimi sizinle paylaşmak istiyorum." },
+  { "id": 5, "tur": "uzun", "text": "Bir şeyi gerçekten öğrenmek istiyorsanız, önce küçük adımlarla başlamalı, sonra her gün biraz daha ilerleyerek bilginizi pekiştirmeli ve hatalarınızdan ders çıkarmayı bilmelisiniz." },
+  { "id": 6, "tur": "soru", "text": "Peki bu yöntem gerçekten işe yarıyor mu, yoksa sadece iyi bir reklam mı?" },
+  { "id": 7, "tur": "unlem", "text": "İnanılmaz! Sonunda başardık, bunu hiç beklemiyordum!" },
+  { "id": 8, "tur": "sayi", "text": "Toplantı 14 Mart 2025 tarihinde saat 15.30'da başlayacak." },
+  { "id": 9, "tur": "sayi", "text": "Ürünün fiyatı 1.249,90 TL, kargo ise 35 TL tutuyor." },
+  { "id": 10, "tur": "sayi", "text": "Şirketin geliri yüzde 12,5 artarak 3,5 milyar dolara ulaştı." },
+  { "id": 11, "tur": "ozel-ad", "text": "Bu videoyu YouTube'da yayınladıktan sonra iPhone'umla yeni bir tane daha çektim." },
+  { "id": 12, "tur": "ozel-ad", "text": "Elon Musk, SpaceX ve Tesla hakkında yaptığı açıklamayla gündem oldu." },
+  { "id": 13, "tur": "sohbet", "text": "Bak, ben de ilk başta aynı şeyi düşünmüştüm ama sonra fikrim değişti." },
+  { "id": 14, "tur": "sohbet", "text": "Hadi ama, bunu gerçekten ciddiye almıyorsun, değil mi?" },
+  { "id": 15, "tur": "haber", "text": "Merkez Bankası, politika faizini sabit tutma kararı aldı; piyasalar kararı olumlu karşıladı." },
+  { "id": 16, "tur": "haber", "text": "Meteoroloji, hafta sonu için İç Anadolu'da kuvvetli yağış uyarısında bulundu." },
+  { "id": 17, "tur": "ogretici", "text": "İlk olarak ayarlar menüsünü açın, ardından gizlilik sekmesine tıklayın ve bu seçeneği kapatın." },
+  { "id": 18, "tur": "ogretici", "text": "Bir yapay sinir ağı, çok sayıda katmandan oluşur ve her katman bir önceki katmanın çıktısını işler." },
+  { "id": 19, "tur": "uzun", "text": "Eğer bu videoyu beğendiyseniz, kanala abone olmayı ve bildirimleri açmayı unutmayın, çünkü önümüzdeki hafta çok daha ilginç bir konuyla geri döneceğim." },
+  { "id": 20, "tur": "kisa", "text": "Teşekkürler, bir sonraki videoda görüşürüz!" }
+]
