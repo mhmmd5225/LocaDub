@@ -21,7 +21,7 @@ Derleme adımı yoktur: düz ES module JavaScript.
 3. Bir YouTube videosu açın ve oynatıcı çubuğundaki **TR** düğmesine (ya da açılır penceredeki anahtara)
    basın. Düğme durumu gösterir: Dublaj kapalı / Hazırlanıyor / Dublaj aktif / Dikkat / Hata.
 
-**Açılır pencere:** aç/kapa, durum kartı, seslendirme seçimi, dublaj ve orijinal ses seviyesi.
+**Açılır pencere:** üstte seslendirme seçici ve dublaj anahtarı (seçici anahtarın solunda), altında durum kartı ile dublaj ve orijinal ses seviyesi. Dublaj her tarayıcı açılışında kapalı başlar.
 
 **Ayarlar sayfası** (`options/`): Genel (Türkçe altyazı, önceden hazırlama süresi, sürüm denetimi, test motoru),
 Ses (konuşma hızı, dublaj ses seviyesi, orijinal ses, konuşmacılara farklı ses), Sözlük, Modeller (her model için

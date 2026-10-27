@@ -30,3 +30,7 @@ test('fixAsrPunct varsayılan kapalı, değer normalleştirilir', () => {
   assert.equal(S({ fixAsrPunct: 1 }).fixAsrPunct, true);
   assert.equal(S({ fixAsrPunct: '' }).fixAsrPunct, false);
 });
+
+test('dublaj varsayılan olarak kapalı (her açılışta kapalı davranışının dayanağı)', () => {
+  assert.equal(S({}).enabled, false);
+});
