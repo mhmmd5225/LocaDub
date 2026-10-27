@@ -1,2 +1,4 @@
 .models/
 node_modules/
+.data/
+.out/
