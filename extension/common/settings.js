@@ -9,6 +9,8 @@ export const DEFAULTS = Object.freeze({
   systemVoiceName: null,   // chrome.tts ses adı (isteğe bağlı)
   speakerVoices: false,    // konuşmacı değişince (>>) ikinci sesle konuş
   voice2: null,            // ikinci ses; null → birinci sesin karşıt cinsiyetlisi
+  glossaryMt: '',          // çeviri düzeltmeleri ("yanlış => doğru" satırları, common/glossary.js)
+  glossaryTts: '',         // okunuşlar (yalnızca seslendirmeden önce)
   originalVolume: 0.25,    // TTS sırasında orijinal ses çarpanı (0..1)
   ttsVolume: 1.0,          // TTS ses seviyesi (0..2)
   ttsSpeed: 1.0,           // temel TTS hızı (0.8..2.0)
@@ -35,6 +37,8 @@ export function normalizeSettings(raw = {}) {
   s.showSubtitles = !!s.showSubtitles;
   s.modelsApproved = !!s.modelsApproved;
   s.speakerVoices = !!s.speakerVoices;
+  s.glossaryMt = String(s.glossaryMt ?? '').slice(0, 20000);
+  s.glossaryTts = String(s.glossaryTts ?? '').slice(0, 20000);
   s.engineMode = s.engineMode === 'mock' ? 'mock' : 'real';
   s.ttsSpeed = clamp(Number(s.ttsSpeed) || 1, ...LIMITS.ttsSpeed);
   s.originalVolume = clamp(Number(s.originalVolume), ...LIMITS.originalVolume);

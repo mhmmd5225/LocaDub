@@ -84,6 +84,20 @@ small { display: block; color: var(--muted); font-size: 12.5px; }
 output { color: var(--muted); font-variant-numeric: tabular-nums; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.row.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+.row.stack > span small { display: block; }
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--fg);
+  font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  resize: vertical;
+}
+.intro { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.intro code { font-size: 12px; }
 select {
   padding: 5px 8px;
   border: 1px solid var(--line);

@@ -3,6 +3,7 @@
 import { DEFAULTS, getSettings, setSettings, onSettingsChanged, secondVoice } from '../common/settings.js';
 import { listCached, deleteByPrefix } from '../engines/common/model-cache.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
+import { parseGlossary } from '../common/glossary.js';
 
 const $ = (id) => document.getElementById(id);
 let settings = await getSettings();
@@ -68,10 +69,26 @@ for (const [id, fmt] of Object.entries(RANGES)) {
   input.addEventListener('change', () => setSettings({ [id]: Number(input.value) }));
 }
 
+// Sözlük: yazarken kısa gecikmeyle kaydedilir.
+for (const id of ['glossaryMt', 'glossaryTts']) {
+  let t = null;
+  const save = () => { clearTimeout(t); if ($(id).value !== settings[id]) setSettings({ [id]: $(id).value }); };
+  $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(save, 700); renderGlossaryNote(); });
+  $(id).addEventListener('change', save);
+}
+
+function renderGlossaryNote() {
+  const n = (id) => parseGlossary($(id).value).length;
+  const a = n('glossaryMt'), b = n('glossaryTts');
+  $('glossaryNote').textContent = a || b ? `${a} çeviri düzeltmesi, ${b} okunuş kuralı etkin.` : '';
+}
+
 $('speakerVoices').addEventListener('change', (e) => setSettings({ speakerVoices: e.target.checked }));
 $('voice2').addEventListener('change', (e) => setSettings({ voice2: e.target.value || null }));
 
 function renderBasics() {
+  for (const id of ['glossaryMt', 'glossaryTts']) if (document.activeElement !== $(id)) $(id).value = settings[id];
+  renderGlossaryNote();
   $('speakerVoices').checked = settings.speakerVoices;
   $('voice2Row').hidden = !settings.speakerVoices;
   $('enabled').checked = settings.enabled;
@@ -92,7 +109,7 @@ $('mock').addEventListener('change', async (e) => {
 });
 $('resetSettings').addEventListener('click', async () => {
   if (!(await confirmBox('Genel ve ses ayarları varsayılana dönecek. İndirilen modeller silinmez.', 'Varsayılana döndür'))) return;
-  const { enabled, modelsApproved, ...rest } = DEFAULTS;
+  const { enabled, modelsApproved, glossaryMt, glossaryTts, ...rest } = DEFAULTS; // sözlük kullanıcı verisidir, sıfırlanmaz
   await setSettings(rest);
 });
 
