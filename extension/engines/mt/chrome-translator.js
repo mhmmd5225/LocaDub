@@ -22,7 +22,11 @@ export function hasApi() {
 export async function availability() {
   if (!hasApi()) return 'unavailable';
   try {
-    return await globalThis.Translator.availability(LANGS);
+    // Some Chromium builds expose the API but never settle the promise: treat that as unavailable.
+    return await Promise.race([
+      globalThis.Translator.availability(LANGS),
+      new Promise((resolve) => setTimeout(resolve, 4000, 'unavailable')),
+    ]);
   } catch {
     return 'unavailable';
   }
