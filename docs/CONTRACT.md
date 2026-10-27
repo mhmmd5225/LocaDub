@@ -1,4 +1,4 @@
-# YT TR Dub — Mimari ve Ajanlar Arası Sözleşme
+# LocaDub — Mimari ve Ajanlar Arası Sözleşme
 
 Amaç: YouTube'da İngilizce altyazısı (manuel veya otomatik) olan videolarda altyazıyı
 **tarayıcıda, yerel olarak** Türkçeye çevirmek ve Türkçe seslendirmek (dublaj).

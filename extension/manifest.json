@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "YT TR Dub — YouTube Türkçe Dublaj",
-  "short_name": "YT TR Dub",
-  "version": "0.1.0",
-  "description": "YouTube videolarının İngilizce altyazısını tarayıcıda yerel olarak Türkçeye çevirir ve seslendirir.",
+  "name": "LocaDub — YouTube Türkçe Dublaj",
+  "short_name": "LocaDub",
+  "version": "0.2.0",
+  "description": "İngilizce YouTube videolarını bilgisayarınızda Türkçeye çevirir ve seslendirir. Metin ve ses hiçbir sunucuya gitmez.",
   "minimum_chrome_version": "116",
   "permissions": ["alarms", "offscreen", "storage", "tts", "unlimitedStorage"],
   "host_permissions": [
@@ -27,7 +27,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "YT TR Dub",
+    "default_title": "LocaDub — Türkçe dublaj",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
