@@ -37,7 +37,11 @@
     return origOpen.apply(this, arguments);
   };
 
+  // common/page.js → findPlayer ile aynı kural (bu betik modül değil).
   function player() {
+    if (location.pathname.startsWith('/shorts/')) {
+      return document.querySelector('ytd-reel-video-renderer[is-active] #shorts-player') || document.getElementById('shorts-player');
+    }
     return document.getElementById('movie_player');
   }
 

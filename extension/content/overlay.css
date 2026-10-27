@@ -74,6 +74,11 @@
   float: none;
   opacity: 1;
 }
+/* Shorts: kontrol çubuğu yok, düğme sağ üstte yüzer (sol üstte durum kutusu, en üst sırada YouTube'un düğmeleri var). */
+.yt-tr-dub-float { position: absolute; top: 56px; right: 12px; z-index: 60; }
+.yt-tr-dub-float .yt-tr-dub-btn { display: inline-flex; padding: 0; border: 0; background: none; cursor: pointer; }
+.yt-tr-dub-float .yt-tr-dub-pill { height: 28px; background: rgba(0, 0, 0, 0.55); }
+.yt-tr-dub-float .yt-tr-dub-btn:hover .yt-tr-dub-pill { background: rgba(0, 0, 0, 0.75); }
 .yt-tr-dub-btn .yt-tr-dub-pill {
   display: inline-flex;
   align-items: center;

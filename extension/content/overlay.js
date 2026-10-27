@@ -33,8 +33,10 @@ export class Overlay {
   }
 
   _resize() {
+    // Yükseklikle ölçeklenir; dikey (Shorts) oynatıcıda genişlik sınırlar.
     const h = this.player.clientHeight || 360;
-    this.root.style.setProperty('--yt-tr-dub-fs', `${Math.max(14, Math.min(40, h * 0.045))}px`);
+    const w = this.player.clientWidth || 640;
+    this.root.style.setProperty('--yt-tr-dub-fs', `${Math.max(14, Math.min(40, h * 0.045, w * 0.055))}px`);
   }
 
   setText(text) {
@@ -110,10 +112,21 @@ const BTN_LABELS = {
   error: 'Hata',
 };
 
-// Oynatıcı kontrol çubuğuna "TR + durum" düğmesi ekler/günceller.
-// state: yukarıdaki durumlardan biri; detail: araç ipucuna eklenen açıklama.
-export function ensureToggleButton(state, onClick, detail = '') {
-  const controls = document.querySelector('#movie_player .ytp-right-controls');
+// Oynatıcı kontrol çubuğuna "TR + durum" düğmesi ekler/günceller. Kontrol çubuğu olmayan Shorts oynatıcısında düğme
+// oynatıcının köşesinde yüzer. state: yukarıdaki durumlardan biri; detail: araç ipucuna eklenen açıklama.
+export function ensureToggleButton(state, onClick, detail = '', player = document.getElementById('movie_player')) {
+  if (!player) return null;
+  let controls;
+  if (player.id === 'movie_player') {
+    controls = player.querySelector('.ytp-right-controls');
+  } else {
+    controls = player.querySelector(':scope > .yt-tr-dub-float');
+    if (!controls) {
+      controls = document.createElement('div');
+      controls.className = 'yt-tr-dub-float';
+      player.appendChild(controls);
+    }
+  }
   if (!controls) return null;
   let btn = controls.querySelector('.' + BTN_CLASS);
   if (!btn) {

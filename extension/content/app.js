@@ -4,6 +4,7 @@ import { getSettings, setSettings, onSettingsChanged, voiceForSpeaker } from '..
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
 import { loadTranscript, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
+import { pageVideo, findPlayer, findVideo } from '../common/page.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -30,9 +31,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class UserError extends Error {}
 
+// İzleme sayfası, Shorts ve gömülü oynatıcı (common/page.js).
 function currentVideoId() {
-  if (location.pathname !== '/watch') return null;
-  return new URLSearchParams(location.search).get('v');
+  return pageVideo(location)?.videoId ?? null;
+}
+
+const pageKind = () => pageVideo(location)?.kind ?? 'watch';
+
+// Altyazı adresini bu sayfanın kökenine çevirir (youtube-nocookie gömülüsünde aynı köken isteği).
+function sameOrigin(url) {
+  const u = new URL(url, location.origin);
+  if (/(^|\.)youtube(-nocookie)?\.com$/.test(u.hostname)) u.host = location.host;
+  return u.toString();
 }
 
 function trKey(s) {
@@ -107,9 +117,10 @@ class Session {
 
   async start() {
     const alive = () => this.alive;
-    this.player = await waitFor(() => document.getElementById('movie_player'), { alive });
+    const kind = pageKind();
+    this.player = await waitFor(() => findPlayer(document, kind), { alive });
     if (!this.alive || !this.player) return;
-    this.video = await waitFor(() => this.player.querySelector('video.html5-main-video') || this.player.querySelector('video'), { alive });
+    this.video = await waitFor(() => findVideo(this.player), { alive });
     if (!this.alive || !this.video) return;
 
     this.overlay = new Overlay(this.player);
@@ -249,7 +260,7 @@ class Session {
 
   async _fetchJson3(pick) {
     const { track, tlang } = pick;
-    let txt = await fetchText(buildJson3Url(track.baseUrl, { tlang }));
+    let txt = await fetchText(sameOrigin(buildJson3Url(track.baseUrl, { tlang })));
     // Yeni YouTube sürümleri timedtext için "pot" belirteci ister: oynatıcının isteğinden al.
     // Oynatıcı sayfa açılışında henüz hazır olmayabilir; birkaç kez dene.
     for (let attempt = 0; !txt && attempt < 3 && this.alive; attempt++) {
@@ -263,7 +274,7 @@ class Session {
           }, 20000);
         } catch { /* yoksay */ }
       }
-      if (cap && this.alive) txt = await fetchText(buildJson3Url(mergeTimedTextParams(track.baseUrl, cap), { tlang }));
+      if (cap && this.alive) txt = await fetchText(sameOrigin(buildJson3Url(mergeTimedTextParams(track.baseUrl, cap), { tlang })));
     }
     if (!txt) {
       throw new UserError('Altyazı indirilemedi (YouTube boş yanıt verdi). Oynatıcıda CC düğmesini bir kez açıp kapatın, sonra TR düğmesiyle dublajı yeniden başlatın.');
@@ -613,10 +624,11 @@ function ensureButton() {
     state = session?.btnState || 'preparing';
     detail = session?.btnDetail || '';
   }
+  const player = session?.player?.isConnected ? session.player : findPlayer(document, pageKind());
   ensureToggleButton(state, () => {
     resumeAudio();
     setSettings({ enabled: !settings.enabled });
-  }, detail);
+  }, detail, player);
 }
 
 function route() {

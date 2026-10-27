@@ -99,6 +99,7 @@ xvfb-run -a node tests/extension/e2e/speaker-voices.e2e.cjs
 xvfb-run -a node tests/extension/e2e/glossary.e2e.cjs
 xvfb-run -a node tests/extension/e2e/update-banner.e2e.cjs
 xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
+xvfb-run -a node tests/extension/e2e/shorts-embed.e2e.cjs
 ```
 
 **Sürüm yayınlama:** `manifest.json` → `version` artırılıp `main`'e birleştirilince site yeni ZIP'i ve
@@ -106,7 +107,9 @@ xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
 
 ## Bilinen sınırlamalar
 
-- Yalnızca `www.youtube.com/watch` (Shorts, canlı yayın, gömülü oynatıcı desteklenmez).
+- Desteklenen sayfalar: `www.youtube.com/watch`, Shorts (`/shorts/…`; TR düğmesi oynatıcının sağ üstünde yüzer) ve
+  başka sitelerdeki gömülü oynatıcı (`youtube.com/embed/…`, `youtube-nocookie.com/embed/…`) — `common/page.js`.
+  Canlı yayın ve `m.youtube.com` desteklenmez.
 - YouTube arayüz/timedtext değişiklikleri altyazı alma yolunu bozabilir.
 - Uzun model indirmelerinde service worker yeniden başlarsa ilk istek zaman aşımına uğrayabilir;
   indirme offscreen'de sürer, bitince içerik betiği yeniden bağlanır.
