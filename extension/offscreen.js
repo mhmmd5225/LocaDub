@@ -201,7 +201,9 @@ async function handle(msg) {
       if (voice === 'system') return { system: true };
       const text = String(msg.text ?? '').trim();
       if (!text) return { pcmBase64: '', sampleRate: 22050, format: 's16le', samples: 0 };
-      const mod = await ensure('tts', settings, voice ? { voice } : {});
+      // Motor ayardaki (birinci) sesle hazırlanır; ikinci konuşmacının sesi synthesize içinde yüklenir
+      // (motor bellekte iki ses tutar), böylece sesler arasında geçişte motor yeniden başlatılmaz.
+      const mod = await ensure('tts', settings);
       const speed = Math.min(2, Math.max(0.5, Number(msg.speed) || 1));
       const r = await run('tts', msg.tag, (signal) => mod.synthesize(text, { voice, speed, signal }));
       if (r?.system) return { system: true };

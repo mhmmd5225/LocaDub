@@ -159,3 +159,17 @@ test('mergeSentences: konuşmacı değişimi (>>) yeni cümle başlatır', () =>
   const s = mergeSentences(cues);
   assert.deepEqual(s.map((x) => x.text), ['are you ready', 'yes I am']);
 });
+
+test('mergeSentences: konuşmacı bilgisi cümlelere taşınır (>> her seferinde değişir)', () => {
+  const cues = parseJson3({ events: [
+    { tStartMs: 0, dDurationMs: 1000, segs: [{ utf8: 'are you ready?' }] },
+    { tStartMs: 1000, dDurationMs: 1000, segs: [{ utf8: '>> yes I am.' }] },
+    { tStartMs: 2000, dDurationMs: 1000, segs: [{ utf8: 'Let us go.' }] },
+    { tStartMs: 3000, dDurationMs: 1000, segs: [{ utf8: '>> okay then.' }] },
+  ] });
+  const s = mergeSentences(cues);
+  assert.deepEqual(s.map((x) => [x.text, x.speaker ?? 0]), [
+    ['are you ready?', 0], ['yes I am.', 1], ['Let us go.', 1], ['okay then.', 0],
+  ]);
+  assert.ok(!('speaker' in s[0]), 'ilk konuşmacıda alan yazılmaz');
+});
