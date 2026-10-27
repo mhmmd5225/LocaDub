@@ -113,20 +113,19 @@ function score(hypFile, refFile) {
 }
 
 // ---------- Çalıştır ----------
+// Her sistem ayrı süreçte çalışır: OPUS-MT ile transformers.js farklı onnxruntime-node sürümleri getirir ve aynı
+// süreçte yüklenince paylaşılan kütüphane çakışır.
 
 const pairs = loadData();
 const sets = { metin: pairs.map((p) => p.en), asr: pairs.map((p) => asrify(p.en)) };
 const refFile = join(OUT, 'ref.tr');
-writeFileSync(refFile, pairs.map((p) => p.tr).join('\n') + '\n');
-console.log(`${pairs.length} cümle (WMT18 haber, EN→TR), ${THREADS} iş parçacığı\n`);
 
-const rows = [];
-const samples = {};
-for (const key of SYSTEMS) {
+async function runOne(key) {
   const t0 = performance.now();
   const sys = await MAKERS[key]();
   console.log(`${sys.name}: yüklendi (${((performance.now() - t0) / 1000).toFixed(1)} sn)`);
   await sys.translate('Hello.');
+  const result = { name: sys.name, rows: [], hyps: {} };
   for (const [set, list] of Object.entries(sets)) {
     const hyps = [];
     const t1 = performance.now();
@@ -139,18 +138,31 @@ for (const key of SYSTEMS) {
     const file = join(OUT, `${key}-${set}.tr`);
     writeFileSync(file, hyps.join('\n') + '\n');
     const s = score(file, refFile);
-    rows.push({ sys: sys.name, set, ...s, ms });
-    (samples[set] ??= []).push({ sys: sys.name, hyps });
+    result.rows.push({ sys: sys.name, set, ...s, ms });
+    result.hyps[set] = hyps;
     console.log(`  ${set}: chrF ${s.chrf.toFixed(1)}  BLEU ${s.bleu.toFixed(1)}  ${ms.toFixed(0)} ms/cümle`);
   }
+  writeFileSync(join(OUT, `${key}.json`), JSON.stringify(result));
 }
 
-console.log('\n| Sistem | Girdi | chrF | BLEU | ms/cümle (CPU) |\n|---|---|---|---|---|');
-for (const r of rows) console.log(`| ${r.sys} | ${r.set} | ${r.chrf.toFixed(1)} | ${r.bleu.toFixed(1)} | ${r.ms.toFixed(0)} |`);
-
-console.log('\nÖrnekler (asr girdisi):');
-for (let i = 0; i < Math.min(5, pairs.length); i++) {
-  console.log(`\nEN : ${sets.asr[i]}\nREF: ${pairs[i].tr}`);
-  for (const s of samples.asr || []) console.log(`${s.sys.split(' ')[0].padEnd(15)}: ${s.hyps[i]}`);
+if (process.argv.includes('--child')) {
+  await runOne(SYSTEMS[0]);
+} else {
+  writeFileSync(refFile, pairs.map((p) => p.tr).join('\n') + '\n');
+  console.log(`${pairs.length} cümle (WMT18 haber, EN→TR), ${THREADS} iş parçacığı\n`);
+  const results = [];
+  for (const key of SYSTEMS) {
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--child', '--systems', key, '--n', String(N), '--threads', String(THREADS)],
+      { stdio: 'inherit' });
+    results.push(JSON.parse(readFileSync(join(OUT, `${key}.json`), 'utf8')));
+  }
+  const rows = results.flatMap((r) => r.rows);
+  console.log('\n| Sistem | Girdi | chrF | BLEU | ms/cümle (CPU) |\n|---|---|---|---|---|');
+  for (const r of rows) console.log(`| ${r.sys} | ${r.set} | ${r.chrf.toFixed(1)} | ${r.bleu.toFixed(1)} | ${r.ms.toFixed(0)} |`);
+  console.log('\nÖrnekler (asr girdisi):');
+  for (let i = 0; i < Math.min(5, pairs.length); i++) {
+    console.log(`\nEN : ${sets.asr[i]}\nREF: ${pairs[i].tr}`);
+    for (const r of results) console.log(`${r.name.split(' ')[0].padEnd(15)}: ${r.hyps.asr[i]}`);
+  }
+  writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ n: pairs.length, threads: THREADS, rows }, null, 2));
 }
-writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ n: pairs.length, threads: THREADS, rows }, null, 2));
