@@ -30,7 +30,7 @@
         <div class="media-host" id="mediaHost"></div>
         <div class="empty" id="empty">
           <p class="empty-title">Eklenti kurmadan Türkçe dublaj</p>
-          <p>Bir video ve onun İngilizce altyazısını verin. Çeviri ve seslendirme bu tarayıcıda yapılır; metin ve ses hiçbir sunucuya gitmez.</p>
+          <p>YouTube bağlantısını yapıştırın ya da bilgisayarınızdan bir video seçin. Konuşma tanıma, çeviri ve seslendirme bu tarayıcıda yapılır; metin ve ses hiçbir sunucuya gitmez.</p>
         </div>
         <div class="sub" id="sub" hidden></div>
       </div>
@@ -42,12 +42,14 @@
           <button class="btn small ghost" id="fullscreen">Tam ekran</button>
         </div>
       </div>
+      <p class="listen-status" id="listenStatus" role="status" aria-live="polite"></p>
+      <button class="btn small ghost" id="reopen" hidden>Dinleyici penceresini yeniden aç</button>
       <p class="hint">Tam ekranı buradaki düğmeyle açın; YouTube'un kendi tam ekranında Türkçe altyazı görünmez.</p>
     </section>
 
     <aside class="side">
       <section class="card" aria-labelledby="h-video">
-        <h2 id="h-video"><span class="step">1</span>Video</h2>
+        <h2 id="h-video">Video</h2>
         <div class="tabs" role="tablist" data-tabs="source" aria-label="Video kaynağı">
           <button role="tab" data-value="youtube" aria-controls="p-youtube" id="t-youtube">YouTube bağlantısı</button>
           <button role="tab" data-value="file" aria-controls="p-file" id="t-file">Bilgisayardaki video</button>
@@ -57,6 +59,8 @@
             <span>Video bağlantısı</span>
             <input id="ytUrl" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
           </label>
+          <p class="note">Başlatınca küçük bir dinleyici penceresi açılır. Orada bir kez <b>bu sekmeyi paylaş</b> izni verirsiniz;
+            video sesi oradan yazıya dökülür. Masaüstünde Chrome ya da Edge gerekir.</p>
         </div>
         <div role="tabpanel" id="p-file" aria-labelledby="t-file" hidden>
           <label class="field">
@@ -67,35 +71,17 @@
         </div>
       </section>
 
-      <section class="card" aria-labelledby="h-subs">
-        <h2 id="h-subs"><span class="step">2</span>İngilizce altyazı</h2>
-        <div class="tabs" role="tablist" data-tabs="subs" aria-label="Altyazı kaynağı">
-          <button role="tab" data-value="paste" aria-controls="p-paste" id="t-paste">Transkripti yapıştır</button>
-          <button role="tab" data-value="subfile" aria-controls="p-subfile" id="t-subfile">Altyazı dosyası</button>
-        </div>
-        <div role="tabpanel" id="p-paste" aria-labelledby="t-paste">
-          <details class="howto">
-            <summary>YouTube transkripti nasıl kopyalanır?</summary>
-            <ol>
-              <li>Videoyu <a id="openOnYouTube" href="https://www.youtube.com/" target="_blank" rel="noopener" hidden>YouTube'da açın</a><span class="or-open">YouTube'da açın</span>, açıklamanın altındaki <b>Transkripti göster</b>'e tıklayın.</li>
-              <li>Paneldeki dil İngilizce değilse altından <b>English</b> seçin.</li>
-              <li>İlk satırdan son satıra fareyle sürükleyerek seçin, kopyalayın (Ctrl+C) ve aşağıya yapıştırın.</li>
-            </ol>
-            <p>Zaman damgaları (0:00, 0:04…) metinde kalmalıdır.</p>
-          </details>
-          <label class="field">
-            <span>Transkript</span>
-            <textarea id="subsText" rows="6" spellcheck="false" placeholder="0:00&#10;Hello and welcome to the channel.&#10;0:04&#10;Today we're going to talk about…"></textarea>
-          </label>
-        </div>
-        <div role="tabpanel" id="p-subfile" aria-labelledby="t-subfile" hidden>
-          <label class="field">
-            <span>.srt, .vtt ya da YouTube json3</span>
-            <input id="subsFile" type="file" accept=".srt,.vtt,.json,.json3,.txt,text/vtt,application/x-subrip">
-          </label>
-        </div>
+      <details class="card optional">
+        <summary><h2>Kendi altyazım var <span class="opt">isteğe bağlı</span></h2></summary>
+        <p class="note">Altyazı vermezseniz videonun İngilizce konuşması bu tarayıcıda yazıya dökülür; bir şey yapmanız gerekmez.
+          Elinizde .srt / .vtt dosyası varsa onu kullanmak daha isabetlidir.</p>
+        <label class="field">
+          <span>.srt, .vtt ya da YouTube json3</span>
+          <input id="subsFile" type="file" accept=".srt,.vtt,.json,.json3,.txt,text/vtt,application/x-subrip">
+        </label>
         <p class="subs-info" id="subsInfo" aria-live="polite"></p>
-      </section>
+        <button class="linklike" id="subsClear" hidden>Altyazı dosyasını kaldır</button>
+      </details>
 
       <button class="btn primary wide" id="start">Dublajı başlat</button>
 
@@ -143,8 +129,8 @@
         <button class="btn small ghost danger" id="clearModels" hidden>Tüm modelleri sil</button>
       </details>
 
-      <p class="fine">Eklenti kuruluysa YouTube'da altyazılar otomatik alınır; web sürümünde altyazıyı siz verirsiniz.
-        Modeller: OPUS-MT (CC BY 4.0), Antalia Mini (Apache-2.0), Ahenk Cep (CC BY 4.0, ozgurguler).</p>
+      <p class="fine">Yalnızca İngilizce konuşulan videolar desteklenir.
+        Modeller: Whisper base.en (MIT, OpenAI), OPUS-MT (CC BY 4.0), Antalia Mini (Apache-2.0), Ahenk Cep (CC BY 4.0, ozgurguler).</p>
     </aside>
   </main>
 

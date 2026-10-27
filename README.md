@@ -16,15 +16,21 @@ projesinden uyarlanmıştır.
 
 ## Eklentisiz kullanım (web sürümü)
 
-https://localdub.mhmmd.app/app/ — aynı çeviri ve ses modelleri doğrudan tarayıcı sekmesinde çalışır, kurulum gerekmez.
+https://localdub.mhmmd.app/app/ — kurulum yok: YouTube bağlantısını yapıştırıp **Dublajı başlat**'a basın.
 
-1. Video: YouTube bağlantısı (gömülü oynatıcı) ya da bilgisayardaki bir video dosyası.
-2. İngilizce altyazı: YouTube'daki **Transkripti göster** metnini yapıştırın ya da .srt / .vtt / json3 dosyası seçin.
-   (Web sayfası YouTube altyazısını kendisi alamaz; eklenti bunu otomatik yapar.)
-3. **Dublajı başlat**. Modeller ilk kullanımda onayınızla indirilir ve tarayıcıda saklanır.
+- **Konuşma tanıma:** Videonun İngilizce konuşması tarayıcıda
+  [Whisper base.en](https://huggingface.co/onnx-community/whisper-base.en) ile yazıya dökülür
+  ([transformers.js](https://github.com/huggingface/transformers.js), ≈136 MB, bir kez indirilir). Altyazı gerekmez.
+- **YouTube:** Web sayfası YouTube'un sesine erişemediği için küçük bir *dinleyici penceresi* (`site/app/listen.html`)
+  açılır. Pencere videoyu ana oynatıcının önünde, sessiz olarak (`suppressLocalAudioPlayback`) oynatır ve bir kez
+  verilen "bu sekmeyi paylaş" izniyle kendi sesini yakalar. Masaüstü Chrome ya da Edge gerekir. Gömmeye kapalı
+  videolar oynatılamaz.
+- **Bilgisayardaki video:** Ses doğrudan dosyadan çözülür; her tarayıcıda çalışır.
+- **Bekleme:** Yazıya dökme, çeviri ya da ses hazır değilse video kendiliğinden kısa süre bekletilir; dublaj kaçmaz.
+- **İsteğe bağlı:** .srt / .vtt / json3 altyazı dosyası verilirse konuşma tanıma kullanılmaz.
 
-YouTube'un kendi tam ekranında Türkçe altyazı görünmez; sayfadaki **Tam ekran** düğmesini kullanın. Gömmeye
-kapalı videolar web sürümünde oynatılamaz.
+YouTube'un kendi tam ekranında Türkçe altyazı görünmez; sayfadaki **Tam ekran** düğmesini kullanın.
+Yalnızca İngilizce konuşulan videolar desteklenir.
 
 ## Eklenti kurulumu
 
@@ -45,7 +51,7 @@ Ayrıntılar: [extension/README.md](extension/README.md).
 | `tests/mt/`, `tests/tts/` | Çeviri ve ses motoru testleri (`npm install && npm test`; uçtan uca testler modelleri indirir) |
 | `site/` | Tanıtım sayfası: https://localdub.mhmmd.app (Netlify; yedek: GitHub Pages) |
 | `site/app/` | Web sürümü. Motorları ve saf modülleri `extension/`'dan alır: `python3 tools/site/build.py` bunları `site/app/ext/`'e kopyalar (yerelde: derleyip `site/` klasörünü herhangi bir statik sunucuyla sunun) |
-| `tests/app/` | Web sürümünün altyazı ayrıştırıcı testleri: `node --test tests/app/*.test.mjs` |
+| `tests/app/` | Web sürümünün testleri (altyazı ayrıştırıcı, konuşma tanıma yardımcıları): `node --test tests/app/*.test.mjs` |
 | `tools/` | Model indirme, simge üretme ve sayfa önizleme araçları |
 | `docs/CONTRACT.md` | Bileşenler arası sözleşme (mesajlar, motor API'leri) |
 

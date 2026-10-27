@@ -55,6 +55,7 @@ export class FileMedia extends Emitter {
   get playbackRate() { return this.video.playbackRate || 1; }
   get duration() { return this.video.duration || 0; }
   play() { return this.video.play().catch(() => {}); }
+  pause() { this.video.pause(); }
   destroy() {
     this._off.forEach((f) => f());
     this.ducker.destroy();
@@ -86,7 +87,7 @@ export function parseYouTubeId(input) {
 }
 
 let apiP = null;
-function loadYouTubeApi() {
+export function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   if (!apiP) {
     apiP = new Promise((resolve, reject) => {
@@ -233,6 +234,7 @@ export class YouTubeMedia extends Emitter {
   get playbackRate() { return this._rate || 1; }
   get duration() { try { return this.player.getDuration() || 0; } catch { return 0; } }
   play() { try { this.player.playVideo(); } catch { /* yoksay */ } }
+  pause() { try { this.player.pauseVideo(); } catch { /* yoksay */ } }
   destroy() {
     clearInterval(this._poll);
     this.ducker.destroy();

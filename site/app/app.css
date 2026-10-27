@@ -187,3 +187,10 @@ dialog {
 dialog::backdrop { background: rgba(10, 12, 24, 0.55); }
 dialog p { margin: 0 0 16px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.listen-status { margin: 6px 0 0; font-size: 14.5px; color: var(--mist); }
+.listen-status:empty { display: none; }
+.listen-status[data-kind="ok"] { color: var(--green); }
+.listen-status[data-kind="warn"] { color: var(--amber); font-weight: 600; }
+.listen-status[data-kind="error"] { color: var(--red); }
+#reopen { margin-top: 8px; }
+.opt { margin-left: 6px; font: 500 12.5px/1 var(--text); color: var(--mist); }

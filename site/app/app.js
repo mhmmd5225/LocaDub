@@ -12,6 +12,8 @@ import { listCached, deleteByPrefix, clearModels } from './ext/engines/common/mo
 import * as engines from './engines.js';
 import { FileMedia, YouTubeMedia, WebSystemVoice, parseYouTubeId, systemVoices } from './media.js';
 import { parseSubtitles } from './subs.js';
+import { mergeSentences } from './ext/content/captions.js';
+import { ASR_MODEL, BufferSource, Coverage, Transcriber, clearAsrCache, decodeFileAudio, isAsrCached } from './asr.js';
 
 const LOG = '[locadub]';
 const TICK_MS = 100;
@@ -137,6 +139,12 @@ class Session {
   dubVolume() { return settings.ttsVolume * this.ducker.userVolume(); }
   applyDubVolume() { this.audio.setVolume(this.dubVolume()); }
 
+  // Konuşma tanımadan yeni cümleler eklendi (first: ilk eklenenin indeksi).
+  onSentencesAdded(first) {
+    if (first <= this.lastPlayed) this.lastPlayed = lastPlayedAfterSeek(this.sentences, this.media.currentTime);
+    this._wakeUp();
+  }
+
   initEngines() {
     if (!this._initing) this._initing = this._initEngines().finally(() => { this._initing = null; });
     return this._initing;
@@ -144,7 +152,8 @@ class Session {
 
   async _initEngines() {
     this.enginesReady = false;
-    ui.status(`Çeviri ve ses motorları yükleniyor… (${this.sentences.length} cümle)`);
+    this.engineFailed = false;
+    ui.status('Çeviri ve ses motorları yükleniyor…');
     const useSystem = settings.voice === 'system';
     const onProgress = (p) => { if (this.alive) ui.progress(p); };
     const [mt, tts] = await Promise.allSettled([
@@ -154,6 +163,7 @@ class Session {
     if (!this.alive) return false;
     ui.progress(null);
     if (mt.status === 'rejected') {
+      this.engineFailed = true;
       ui.status('Çeviri motoru başlatılamadı: ' + (mt.reason?.message || mt.reason), 'error');
       renderModels();
       return false;
@@ -164,7 +174,7 @@ class Session {
     } else if (this.ttsBroken) {
       ui.status('Bu tarayıcıda sistem sesi yok, yalnızca altyazı gösterilecek.', 'warn', 12000);
     } else {
-      ui.status('Dublaj hazır. Videoyu oynatın.', 'ok');
+      ui.status('Dublaj hazır.', 'ok');
     }
     this.enginesReady = true;
     renderModels();
@@ -429,8 +439,7 @@ function onSettings(prev, keys) {
 // ---------- Kaynak seçimi ve başlatma ----------
 
 let sourceTab = 'youtube';
-let subsTab = 'paste';
-let parsedSubs = null; // { sentences, format, name }
+let parsedSubs = null; // isteğe bağlı altyazı dosyası: { sentences, format, name }
 
 function setTab(group, value) {
   for (const b of document.querySelectorAll(`[data-tabs="${group}"] [role="tab"]`)) {
@@ -440,8 +449,6 @@ function setTab(group, value) {
     $(b.getAttribute('aria-controls')).hidden = !on;
   }
   if (group === 'source') sourceTab = value;
-  else subsTab = value;
-  updateSubsInfo();
 }
 
 for (const list of document.querySelectorAll('[data-tabs]')) {
@@ -466,51 +473,27 @@ const fmtClock = (sec) => {
   return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + ':' + String(r).padStart(2, '0');
 };
 
-async function readSubsInput() {
-  if (subsTab === 'paste') {
-    const text = $('subsText').value;
-    return text.trim() ? { text, name: 'yapıştırılan metin' } : null;
-  }
-  const f = $('subsFile').files[0];
-  return f ? { text: await f.text(), name: f.name } : null;
-}
-
-const FORMAT_NAMES = { transcript: 'YouTube transkripti', timed: 'SRT/VTT', json3: 'YouTube json3' };
+const FORMAT_NAMES = { transcript: 'transkript', timed: 'SRT/VTT', json3: 'YouTube json3' };
 
 async function updateSubsInfo() {
   const info = $('subsInfo');
   parsedSubs = null;
-  let input;
-  try { input = await readSubsInput(); } catch { input = null; }
-  if (!input) {
-    info.textContent = '';
-    info.dataset.kind = '';
-    return;
-  }
+  const f = $('subsFile').files[0];
+  $('subsClear').hidden = !f;
+  if (!f) { info.textContent = ''; info.dataset.kind = ''; return; }
   try {
-    const r = parseSubtitles(input.text);
-    parsedSubs = { ...r, name: input.name };
+    const r = parseSubtitles(await f.text());
+    parsedSubs = { ...r, name: f.name };
     const last = r.sentences[r.sentences.length - 1];
-    info.textContent = `✓ ${r.sentences.length} cümle · ${FORMAT_NAMES[r.format]} · ${fmtClock(r.sentences[0].start)}–${fmtClock(last.end)}`;
+    info.textContent = `✓ ${r.sentences.length} cümle · ${FORMAT_NAMES[r.format]} · ${fmtClock(r.sentences[0].start)}–${fmtClock(last.end)}. Konuşma tanıma kullanılmayacak.`;
     info.dataset.kind = 'ok';
   } catch (e) {
     info.textContent = e.message;
     info.dataset.kind = 'error';
   }
 }
-
-let subsTimer = null;
-$('subsText').addEventListener('input', () => { clearTimeout(subsTimer); subsTimer = setTimeout(updateSubsInfo, 250); });
 $('subsFile').addEventListener('change', updateSubsInfo);
-
-// YouTube bağlantısı değişince transkript adımlarındaki "videoyu YouTube'da aç" bağlantısını güncelle.
-$('ytUrl').addEventListener('input', () => {
-  const id = parseYouTubeId($('ytUrl').value);
-  const a = $('openOnYouTube');
-  a.hidden = !id;
-  document.querySelector('.or-open').hidden = !!id;
-  if (id) a.href = `https://www.youtube.com/watch?v=${id}`;
-});
+$('subsClear').addEventListener('click', () => { $('subsFile').value = ''; updateSubsInfo(); });
 
 function confirmBox(text, yesLabel) {
   const d = $('confirm');
@@ -523,23 +506,25 @@ function confirmBox(text, yesLabel) {
 }
 
 // Seçili modeller indirilmemişse boyutu gösterip onay ister; Chrome çevirmeni dil paketi için tıklama gerekir.
-async function approveModels() {
-  if (settings.engineMode === 'mock') return true;
+async function approveModels({ asr }) {
   const lists = await engines.listAll(settings);
   const backend = effectiveBackend(lists);
   const voice = effectiveVoice(lists);
   let mb = 0;
   const names = [];
-  if (backend?.id === 'opus-mt' && !backend.downloaded) { mb += backend.sizeMB; names.push(backend.label); }
-  if (voice && !voice.system && !voice.cached) { mb += voice.sizeMB; names.push(voice.label); }
+  if (asr && !(await isAsrCached())) { mb += ASR_MODEL.sizeMB; names.push('konuşma tanıma (Whisper)'); }
+  if (settings.engineMode !== 'mock') {
+    if (backend?.id === 'opus-mt' && !backend.downloaded) { mb += backend.sizeMB; names.push('çeviri (OPUS-MT)'); }
+    if (voice && !voice.system && !voice.cached) { mb += voice.sizeMB; names.push(`ses (${voice.label})`); }
+  }
   if (mb > 0) {
     const ok = await confirmBox(
-      `İlk kullanım için ${names.join(' ve ')} indirilecek (yaklaşık ${fmtMB(mb)}). Modeller bu tarayıcıda saklanır; ` +
+      `İlk kullanım için ${names.join(', ')} modelleri indirilecek (yaklaşık ${fmtMB(mb)}). Modeller bu tarayıcıda saklanır; ` +
       'sonraki kullanımlarda yeniden indirilmez. Metin ve ses hiçbir sunucuya gönderilmez.',
       `İndir ve başlat (${fmtMB(mb)})`);
     if (!ok) return false;
   }
-  if (backend?.id === 'chrome-translator' && backend.needsUserActivation) {
+  if (settings.engineMode !== 'mock' && backend?.id === 'chrome-translator' && backend.needsUserActivation) {
     ui.status('Chrome EN→TR dil paketi hazırlanıyor…');
     try {
       const mt = await engines.loadModule('mt', 'real');
@@ -552,34 +537,183 @@ async function approveModels() {
   return true;
 }
 
+// ---------- Konuşma tanıma ----------
+
+const listenUi = (text, kind = 'info') => {
+  const el = $('listenStatus');
+  el.textContent = text || '';
+  el.dataset.kind = text ? kind : '';
+};
+
+// YouTube: dinleyici penceresi (listen.html) videoyu önden oynatıp yazıya döker; burada yalnızca sonuçlar toplanır.
+class PopupSource {
+  constructor(win, media) {
+    this.win = win;
+    this.media = media;
+    this.coverage = new Coverage();
+    this.onCues = null;
+    this.closed = false;
+    this._onMsg = (ev) => {
+      const d = ev.data;
+      if (ev.origin !== location.origin || ev.source !== this.win || d?.source !== 'locadub-listener') return;
+      if (d.type === 'cues') {
+        this.coverage.list = Array.isArray(d.coverage) ? d.coverage : [];
+        this.onCues?.(d.cues || []);
+      } else if (d.type === 'status') listenUi(d.text, d.kind);
+      else if (d.type === 'progress' && d.total) listenUi(`Konuşma tanıma modeli indiriliyor… %${Math.floor((d.loaded / d.total) * 100)}`);
+    };
+    window.addEventListener('message', this._onMsg);
+    this._timer = setInterval(() => this._sync(), 400);
+  }
+  _sync() {
+    if (this.win.closed) {
+      if (!this.closed) {
+        this.closed = true;
+        listenUi('Dinleyici penceresi kapandı; yeni bölümler yazıya dökülemiyor.', 'error');
+        $('reopen').hidden = false;
+      }
+      return;
+    }
+    this.win.postMessage({ source: 'locadub-main', type: 'main', t: this.media.currentTime, playing: !this.media.paused }, location.origin);
+  }
+  until(t) { return this.coverage.until(t); }
+  follow() {}
+  destroy() {
+    clearInterval(this._timer);
+    window.removeEventListener('message', this._onMsg);
+    try { this.win.close(); } catch { /* yoksay */ }
+  }
+}
+
+function openListener(videoId) {
+  return window.open(`listen.html?v=${encodeURIComponent(videoId)}`, 'locadub-listener', 'popup,width=600,height=680');
+}
+
+$('reopen').addEventListener('click', () => {
+  if (!job?.videoId) return;
+  const w = openListener(job.videoId);
+  if (!w) { listenUi('Açılır pencere engellendi. Adres çubuğundan bu siteye açılır pencere izni verin.', 'error'); return; }
+  job.source?.destroy();
+  job.source = new PopupSource(w, job.media);
+  job.source.onCues = addCues;
+  $('reopen').hidden = true;
+  listenUi('Dinleyici penceresinde "Dinlemeyi başlat"a basın.');
+});
+
+// Yazıya dökülen yeni parçaları cümle listesine sıralı ekler (çakışanlar atlanır).
+function addCues(cues) {
+  if (!job || !cues.length) return;
+  const S = job.sentences;
+  const fresh = mergeSentences(cues).filter((n) => {
+    const mid = (n.start + n.end) / 2;
+    return !S.some((s) => mid >= s.start && mid <= s.end);
+  });
+  if (!fresh.length) return;
+  let first = Infinity;
+  for (const n of fresh) {
+    let pos = S.findIndex((s) => s.start > n.start);
+    if (pos < 0) pos = S.length;
+    S.splice(pos, 0, { ...n, tr: null, audio: null });
+    first = Math.min(first, pos);
+  }
+  S.forEach((s, i) => { s.i = i; });
+  session?.onSentencesAdded(first);
+}
+
+// Dublaj kaçmasın diye video gerekirse bekletilir (tampon gibi): konuşma henüz yazıya dökülmediyse,
+// motorlar yükleniyorsa ya da sıradaki cümlenin çevirisi/sesi hazır değilse. Hazır olunca kendiliğinden sürer.
+const HOLD_TEXT = {
+  listen: 'Ses yazıya dökülüyor; video birkaç saniye içinde kendiliğinden devam edecek…',
+  engines: 'Çeviri ve ses motorları hazırlanıyor; video hazır olunca kendiliğinden başlayacak…',
+  translate: 'Türkçe dublaj hazırlanıyor; video birazdan kendiliğinden devam edecek…',
+  synth: 'Türkçe dublaj hazırlanıyor; video birazdan kendiliğinden devam edecek…',
+};
+
+function holdReason(t) {
+  const m = job.media;
+  const dur = m.duration || Infinity;
+  if (job.source) {
+    let u = t >= dur - 1.5 ? Infinity : job.source.until(t);
+    if (u >= dur - 1.5) u = Infinity; // videonun sonuna kadar yazıya döküldü
+    if (u < t + (job.gated === 'listen' ? 20 : 1.5)) return 'listen';
+  }
+  if (!session || session.engineFailed) return null;
+  if (!session.enginesReady) return 'engines';
+  const needAudio = !session.ttsBroken && settings.voice !== 'system';
+  const p = prepStatus(session.sentences, t, 5, { needAudio, soonSec: job.gated ? 3 : 0.4 });
+  return p ? p.phase : null;
+}
+
+function gateTick() {
+  if (!job) return;
+  const m = job.media;
+  const t = m.currentTime;
+  job.source?.follow(t);
+  const reason = settings.enabled ? holdReason(t) : null;
+  if (reason && !job.gated && !m.paused) {
+    job.gated = reason;
+    m.pause();
+  } else if (job.gated && !reason) {
+    job.gated = false;
+    m.play();
+    listenUi('');
+    return;
+  }
+  if (job.gated) {
+    job.gated = reason;
+    listenUi(HOLD_TEXT[reason], 'warn');
+  }
+}
+
+function destroyJob() {
+  stopSession();
+  if (!job) return;
+  clearInterval(job.gateTimer);
+  job.source?.destroy();
+  job.transcriber?.dispose();
+  job.media.destroy();
+  job = null;
+  $('reopen').hidden = true;
+  listenUi('');
+}
+
 $('start').addEventListener('click', async () => {
   resumeAudio();
   const btn = $('start');
   if (btn.disabled) return;
-  // Kaynak
-  let make;
+  let make, videoId = null, file = null;
   if (sourceTab === 'youtube') {
-    const id = parseYouTubeId($('ytUrl').value);
-    if (!id) { ui.status('Geçerli bir YouTube bağlantısı girin (ör. https://www.youtube.com/watch?v=…).', 'error'); $('ytUrl').focus(); return; }
-    make = (host) => new YouTubeMedia(host, id);
+    videoId = parseYouTubeId($('ytUrl').value);
+    if (!videoId) { ui.status('Geçerli bir YouTube bağlantısı girin (ör. https://www.youtube.com/watch?v=…).', 'error'); $('ytUrl').focus(); return; }
+    make = (host) => new YouTubeMedia(host, videoId);
   } else {
-    const f = $('videoFile').files[0];
-    if (!f) { ui.status('Bilgisayarınızdan bir video dosyası seçin.', 'error'); $('videoFile').focus(); return; }
-    make = (host) => new FileMedia(host, f);
+    file = $('videoFile').files[0];
+    if (!file) { ui.status('Bilgisayarınızdan bir video dosyası seçin.', 'error'); $('videoFile').focus(); return; }
+    make = (host) => new FileMedia(host, file);
   }
-  // Altyazı
-  await updateSubsInfo();
-  if (!parsedSubs) {
-    ui.status($('subsInfo').dataset.kind === 'error' ? $('subsInfo').textContent : 'İngilizce altyazıyı yapıştırın ya da bir altyazı dosyası seçin.', 'error');
-    return;
+  const subs = parsedSubs;
+  const asr = !subs;
+
+  // Açılır pencere yalnızca tıklamanın hemen ardından açılabilir.
+  let listener = null;
+  if (asr && videoId) {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      ui.status('Bu tarayıcı YouTube videolarını yazıya dökemiyor (sekme sesi yakalama yok). Masaüstünde Chrome ya da Edge kullanın.', 'error');
+      return;
+    }
+    listener = openListener(videoId);
+    if (!listener) { ui.status('Açılır pencere engellendi. Adres çubuğundan bu siteye açılır pencere izni verip yeniden deneyin.', 'error'); return; }
+    window.focus();
   }
 
   btn.disabled = true;
   try {
-    if (!(await approveModels())) { ui.status('Model indirmesi onaylanmadı.', 'warn'); return; }
-    stopSession();
-    job?.media.destroy();
-    job = null;
+    if (!(await approveModels({ asr }))) {
+      listener?.close();
+      ui.status('Model indirmesi onaylanmadı.', 'warn');
+      return;
+    }
+    destroyJob();
     $('empty').hidden = true;
     ui.status('Video yükleniyor…');
     const media = make($('mediaHost'));
@@ -587,18 +721,42 @@ $('start').addEventListener('click', async () => {
       await media.ready();
     } catch (e) {
       media.destroy();
+      listener?.close();
       $('empty').hidden = false;
       throw e;
     }
     media.on('error', (e) => ui.status(e.message, 'error'));
     job = {
       media,
-      sentences: parsedSubs.sentences.map((s, i) => ({ ...s, i, tr: null, audio: null })),
+      videoId,
+      sentences: subs ? subs.sentences.map((s, i) => ({ ...s, i, tr: null, audio: null })) : [],
       trKey: trKey(settings),
+      source: null,
+      gated: false,
     };
+    if (asr && listener) {
+      job.source = new PopupSource(listener, media);
+      job.source.onCues = addCues;
+      listenUi('Açılan dinleyici penceresinde "Dinlemeyi başlat"a basın ve bu sekmeyi paylaşın.', 'warn');
+    } else if (asr && file) {
+      listenUi('Videonun sesi çözülüyor…');
+      const audio = await decodeFileAudio(file);
+      if (job?.media !== media) return;
+      job.transcriber = new Transcriber();
+      const src = new BufferSource(audio, job.transcriber);
+      src.onCues = addCues;
+      src.onError = (e) => listenUi('Konuşma tanıma hatası: ' + (e?.message || e), 'error');
+      job.source = src;
+      listenUi('Konuşma tanıma modeli yükleniyor…');
+      job.transcriber.load((p) => {
+        if (p.total && !p.done) listenUi(`Konuşma tanıma modeli indiriliyor… %${Math.floor((p.loaded / p.total) * 100)}`);
+        else if (p.done && !job?.gated) listenUi('');
+      }).catch((e) => listenUi('Konuşma tanıma modeli yüklenemedi: ' + (e?.message || e), 'error'));
+      src.run();
+    }
+    job.gateTimer = setInterval(gateTick, 250);
     if (!settings.enabled) setSettings({ enabled: true });
     else startSession();
-    document.body.classList.add('has-media');
     $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     ui.status(String(e?.message || e), 'error');
@@ -732,7 +890,7 @@ async function deleteModel(prefix, label) {
   if (job && settings.enabled) startSession();
 }
 
-function modelRow({ engine, item, ready, inUse, sizeMB, prefix, note }) {
+function modelRow({ engine, item, ready, inUse, sizeMB, prefix, note, onDownload, onDelete }) {
   const dl = downloading.get(`${engine}:${item.id}`);
   const chip = dl
     ? el('span', { class: 'chip busy', textContent: dl.total ? `İndiriliyor %${Math.floor((dl.loaded / dl.total) * 100)}` : 'Hazırlanıyor…' })
@@ -740,16 +898,44 @@ function modelRow({ engine, item, ready, inUse, sizeMB, prefix, note }) {
       : el('span', { class: 'chip', textContent: item.available === false ? 'Desteklenmiyor' : 'İndirilmedi' });
   const actions = [];
   if (!ready && !dl && item.available !== false && sizeMB) {
-    actions.push(el('button', { class: 'btn small ghost', textContent: `İndir (${fmtMB(sizeMB)})`, onclick: () => downloadModel(engine, item.id) }));
+    actions.push(el('button', { class: 'btn small ghost', textContent: `İndir (${fmtMB(sizeMB)})`, onclick: onDownload || (() => downloadModel(engine, item.id)) }));
   }
-  if (ready && prefix) actions.push(el('button', { class: 'btn small ghost danger', textContent: 'Sil', onclick: () => deleteModel(prefix, item.label) }));
+  if (ready && (prefix || onDelete)) {
+    actions.push(el('button', { class: 'btn small ghost danger', textContent: 'Sil', onclick: onDelete || (() => deleteModel(prefix, item.label)) }));
+  }
   return el('li', { class: 'model' + (inUse ? ' in-use' : '') },
     el('div', { class: 'model-name' }, item.label, inUse ? el('span', { class: 'chip use', textContent: 'Seçili' }) : null),
     el('div', { class: 'model-meta' }, chip, note ? el('span', { textContent: note }) : null, ...actions));
 }
 
+let asrCached = false;
+
+async function downloadAsr() {
+  downloading.set('asr:whisper', { loaded: 0, total: 0 });
+  renderModelList();
+  const t = new Transcriber();
+  try {
+    await t.load((p) => { if (p.total) { downloading.set('asr:whisper', { loaded: p.loaded, total: p.total }); renderModelList(); } });
+  } catch (e) {
+    ui.status('Model indirilemedi: ' + (e?.message || e), 'error');
+  } finally {
+    t.dispose();
+    downloading.delete('asr:whisper');
+    await renderModels();
+  }
+}
+
+async function deleteAsr() {
+  if (!(await confirmBox(`${ASR_MODEL.label} bu tarayıcıdan silinecek.`, 'Sil'))) return;
+  await clearAsrCache();
+  await renderModels();
+}
+
 function renderModelList() {
-  const rows = [];
+  const rows = [modelRow({
+    engine: 'asr', item: { id: 'whisper', label: ASR_MODEL.label }, ready: asrCached, inUse: !parsedSubs,
+    sizeMB: ASR_MODEL.sizeMB, note: 'İngilizce konuşmayı yazıya döker', onDownload: downloadAsr, onDelete: deleteAsr,
+  })];
   const useB = effectiveBackend(), useV = effectiveVoice();
   for (const b of lists.backends) {
     if (b.id === 'chrome-translator') {
@@ -775,7 +961,7 @@ function renderModelList() {
 }
 
 async function renderModels() {
-  lists = await engines.listAll(settings);
+  [lists, asrCached] = await Promise.all([engines.listAll(settings), isAsrCached()]);
   const mock = lists.mode === 'mock';
   fillSelect($('mtBackend'), lists.backends, settings.mtBackend, mock ? 'Otomatik' : 'Otomatik (Chrome çevirmeni varsa o)');
   fillSelect($('voice'), lists.voices.map((v) => (v.system ? { ...v, label: 'Tarayıcının sistem sesi (indirme yok)' }
@@ -785,8 +971,10 @@ async function renderModels() {
   try {
     const files = await listCached();
     const bytes = files.reduce((n, f) => n + f.size, 0);
-    $('storage').textContent = bytes ? `Bu tarayıcıda ${fmtMB(bytes / 1048576)} model verisi saklanıyor.` : 'Henüz model indirilmedi.';
-    $('clearModels').hidden = !bytes;
+    const any = bytes || asrCached;
+    $('storage').textContent = bytes ? `Bu tarayıcıda ${fmtMB(bytes / 1048576)} çeviri/ses model verisi saklanıyor${asrCached ? ' (konuşma tanıma hariç)' : ''}.`
+      : asrCached ? 'Konuşma tanıma modeli indirildi.' : 'Henüz model indirilmedi.';
+    $('clearModels').hidden = !any;
   } catch {
     $('storage').textContent = 'Bu tarayıcıda model önbelleği kullanılamıyor.';
   }
@@ -797,6 +985,7 @@ $('clearModels').addEventListener('click', async () => {
   stopSession();
   await engines.resetAll();
   await clearModels();
+  await clearAsrCache();
   await renderModels();
   if (job && settings.enabled) startSession();
 });
@@ -806,10 +995,8 @@ $('clearModels').addEventListener('click', async () => {
 const params = new URLSearchParams(location.search);
 if (params.get('v') || params.get('url')) {
   $('ytUrl').value = params.get('url') || `https://www.youtube.com/watch?v=${params.get('v')}`;
-  $('ytUrl').dispatchEvent(new Event('input'));
 }
 setTab('source', 'youtube');
-setTab('subs', 'paste');
 renderSettings();
 renderSystemVoices();
 renderDubToggle();
