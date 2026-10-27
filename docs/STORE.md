@@ -30,7 +30,7 @@ Her gönderimde `manifest.json` → `version` artırılmalıdır.
 >
 > • Tamamen yerel: çeviri ve seslendirme bilgisayarınızda, tarayıcınızın içinde yapılır. Hesap, abonelik, API anahtarı yok.
 > • Modeller bir kez indirilir (onayınızla), sonra internetsiz çalışır.
-> • Çeviri: Chrome'un cihaz üzerindeki çevirmeni ya da OPUS-MT. Ses: Antalia Mini (erkek), Ahenk Cep (kadın) ya da sistem sesi.
+> • Çeviri: Chrome'un cihaz üzerindeki çevirmeni ya da OPUS-MT. Ses: Antalia Mini (erkek), Ahenk Cep ve EMA Lightning (kadın) ya da sistem sesi.
 > • Konuşmacı değişince farklı ses, kişisel sözlük (çeviri düzeltmeleri ve okunuşlar), Türkçe altyazı.
 > • Normal videolar, Shorts ve sitelere gömülü YouTube oynatıcıları.
 > • Açık kaynak: https://github.com/mhmmd5225/LocaDub

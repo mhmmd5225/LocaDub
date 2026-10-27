@@ -74,7 +74,7 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
 
 - **harfiyen** — https://github.com/ozcancelik/harfiyen — MIT, Copyright (c) 2026 Özcan Çelik
   (commit `981902ceaef804fdb7a4edb782078c766e3b53c2`). `trnorm/*.js` (src/tts/trnorm),
-  `ahenk.js` (src/tts/ahenk.ts + ema.ts portu), `dsp.js` trimSilence, `antalia.js` yapısı.
+  `ahenk.js` (src/tts/ahenk.ts + ema.ts portu), `ema.js` (src/tts/ema.ts portu), `dsp.js` trimSilence, `antalia.js` yapısı.
 - **trnorm / Ahenk demo** — https://github.com/ozguradmin/ahenk-turkish-tts — Apache-2.0.
 - **Antalia-2 Mini web demo** — https://huggingface.co/spaces/cloud0day3/antalia-mini
   (`js/tts.js`, `js/frontend.js` @ `2c24b406`) — Apache-2.0, Copyright 2026 PatientDesk AI.
@@ -86,6 +86,8 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
 - **Ahenk Cep** (kadın) — https://huggingface.co/ozgurguler/ahenk-cep-tr — CC BY 4.0, ozgurguler;
   EMA Lightning (Apache-2.0) türevi, Alania verileri (CC BY 4.0, PatientDesk AI).
   Atıf: "Ses: Ahenk Cep (ozgurguler), CC BY 4.0". Üretilen ses yapaydır (yapay zekâ ile sentezlenmiştir).
+- **EMA Lightning** (kadın) — ağırlıklar https://huggingface.co/canberkkkkkk/ema-lightning, ONNX dışa aktarımı
+  https://huggingface.co/ozcancelik/ema-lightning-onnx (`13c431d`) — Apache-2.0. Üretilen ses yapaydır.
 
 ## Referans proje
 

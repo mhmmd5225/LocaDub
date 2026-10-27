@@ -6,6 +6,7 @@
 
 import { Ahenk } from './ahenk.js';
 import { Antalia } from './antalia.js';
+import { Ema } from './ema.js';
 import { normalizeText } from './normalize.js';
 import { concat, convertRate, shiftPitch, softLimit, timeStretch, trimSilence } from './dsp.js';
 import { pitchRatio, resolveTone } from './styles.js';
@@ -42,6 +43,7 @@ export async function loadVoice(ort, voiceDef, buffers, opts = {}) {
   let model;
   if (voiceDef.model === 'ahenk') model = await Ahenk.create(ort, manifest, b, sessionOptions, opts);
   else if (voiceDef.model === 'antalia') model = await Antalia.create(ort, manifest, b, sessionOptions, opts);
+  else if (voiceDef.model === 'ema') model = await Ema.create(ort, manifest, b, sessionOptions);
   else throw new Error(`unknown model ${voiceDef.model}`);
   return { id: voiceDef.id, def: voiceDef, model, sampleRate: model.sampleRate };
 }
