@@ -10,6 +10,7 @@ const { launch } = require('./common.cjs');
     assert.equal(r.ok, false);
     await opt.reload();
     await opt.waitForTimeout(1500);
+    await opt.click('#tab-diger');
     await opt.click('#copyDiag');
     await opt.waitForFunction(() => document.getElementById('diagNote').textContent);
     const text = await opt.textContent('#diagText');

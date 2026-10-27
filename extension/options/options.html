@@ -8,8 +8,14 @@
 </head>
 <body>
   <header class="top">
-    <div class="wrap top-row">
-      <div class="brand"><img src="../icons/icon-48.png" alt="" width="28" height="28"> LocaDub <span class="muted">· Ayarlar</span></div>
+    <div class="top-row">
+      <div class="brand"><img src="../icons/icon-48.png" alt="" width="26" height="26"> LocaDub</div>
+      <nav class="tabs" role="tablist" aria-label="Ayar menüleri">
+        <button type="button" role="tab" id="tab-indirme" data-tab="indirme" aria-controls="indirme" aria-selected="true" tabindex="0">İndirme</button>
+        <button type="button" role="tab" id="tab-seslendirme" data-tab="seslendirme" aria-controls="seslendirme" aria-selected="false" tabindex="-1">Seslendirme</button>
+        <button type="button" role="tab" id="tab-ai-model" data-tab="ai-model" aria-controls="ai-model" aria-selected="false" tabindex="-1">AI Model</button>
+        <button type="button" role="tab" id="tab-diger" data-tab="diger" aria-controls="diger" aria-selected="false" tabindex="-1">Diğer</button>
+      </nav>
       <label class="switch-row">
         <span id="enabledLabel">Dublaj kapalı</span>
         <span class="switch">
@@ -18,139 +24,163 @@
         </span>
       </label>
     </div>
-    <nav class="wrap tabs" aria-label="Bölümler">
-      <a href="#genel">Genel</a>
-      <a href="#ses">Ses</a>
-      <a href="#sozluk">Sözlük</a>
-      <a href="#modeller">Modeller</a>
-      <a href="#depolama">Depolama</a>
-      <a href="#durum">Durum</a>
-    </nav>
   </header>
 
-  <main class="wrap">
-    <section id="genel" class="card">
-      <h2>Genel</h2>
-      <label class="row check">
-        <input type="checkbox" id="showSubtitles">
-        <span><b>Türkçe altyazıyı göster</b><small>Seslendirmeyle birlikte çeviri metni videonun altında görünür.</small></span>
-      </label>
-      <label class="row range">
-        <span><b>Önceden hazırlama süresi</b> <output id="lookaheadSecOut"></output></span>
-        <input type="range" id="lookaheadSec" min="10" max="120" step="5">
-        <small>Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği. Uzun süre, ileri sarınca daha az bekleme ama daha fazla işlemci kullanımı demek.</small>
-      </label>
-      <label class="row check">
-        <input type="checkbox" id="checkUpdates">
-        <span><b>Yeni sürümleri denetle</b><small>Günde iki kez localdub.mhmmd.app'teki sürüm numarasına bakar; yeni sürüm varsa açılır pencerede bildirir. Başka bilgi gönderilmez.</small></span>
-      </label>
-      <label class="row check">
-        <input type="checkbox" id="mock">
-        <span><b>Test motoru</b><small>Model indirmeden denemek için sahte çeviri ve bip sesi kullanır.</small></span>
-      </label>
-      <div class="buttons">
-        <button type="button" id="resetSettings" class="secondary">Ayarları varsayılana döndür</button>
+  <!-- Yalnızca motor/model hatası ya da uyarı varken görünür -->
+  <div class="strip" id="statusBar" role="status" hidden>
+    <span class="strip-text" id="status"></span>
+    <a href="#diger" class="strip-link" id="goDiag">Tanılama kopyala</a>
+  </div>
+
+  <main>
+    <!-- İndirme -->
+    <section id="indirme" class="panel" role="tabpanel" aria-labelledby="tab-indirme">
+      <div class="bar">
+        <div class="bar-info">
+          <b>Modeller</b>
+          <span class="muted" id="dlSummary"></span>
+        </div>
+        <div class="bar-act" id="prepareBox" hidden>
+          <span class="note" id="prepareNote"></span>
+          <button type="button" id="prepareSelected">Seçili modelleri indir</button>
+        </div>
       </div>
-    </section>
-
-    <section id="ses" class="card">
-      <h2>Ses</h2>
-      <label class="row range">
-        <span><b>Konuşma hızı</b> <output id="ttsSpeedOut"></output></span>
-        <input type="range" id="ttsSpeed" min="0.8" max="2" step="0.05">
-        <small>Uzun cümleler videoya yetişmek için bu hızın üstüne otomatik hızlandırılır.</small>
-      </label>
-      <label class="row range">
-        <span><b>Dublaj ses seviyesi</b> <output id="ttsVolumeOut"></output></span>
-        <input type="range" id="ttsVolume" min="0" max="2" step="0.05">
-        <small>YouTube'un ses düğmesiyle birlikte ölçeklenir.</small>
-      </label>
-      <label class="row range">
-        <span><b>Orijinal ses (dublaj konuşurken)</b> <output id="originalVolumeOut"></output></span>
-        <input type="range" id="originalVolume" min="0" max="1" step="0.05">
-      </label>
-      <label class="row check">
-        <input type="checkbox" id="speakerVoices">
-        <span><b>Konuşmacılara farklı ses</b><small>Altyazıda konuşmacı değişimi (&gt;&gt;) işaretliyse cümleler iki ses arasında paylaştırılır. YouTube'un otomatik altyazılarının çoğunda bu işaret bulunur. Sistem sesinde kullanılmaz.</small></span>
-      </label>
-      <label class="row" id="voice2Row" hidden>
-        <span><b>İkinci ses</b></span>
-        <select id="voice2"></select>
-        <small id="voice2Note"></small>
-      </label>
-    </section>
-
-    <section id="sozluk" class="card">
-      <h2>Sözlük</h2>
-      <p class="intro">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Büyük-küçük harf fark etmez; yalnızca tam sözcükler değişir.
-        Sonuna <code>*</code> koyarsanız sözcüğün ekleri korunur (<code>zeka* =&gt; zekâ*</code> → "zekanın" "zekânın" olur). <code>#</code> ile başlayan satırlar yorumdur.</p>
-      <label class="row stack">
-        <span><b>Çeviri düzeltmeleri</b><small>Türkçe çeviride geçen ifadeyi değiştirir; altyazıda ve seste görünür. Yeniden çeviri gerekmez.</small></span>
-        <textarea id="glossaryMt" rows="5" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
-      </label>
-      <label class="row stack">
-        <span><b>Okunuşlar</b><small>Yalnızca seslendirmede uygulanır; altyazıda yazılış kalır. Kısaltmalar ve yabancı adlar için.</small></span>
-        <textarea id="glossaryTts" rows="5" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
-      </label>
-      <p class="note" id="glossaryNote"></p>
-    </section>
-
-    <section id="modeller" class="card">
-      <h2>Modeller</h2>
-      <p class="lead">Çeviri ve seslendirme bu bilgisayarda yapılır. Modeller bir kez indirilir, tarayıcıda saklanır ve sonra internetsiz çalışır. Dublajın kullanacağı modeli <b>Kullan</b> ile seçin.</p>
-      <div class="note err" id="listError" hidden></div>
-      <div class="buttons" id="prepareBox" hidden>
-        <button type="button" id="prepareSelected">Seçili modelleri indir</button>
-        <span class="note" id="prepareNote"></span>
+      <div class="models" id="modelList">
+        <div id="modelRows" class="rows"></div>
+        <div id="punctModels" class="rows"></div>
       </div>
-
-      <h3>Çeviri</h3>
-      <div class="models" id="mtModels"></div>
-
-      <h3>Seslendirme</h3>
-      <div class="models" id="ttsModels"></div>
-
-      <h3>Otomatik altyazı için noktalama (isteğe bağlı)</h3>
-      <p class="note">YouTube'un otomatik altyazıları küçük harfli ve noktalamasızdır; çeviri bu yüzden zayıflar. Bu model, çeviriden önce
-        İngilizce metne noktalama ve büyük harf ekler (ölçüm: otomatik altyazı biçiminde chrF 51.1 → 53.1). Yalnızca İngilizce, yalnızca
-        otomatik altyazıda, her cümlede birkaç milisaniye. Elle yazılmış altyazıya dokunmaz.</p>
-      <div class="models" id="punctModels"></div>
-    </section>
-
-    <section id="depolama" class="card">
-      <h2>Depolama</h2>
-      <div class="storage">
-        <div><span class="big" id="cacheTotal">—</span><small>indirilen modeller</small></div>
-        <div><span class="big" id="usageTotal">—</span><small>eklentinin toplam depolaması</small></div>
-        <div><span class="big" id="cacheFiles">—</span><small>dosya</small></div>
-        <div><span class="big" id="trVideos">—</span><small>çevirisi saklanan video</small></div>
-      </div>
-      <div class="buttons">
+      <div class="foot">
         <button type="button" id="clearAll" class="danger">Tüm modelleri sil</button>
-        <button type="button" id="clearTranscripts" class="secondary">Çeviri önbelleğini temizle</button>
+        <button type="button" id="clearTranscripts" class="secondary" disabled>Çeviri önbelleğini temizle</button>
+        <span class="note" id="storageNote" role="status"></span>
       </div>
-      <div class="note" id="storageNote"></div>
     </section>
 
-    <section id="durum" class="card">
-      <h2>Durum</h2>
-      <div class="status" id="status">Durum okunuyor…</div>
-      <div class="buttons">
-        <button type="button" id="refreshStatus" class="secondary">Yenile</button>
-        <button type="button" id="copyDiag" class="secondary">Tanılama bilgisini kopyala</button>
-        <span class="note" id="diagNote"></span>
+    <!-- Seslendirme -->
+    <section id="seslendirme" class="panel" role="tabpanel" aria-labelledby="tab-seslendirme" hidden>
+      <div class="group">
+        <h2>Ses</h2>
+        <div class="choices" id="voiceChoice" role="radiogroup" aria-label="Ses seçimi"></div>
+        <div class="sysrow" id="systemVoiceRow" hidden>
+          <label for="systemVoice">Sistem sesi</label>
+          <select id="systemVoice"></select>
+        </div>
+        <p class="note" id="voiceNote"></p>
       </div>
-      <details class="diag">
-        <summary>Kopyalanacak bilgiyi göster</summary>
-        <p class="note">Sorun bildirirken GitHub'daki konuya yapıştırın. Video adresi, altyazı ve çeviri metni yer almaz.</p>
-        <pre id="diagText"></pre>
+
+      <div class="group">
+        <h2>Hız ve ses seviyesi</h2>
+        <div class="slider-row">
+          <label for="ttsSpeed">Konuşma hızı</label>
+          <input type="range" id="ttsSpeed" min="0.8" max="2" step="0.05">
+          <output id="ttsSpeedOut" for="ttsSpeed"></output>
+        </div>
+        <div class="slider-row">
+          <label for="ttsVolume">Dublaj ses seviyesi</label>
+          <input type="range" id="ttsVolume" min="0" max="2" step="0.05">
+          <output id="ttsVolumeOut" for="ttsVolume"></output>
+        </div>
+        <div class="slider-row">
+          <label for="originalVolume">Orijinal ses</label>
+          <input type="range" id="originalVolume" min="0" max="1" step="0.05">
+          <output id="originalVolumeOut" for="originalVolume"></output>
+        </div>
+      </div>
+
+      <details class="adv" id="speakerBlock">
+        <summary>Konuşmacılara farklı ses</summary>
+        <label class="check">
+          <input type="checkbox" id="speakerVoices">
+          <span>Konuşmacı değişince (&gt;&gt;) ikinci sesle konuş <small>Sistem sesinde kullanılmaz.</small></span>
+        </label>
+        <div class="sysrow" id="voice2Row" hidden>
+          <label for="voice2">İkinci ses</label>
+          <select id="voice2"></select>
+          <small id="voice2Note"></small>
+        </div>
       </details>
     </section>
 
-    <footer>
-      Metin ve ses hiçbir sunucuya gönderilmez. Kullanılan modellerin lisansları ve atıflar:
-      <a href="../THIRD_PARTY_NOTICES.md" target="_blank">üçüncü taraf bildirimleri</a>.
-    </footer>
+    <!-- AI Model -->
+    <section id="ai-model" class="panel" role="tabpanel" aria-labelledby="tab-ai-model" hidden>
+      <div class="group">
+        <h2>Çeviri motoru</h2>
+        <div class="choices col" id="mtChoice" role="radiogroup" aria-label="Çeviri motoru"></div>
+      </div>
+      <div class="group">
+        <h2>Otomatik altyazı</h2>
+        <label class="check">
+          <input type="checkbox" id="fixAsrPunct">
+          <span>Noktalama ve büyük harfi düzelt <small id="punctNote"></small></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Diğer -->
+    <section id="diger" class="panel" role="tabpanel" aria-labelledby="tab-diger" hidden>
+      <div class="group">
+        <h2>Genel</h2>
+        <div class="trio">
+          <label class="check">
+            <input type="checkbox" id="showSubtitles">
+            <span>Türkçe altyazıyı göster</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="checkUpdates">
+            <span>Yeni sürümleri denetle</span>
+          </label>
+          <div class="slider-row mini">
+            <label for="lookaheadSec">Önceden hazırlama</label>
+            <input type="range" id="lookaheadSec" min="10" max="120" step="5">
+            <output id="lookaheadSecOut" for="lookaheadSec"></output>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Sözlük <span class="note" id="glossaryNote"></span></h2>
+        <div class="pair">
+          <label class="stack">
+            <span><b>Çeviri düzeltmeleri</b> <small>altyazıda ve seste</small></span>
+            <textarea id="glossaryMt" rows="3" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
+          </label>
+          <label class="stack">
+            <span><b>Okunuşlar</b> <small>yalnızca seste</small></span>
+            <textarea id="glossaryTts" rows="3" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
+          </label>
+        </div>
+        <small class="hint">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Sonuna <code>*</code> koyarsanız sözcüğün ekleri korunur; <code>#</code> ile başlayan satır yorumdur.</small>
+      </div>
+
+      <div class="group">
+        <div class="diagrow">
+          <button type="button" id="copyDiag" class="secondary">Tanılama bilgisini kopyala</button>
+          <span class="note" id="diagNote"></span>
+        </div>
+        <details class="diag">
+          <summary>Kopyalanacak bilgiyi göster</summary>
+          <pre id="diagText"></pre>
+        </details>
+      </div>
+
+      <div class="group" id="mockRow" hidden>
+        <label class="check">
+          <input type="checkbox" id="mock">
+          <span>Test motoru <small>Sahte çeviri ve bip sesi kullanır; model indirmez. Kapatınca gerçek motora dönülür.</small></span>
+        </label>
+      </div>
+
+      <div class="about">
+        <button type="button" id="resetSettings" class="link">Varsayılana döndür</button>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="https://localdub.mhmmd.app/gizlilik.html" target="_blank" rel="noopener">Gizlilik</a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="../THIRD_PARTY_NOTICES.md" target="_blank">Üçüncü taraf bildirimleri</a>
+        <span class="sep" aria-hidden="true">·</span>
+        <span id="aboutVersion"></span>
+        <small class="credit">Metin ve ses hiçbir sunucuya gönderilmez. Ahenk Cep sesi ozgurguler'e aittir (CC BY 4.0); ses yapay zekâ ile üretilir.</small>
+      </div>
+    </section>
   </main>
 
   <dialog id="confirm">
