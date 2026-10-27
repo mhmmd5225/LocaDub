@@ -64,6 +64,15 @@
         <span><b>Orijinal ses (dublaj konuşurken)</b> <output id="originalVolumeOut"></output></span>
         <input type="range" id="originalVolume" min="0" max="1" step="0.05">
       </label>
+      <label class="row check">
+        <input type="checkbox" id="speakerVoices">
+        <span><b>Konuşmacılara farklı ses</b><small>Altyazıda konuşmacı değişimi (&gt;&gt;) işaretliyse cümleler iki ses arasında paylaştırılır. YouTube'un otomatik altyazılarının çoğunda bu işaret bulunur. Sistem sesinde kullanılmaz.</small></span>
+      </label>
+      <label class="row" id="voice2Row" hidden>
+        <span><b>İkinci ses</b></span>
+        <select id="voice2"></select>
+        <small id="voice2Note"></small>
+      </label>
     </section>
 
     <section id="modeller" class="card">

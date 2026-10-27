@@ -1,6 +1,6 @@
 // Ayarlar sayfası: genel ayarlar, ses, model yönetimi (indir / sil / kullan), depolama ve durum.
 
-import { DEFAULTS, getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
+import { DEFAULTS, getSettings, setSettings, onSettingsChanged, secondVoice } from '../common/settings.js';
 import { listCached, deleteByPrefix } from '../engines/common/model-cache.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 
@@ -68,7 +68,12 @@ for (const [id, fmt] of Object.entries(RANGES)) {
   input.addEventListener('change', () => setSettings({ [id]: Number(input.value) }));
 }
 
+$('speakerVoices').addEventListener('change', (e) => setSettings({ speakerVoices: e.target.checked }));
+$('voice2').addEventListener('change', (e) => setSettings({ voice2: e.target.value || null }));
+
 function renderBasics() {
+  $('speakerVoices').checked = settings.speakerVoices;
+  $('voice2Row').hidden = !settings.speakerVoices;
   $('enabled').checked = settings.enabled;
   $('enabledLabel').textContent = settings.enabled ? 'Dublaj açık' : 'Dublaj kapalı';
   $('showSubtitles').checked = settings.showSubtitles;
@@ -232,6 +237,22 @@ function renderModels() {
     extra: sel,
   }));
   $('ttsModels').replaceChildren(...tts);
+  renderVoice2();
+}
+
+// İkinci konuşmacının sesi: birinci sesten farklı, indirilebilir sesler.
+function renderVoice2() {
+  const first = effectiveVoiceId();
+  const want = secondVoice({ ...settings, voice: first });
+  const voices = lists.voices.filter((v) => !v.system && v.id !== first);
+  const sel = $('voice2');
+  sel.replaceChildren(...voices.map((v) => el('option', {
+    value: v.id, textContent: v.label + (v.cached || settings.engineMode === 'mock' ? '' : ' — indirilmedi'), selected: v.id === want,
+  })));
+  sel.disabled = !voices.length || first === 'system';
+  const v = voices.find((x) => x.id === want);
+  $('voice2Note').textContent = first === 'system' ? 'Sistem sesi seçiliyken kullanılmaz.'
+    : v && !v.cached && settings.engineMode !== 'mock' ? 'Bu ses henüz indirilmedi; Modeller bölümünden indirin.' : '';
 }
 
 // Kullanılacak (seçili) modellerden indirilmemiş olanlar.
@@ -241,6 +262,10 @@ function missingSelected() {
   if (b && b.id !== 'chrome-translator' && !b.downloaded) out.push({ engine: 'mt', id: b.id, label: b.label, mb: b.sizeMB - bytesMB(cachedBytes(b.cachePrefix)) });
   const v = lists.voices.find((x) => x.id === effectiveVoiceId());
   if (v && !v.system && !v.cached) out.push({ engine: 'tts', id: v.id, label: v.label, mb: v.sizeMB - bytesMB(cachedBytes(v.cachePrefix)) });
+  if (settings.speakerVoices && v && !v.system) {
+    const v2 = lists.voices.find((x) => x.id === secondVoice({ ...settings, voice: v.id }));
+    if (v2 && !v2.cached) out.push({ engine: 'tts', id: v2.id, label: v2.label, mb: v2.sizeMB - bytesMB(cachedBytes(v2.cachePrefix)) });
+  }
   return out;
 }
 

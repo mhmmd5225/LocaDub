@@ -36,6 +36,7 @@ Ayarlar (`chrome.storage.local`):
 | Konuşma hızı | Temel TTS hızı (0.8–2.0). Cümle sığmazsa hız otomatik artırılır (toplam ≤ 1.6) |
 | Dublaj ses seviyesi | TTS kazancı (%0–200); YouTube'un ses düğmesiyle çarpılır |
 | Orijinal ses | Türkçe konuşma sırasında orijinal sesin seviyesi (ducking) |
+| Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde iki ses sırayla konuşur (`speakerVoices`, `voice2`; varsayılan ikinci ses birincinin karşıt cinsiyetlisi) |
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
 | Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, indirme yok |
@@ -59,7 +60,8 @@ offscreen.js                  engines/mt/index.js + engines/tts/index.js (dinami
 - **Çeviri önbelleği** (`common/transcript-store.js`): cümleler ve çeviriler `chrome.storage.local`'da
   (`tr:<videoId>:<motor>`, son 50 video). Aynı video yeniden açılınca altyazı çekilmez, çeviri beklenmez.
   15 sn'de bir ve sekme kapanırken yazılır; Ayarlar → Depolama'dan temizlenir.
-- **Cümleler** (`content/captions.js`): noktalama, > 700 ms duraklama, konuşmacı değişimi (`>>`),
+- **Cümleler** (`content/captions.js`): noktalama, > 700 ms duraklama, konuşmacı değişimi (`>>`; cümleye
+  `speaker: 1` olarak taşınır, her işarette 0 ↔ 1),
   en fazla ~12 sn (mümkünse virgülde bölünür). Parça içi cümle sonları zamana orantılı bölünür.
 - **Zamanlama** (`content/timing.js`): cümle süresi = sonraki cümleye kadar (en fazla bitiş + 0.8 sn).
   Sentez hızı tahmini süreye göre seçilir (≤ 1.6), kalan taşma `<audio>.playbackRate` ile (perde korunur)
@@ -90,6 +92,7 @@ Uçtan uca (gerçek Chromium + eklenti, sahte YouTube sayfası, test motoru; Pla
 
 ```
 xvfb-run -a node tests/extension/e2e/transcript-cache.e2e.cjs
+xvfb-run -a node tests/extension/e2e/speaker-voices.e2e.cjs
 ```
 
 ## Bilinen sınırlamalar

@@ -1,6 +1,6 @@
 // YouTube içerik uygulaması: altyazı → çeviri → seslendirme → senkron çalma.
 
-import { getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
+import { getSettings, setSettings, onSettingsChanged, voiceForSpeaker } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
 import { loadTranscript, saveTranscript } from '../common/transcript-store.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
@@ -38,7 +38,7 @@ function trKey(s) {
   return `${s.engineMode}|${s.mtBackend || ''}`;
 }
 function audioKey(s) {
-  return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}`;
+  return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${s.speakerVoices ? s.voice2 || '2' : ''}`;
 }
 
 async function waitFor(fn, { timeoutMs = 15000, intervalMs = 200, alive = () => true } = {}) {
@@ -416,7 +416,7 @@ class Session {
     const speed = chooseSynthSpeed(s.tr, slot, { base: settings.ttsSpeed });
     s.auPending = true;
     const res = await sendBg({
-      type: 'tts.synthesize', text: s.tr, voice: settings.voice || undefined, speed, tag: this.tag,
+      type: 'tts.synthesize', text: s.tr, voice: voiceForSpeaker(settings, s.speaker), speed, tag: this.tag,
     });
     s.auPending = false;
     if (!this.alive || gen !== this.audioGen) return;

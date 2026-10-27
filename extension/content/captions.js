@@ -147,21 +147,24 @@ export function splitCue(c) {
   });
 }
 
-// Parçaları cümlelere birleştirir. Sonuç saniye cinsinden: [{ start, end, text }]
+// Parçaları cümlelere birleştirir. Sonuç saniye cinsinden: [{ start, end, text, speaker? }]
+// speaker: her konuşmacı değişiminde (>>) 0 ↔ 1 değişir; yalnızca 1 olduğunda yazılır.
 export function mergeSentences(rawCues, { pauseMs = 700, maxMs = 12000, minSplitMs = 4000 } = {}) {
   const out = [];
   let cur = null;
+  let speaker = 0;
   const cues = [];
   for (const c of rawCues || []) if (c && c.text) cues.push(...splitCue(c));
   const flush = () => {
     if (cur && cur.parts.length) {
       const text = cur.parts.join(' ').replace(/\s+([,.!?;:…])/g, '$1').replace(/\s+/g, ' ').trim();
-      if (text) out.push({ start: cur.start / 1000, end: cur.end / 1000, text });
+      if (text) out.push({ start: cur.start / 1000, end: cur.end / 1000, text, ...(cur.speaker ? { speaker: 1 } : {}) });
     }
     cur = null;
   };
   for (const c of cues || []) {
     if (!c || !c.text) continue;
+    if (c.speakerChange) speaker = 1 - speaker;
     if (cur) {
       const gap = c.start - cur.end;
       const wouldBe = c.end - cur.start;
@@ -170,14 +173,14 @@ export function mergeSentences(rawCues, { pauseMs = 700, maxMs = 12000, minSplit
         // Uzun cümle: son virgülde bölmeyi dene
         const idx = lastCommaSplit(cur, minSplitMs);
         if (idx > 0) {
-          const head = { start: cur.start, end: cur.times[idx - 1].end, parts: cur.parts.slice(0, idx), times: cur.times.slice(0, idx) };
-          const tail = { start: cur.times[idx].start, end: cur.end, parts: cur.parts.slice(idx), times: cur.times.slice(idx) };
+          const head = { start: cur.start, end: cur.times[idx - 1].end, parts: cur.parts.slice(0, idx), times: cur.times.slice(0, idx), speaker: cur.speaker };
+          const tail = { start: cur.times[idx].start, end: cur.end, parts: cur.parts.slice(idx), times: cur.times.slice(idx), speaker: cur.speaker };
           cur = head; flush(); cur = tail;
           if (c.end - cur.start > maxMs) flush();
         } else flush();
       }
     }
-    if (!cur) cur = { start: c.start, end: c.end, parts: [], times: [] };
+    if (!cur) cur = { start: c.start, end: c.end, parts: [], times: [], speaker };
     cur.parts.push(c.text);
     cur.times.push({ start: c.start, end: c.end });
     cur.end = Math.max(cur.end, c.end);

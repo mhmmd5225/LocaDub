@@ -7,6 +7,8 @@ export const DEFAULTS = Object.freeze({
   mtBackend: null,         // null → motorun varsayılanı
   voice: null,             // null → motorun varsayılanı; 'system' → chrome.tts
   systemVoiceName: null,   // chrome.tts ses adı (isteğe bağlı)
+  speakerVoices: false,    // konuşmacı değişince (>>) ikinci sesle konuş
+  voice2: null,            // ikinci ses; null → birinci sesin karşıt cinsiyetlisi
   originalVolume: 0.25,    // TTS sırasında orijinal ses çarpanı (0..1)
   ttsVolume: 1.0,          // TTS ses seviyesi (0..2)
   ttsSpeed: 1.0,           // temel TTS hızı (0.8..2.0)
@@ -32,6 +34,7 @@ export function normalizeSettings(raw = {}) {
   s.enabled = !!s.enabled;
   s.showSubtitles = !!s.showSubtitles;
   s.modelsApproved = !!s.modelsApproved;
+  s.speakerVoices = !!s.speakerVoices;
   s.engineMode = s.engineMode === 'mock' ? 'mock' : 'real';
   s.ttsSpeed = clamp(Number(s.ttsSpeed) || 1, ...LIMITS.ttsSpeed);
   s.originalVolume = clamp(Number(s.originalVolume), ...LIMITS.originalVolume);
@@ -40,6 +43,21 @@ export function normalizeSettings(raw = {}) {
   if (!Number.isFinite(s.ttsVolume)) s.ttsVolume = DEFAULTS.ttsVolume;
   s.lookaheadSec = clamp(Number(s.lookaheadSec) || 30, 10, 120);
   return s;
+}
+
+// İkinci konuşmacının varsayılan sesi: birinci ses kadınsa erkek, değilse kadın.
+const FEMALE = 'ahenk-cep';
+const MALE = 'antalia-mini';
+export function secondVoice(s) {
+  if (s.voice2 && s.voice2 !== s.voice) return s.voice2;
+  return s.voice === FEMALE ? MALE : FEMALE;
+}
+
+// Cümleyi seslendirecek ses (undefined → motorun varsayılanı). Sistem sesinde konuşmacı ayrımı yapılmaz.
+export function voiceForSpeaker(s, speaker) {
+  if (!s.speakerVoices || !speaker || s.voice === 'system') return s.voice || undefined;
+  if (s.engineMode === 'mock' && !s.voice2) return s.voice || undefined; // test motorunda gerçek ses adları yok
+  return secondVoice(s);
 }
 
 export async function getSettings() {
