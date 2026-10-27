@@ -88,20 +88,22 @@ function renderVoices() {
   const current = settings.voice || voices.find((v) => v.default)?.id || null;
   const gender = (v) => (v.gender === 'female' ? 'kadın' : v.gender === 'male' ? 'erkek' : '');
   const name = (v) => String(v.label).replace(/\s*\(.*\)\s*$/, '');
+  const short = (s) => s.replace(/^Microsoft\s+/, '').replace(/\s*-\s*Turkish.*$/i, '');
 
   const ready = voices.filter((v) => v.cached || settings.engineMode === 'mock');
   const missing = voices.filter((v) => !ready.includes(v));
   if (ready.length) {
     const g = document.createElement('optgroup');
-    g.label = 'İndirilmiş sesler';
+    g.label = 'İndirilmiş';
     for (const v of ready) g.append(option(v.id, `${name(v)}${gender(v) ? ` · ${gender(v)}` : ''}`, { selected: current === v.id }));
     sel.append(g);
   }
   const sys = document.createElement('optgroup');
-  sys.label = 'Sistem sesleri (indirme yok)';
+  sys.label = 'Sistem (indirmesiz)';
   if (systemVoices.length) {
-    for (const sv of systemVoices) {
-      sys.append(option('system:' + sv, sv.replace(/^Microsoft\s+/, '').replace(/\s*-\s*Turkish.*$/i, ''),
+    for (const { voiceName: sv, remote } of systemVoices) {
+      // Çevrimiçi sistem sesinde metin sağlayıcının sunucusuna gidebilir; ayarlar sayfasıyla aynı uyarı.
+      sys.append(option('system:' + sv, `${short(sv)}${remote ? ' (çevrimiçi)' : ''}`,
         { selected: settings.voice === 'system' && settings.systemVoiceName === sv }));
     }
   } else {
@@ -111,13 +113,13 @@ function renderVoices() {
   if (missing.length) {
     const g = document.createElement('optgroup');
     g.label = 'İndirilmemiş';
-    for (const v of missing) g.append(option(MORE + v.id, `${name(v)} — ${Math.round(v.sizeMB)} MB, ayarlardan indir`));
+    for (const v of missing) g.append(option(MORE + v.id, `${name(v)} (indir)`));
     sel.append(g);
   }
   // Seçili ses indirilmemişse (ör. silindi) listede yine görünsün.
   if (current && current !== 'system' && !ready.some((v) => v.id === current)) {
     const v = voices.find((x) => x.id === current);
-    if (v) sel.prepend(option(v.id, `${name(v)} (indirilmedi)`, { selected: true }));
+    if (v) sel.prepend(option(v.id, `${name(v)} (indir)`, { selected: true }));
   }
 }
 
@@ -125,7 +127,7 @@ $('voice').addEventListener('change', (e) => {
   const v = e.target.value;
   if (v.startsWith(MORE)) {
     renderVoices(); // seçimi geri al
-    openOptions('#modeller');
+    openOptions('#indirme');
   } else if (v.startsWith('system:')) {
     setSettings({ voice: 'system', systemVoiceName: v.slice(7) || null });
   } else {
@@ -136,7 +138,7 @@ $('voice').addEventListener('change', (e) => {
 async function loadSystemVoices() {
   try {
     const all = await chrome.tts.getVoices();
-    systemVoices = all.filter((v) => v.lang && /^tr\b/i.test(v.lang)).map((v) => v.voiceName);
+    systemVoices = all.filter((v) => v.lang && /^tr\b/i.test(v.lang)).map((v) => ({ voiceName: v.voiceName, remote: !!v.remote }));
   } catch {
     systemVoices = [];
   }
@@ -172,16 +174,16 @@ async function render() {
   const dl = Object.values(progress).filter((p) => p && !p.done && !p.error && !p.cached && p.total);
 
   if (settings.engineMode === 'mock') {
-    show('warn', 'Test motoru açık', 'Sahte çeviri ve bip sesi kullanılıyor.', { label: 'Ayarlara git', run: () => openOptions('#genel') });
+    show('warn', 'Test motoru açık', 'Sahte çeviri ve bip sesi kullanılıyor.', { label: 'Ayarlara git', run: () => openOptions('#diger') });
   } else if (dl.length) {
     const L = dl.reduce((n, p) => n + p.loaded, 0), T = dl.reduce((n, p) => n + p.total, 0);
     const pct = Math.floor((L / T) * 100);
     show('info', `Modeller indiriliyor… %${pct}`, `${Math.round(L / 1048576)} / ${Math.round(T / 1048576)} MB`, null, pct);
   } else if (st && (st.mt.error || st.tts.error)) {
-    show('err', 'Motor hatası', st.mt.error || st.tts.error, { label: 'Ayrıntılar', run: () => openOptions('#durum') });
+    show('err', 'Motor hatası', st.mt.error || st.tts.error, { label: 'Ayrıntılar', run: () => openOptions('#ai-model') });
   } else if (!settings.modelsApproved) {
     show('warn', 'Modeller indirilmedi', 'Dublaj için çeviri ve ses modellerinin bir kez indirilmesi gerekiyor.',
-      { label: 'Modelleri indir', run: () => openOptions('#modeller') });
+      { label: 'Modelleri indir', run: () => openOptions('#indirme') });
   } else if (!settings.enabled) {
     show('off', 'Dublaj kapalı', modelNames() || 'Açmak için anahtarı ya da videodaki TR düğmesini kullanın.');
   } else {

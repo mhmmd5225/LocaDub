@@ -8,11 +8,14 @@
 </head>
 <body>
   <header>
-    <div class="brand"><img src="../icons/icon-32.png" alt="" width="20" height="20"> LocaDub</div>
-    <label class="switch" title="Dublajı aç/kapa">
-      <input type="checkbox" id="enabled">
-      <span class="slider" aria-hidden="true"></span>
-      <span class="sr">Dublaj açık</span>
+    <div class="brand"><img src="../icons/icon-32.png" alt="" title="LocaDub" width="20" height="20"></div>
+    <select id="voice" aria-label="Seslendirme"></select>
+    <label class="switch-wrap" title="Dublajı aç/kapa">
+      <span class="switch-text">Dublaj</span>
+      <span class="switch">
+        <input type="checkbox" id="enabled">
+        <span class="slider" aria-hidden="true"></span>
+      </span>
     </label>
   </header>
 
@@ -34,10 +37,6 @@
   </section>
 
   <section>
-    <label class="row select">
-      <span>Seslendirme</span>
-      <select id="voice"></select>
-    </label>
     <label class="row range">
       <span>Dublaj ses seviyesi <output id="ttsVolumeOut"></output></span>
       <input type="range" id="ttsVolume" min="0" max="2" step="0.05">

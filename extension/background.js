@@ -173,6 +173,13 @@ function scheduleUpdateCheck() {
 chrome.alarms.onAlarm.addListener((a) => { if (a.name === UPDATE_ALARM) checkUpdate(); });
 chrome.runtime.onStartup.addListener(scheduleUpdateCheck);
 
+// Her tarayıcı açılışında dublaj kapalı başlar (servis çalışanının uyanması onStartup'ı tetiklemez).
+function resetEnabledOnStartup() {
+  return chrome.storage.local.set({ enabled: false });
+}
+chrome.runtime.onStartup.addListener(resetEnabledOnStartup);
+globalThis.resetEnabledOnStartup = resetEnabledOnStartup; // e2e testi için
+
 // ---------- Mesajlar ----------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
