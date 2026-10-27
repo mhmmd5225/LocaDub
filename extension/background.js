@@ -2,6 +2,7 @@
 
 import { getSettings } from './common/settings.js';
 import { VERSION_URL } from './common/version.js';
+import { pushError } from './common/diagnostics.js';
 
 const OFFSCREEN_URL = 'offscreen.html';
 const FORWARD = new Set([
@@ -126,6 +127,20 @@ async function systemVoices() {
     .map((v) => ({ voiceName: v.voiceName, lang: v.lang || '', remote: !!v.remote }));
 }
 
+// ---------- Son hatalar (tanılama raporu için) ----------
+// chrome.storage.session: tarayıcı kapanınca silinir. Sıralı yazım, eşzamanlı hatalarda kayıp olmasın.
+
+let errorWrite = Promise.resolve();
+const QUIET_CODES = new Set(['ABORTED', 'NOT_APPROVED']); // olağan durumlar
+
+function recordError(source, message) {
+  errorWrite = errorWrite.then(async () => {
+    const { errors = [] } = await chrome.storage.session.get('errors');
+    await chrome.storage.session.set({ errors: pushError(errors, { source, message }) });
+  }).catch(() => {});
+  return errorWrite;
+}
+
 // ---------- Güncelleme denetimi ----------
 // Sitedeki version.json okunur ve chrome.storage.local → update'e yazılır; açılır pencere kurulu sürümle karşılaştırır.
 
@@ -165,11 +180,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return false;
     }
     case 'engine.progress':
+      if (msg.error) recordError(`model (${msg.engine})`, msg.error);
       rememberProgress(msg);
       broadcastToTabs(msg);
       return false;
     case 'tts.system.speak':
-      systemSpeak(msg).then(sendResponse);
+      systemSpeak(msg).then((r) => {
+        if (!r.ok) recordError('sistem sesi', r.error);
+        sendResponse(r);
+      });
       return true;
     case 'tts.system.stop':
       chrome.tts.stop();
@@ -183,6 +202,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chrome.tts.resume();
       sendResponse({ ok: true });
       return false;
+    case 'diag.error':
+      recordError(String(msg.source || 'sayfa'), String(msg.message || ''));
+      return false;
+    case 'diag.errors':
+      chrome.storage.session.get('errors').then(({ errors = [] }) => sendResponse({ ok: true, result: errors }));
+      return true;
     case 'update.check':
       checkUpdate().then((result) => sendResponse({ ok: true, result }));
       return true;
@@ -192,7 +217,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     default:
       if (FORWARD.has(msg.type)) {
         if (msg.type === 'models.clear') chrome.storage.session.remove('progress').catch(() => {});
-        sendToOffscreen(msg).then(sendResponse, (e) => sendResponse({ ok: false, error: e?.message || String(e) }));
+        sendToOffscreen(msg).then((res) => {
+          if (res && !res.ok && !QUIET_CODES.has(res.code)) recordError(msg.type, res.error);
+          sendResponse(res);
+        }, (e) => {
+          recordError(msg.type, e?.message || String(e));
+          sendResponse({ ok: false, error: e?.message || String(e) });
+        });
         return true;
       }
       return false;

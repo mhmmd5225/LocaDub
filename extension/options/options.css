@@ -204,3 +204,10 @@ dialog p { margin: 0 0 6px; }
   .model { grid-template-columns: 1fr; }
   .model .actions { grid-row: auto; justify-content: flex-start; }
 }
+.diag { margin-top: 10px; }
+.diag summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.diag pre {
+  margin: 6px 0 0; padding: 10px; max-height: 320px; overflow: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre-wrap;
+}

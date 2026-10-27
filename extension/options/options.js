@@ -4,6 +4,7 @@ import { DEFAULTS, getSettings, setSettings, onSettingsChanged, secondVoice } fr
 import { listCached, deleteByPrefix } from '../engines/common/model-cache.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 import { parseGlossary } from '../common/glossary.js';
+import { buildReport } from '../common/diagnostics.js';
 
 const $ = (id) => document.getElementById(id);
 let settings = await getSettings();
@@ -454,6 +455,48 @@ async function renderStatus() {
     settings.modelsApproved ? 'Model indirme onayı: verildi' : 'Model indirme onayı: yok (dublaj, modeller indirilene kadar bekler)'));
 }
 $('refreshStatus').addEventListener('click', () => { renderStatus(); refreshModels(); });
+
+// ---------- Tanılama ----------
+
+async function browserInfo() {
+  const uad = navigator.userAgentData;
+  if (uad?.getHighEntropyValues) {
+    try {
+      const h = await uad.getHighEntropyValues(['fullVersionList', 'platformVersion']);
+      const b = (h.fullVersionList || []).find((x) => /Chrome|Edge|Opera|Brave/i.test(x.brand)) || h.fullVersionList?.[0];
+      return { browser: b ? `${b.brand} ${b.version}` : 'Chromium', platform: `${uad.platform} ${h.platformVersion || ''}`.trim() };
+    } catch { /* yoksay */ }
+  }
+  const m = /Chrome\/([\d.]+)/.exec(navigator.userAgent);
+  return { browser: m ? 'Chrome ' + m[1] : navigator.userAgent, platform: navigator.platform || '?' };
+}
+
+async function diagnosticsReport() {
+  const [status, errors, info] = await Promise.all([bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), browserInfo()]);
+  const models = [...lists.backends, ...lists.voices]
+    .filter((m) => m.cachePrefix && cachedBytes(m.cachePrefix) > 0)
+    .map((m) => ({ name: m.label, sizeMB: bytesMB(cachedBytes(m.cachePrefix)) }));
+  return buildReport({
+    version: chrome.runtime.getManifest().version, ...info, settings,
+    status: status.ok ? status.result : null, models, errors: errors.ok ? errors.result : [],
+    glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
+  });
+}
+
+$('copyDiag').addEventListener('click', async () => {
+  const text = await diagnosticsReport();
+  $('diagText').textContent = text;
+  try {
+    await navigator.clipboard.writeText(text);
+    $('diagNote').textContent = 'Kopyalandı.';
+  } catch {
+    $('diagNote').textContent = 'Kopyalanamadı; aşağıdaki metni elle seçip kopyalayın.';
+    document.querySelector('.diag').open = true;
+  }
+});
+document.querySelector('.diag').addEventListener('toggle', async (e) => {
+  if (e.target.open) $('diagText').textContent = await diagnosticsReport();
+});
 
 // ---------- Sekme vurgusu ----------
 

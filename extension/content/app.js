@@ -128,6 +128,7 @@ class Session {
       this.overlay.setStatus(msg, { kind: e instanceof UserError ? 'warn' : 'error', timeoutMs: 10000 });
       this._setBtn(e instanceof UserError ? 'warn' : 'error', msg);
       console.warn(LOG, e);
+      sendBg({ type: 'diag.error', source: 'altyazı', message: msg });
       return;
     }
     if (!this.alive) return;
