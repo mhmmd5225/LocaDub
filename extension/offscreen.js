@@ -3,6 +3,7 @@
 
 import { clearModels } from './engines/common/model-cache.js';
 import { encodePcmBase64 } from './common/pcm.js';
+import { restoreTexts, disposePunct } from './engines/mt/restore-engine.js';
 
 const PATHS = {
   real: { mt: './engines/mt/index.js', tts: './engines/tts/index.js' },
@@ -190,7 +191,9 @@ async function handle(msg) {
       const sentences = Array.isArray(msg.sentences) ? msg.sentences.map((x) => String(x ?? '')) : [];
       if (!sentences.length) return [];
       const mod = await ensure('mt', settings);
-      const result = await run('mt', msg.tag, (signal) => mod.translateBatch(sentences, { signal }));
+      // Otomatik altyazı: çeviriden önce noktalama ve büyük harf (yalnızca kullanıcı modeli indirip açtıysa).
+      const input = msg.restore && settings.fixAsrPunct ? await restoreTexts(sentences) : sentences;
+      const result = await run('mt', msg.tag, (signal) => mod.translateBatch(input, { signal }));
       if (!Array.isArray(result) || result.length !== sentences.length) {
         throw new EngineError('Çeviri motoru beklenmeyen sonuç döndürdü (uzunluk uyuşmuyor).', 'ENGINE_INVALID');
       }
@@ -220,11 +223,13 @@ async function handle(msg) {
     }
     case 'models.clear': {
       for (const engine of ['mt', 'tts']) await resetEngine(engine);
+      await disposePunct();
       const n = await clearModels();
       return { cleared: n };
     }
     case 'engine.reset': {
       // Ayarlar sayfası tek bir modeli silmeden önce motoru bellekten boşaltır.
+      if (msg.engine === 'punct') { await disposePunct(); return status(); }
       if (msg.engine !== 'mt' && msg.engine !== 'tts') throw new EngineError('Bilinmeyen motor: ' + msg.engine, 'BAD_REQUEST');
       await resetEngine(msg.engine);
       return status();

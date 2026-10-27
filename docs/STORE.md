@@ -64,7 +64,7 @@ YouTube videolarının İngilizce altyazısını Türkçeye çevirip Türkçe se
 | `tts` | Kullanıcı "Sistem sesi"ni seçerse Türkçe metin işletim sisteminin/Chrome'un sesiyle okunur. |
 | `alarms` | Günde iki kez yeni sürüm denetimi (kullanıcı kapatabilir). |
 | Host: `www.youtube.com`, `www.youtube-nocookie.com` | İçerik betiği oynatıcıya TR düğmesini ve Türkçe altyazıyı ekler, videonun altyazısını alır ve sesi videoyla eşler. |
-| Host: `huggingface.co` ve indirme alt alan adları (`*.huggingface.co`, `*.hf.co`, `cdn-lfs.huggingface.co`, `cas-bridge.xethub.hf.co`) | Çeviri ve ses modellerinin dosyaları (yalnızca veri; kod değil) kullanıcı onayıyla bir kez buradan indirilir. |
+| Host: `huggingface.co` ve indirme alt alan adları (`*.huggingface.co`, `*.hf.co`, `cdn-lfs.huggingface.co`, `cas-bridge.xethub.hf.co`) | Çeviri, ses ve (isteğe bağlı) noktalama modellerinin dosyaları (yalnızca veri; kod değil) kullanıcı onayıyla bir kez buradan indirilir. |
 | Host: `localdub.mhmmd.app` | Yeni sürüm denetimi için `version.json` okunur. |
 
 **Uzak kod:** Hayır. Tüm JavaScript ve WebAssembly pakette gelir; indirilen dosyalar yalnızca model ağırlıkları ve

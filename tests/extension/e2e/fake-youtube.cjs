@@ -10,12 +10,12 @@
 
 const fs = require('fs');
 
-function playerResponse(videoId, origin) {
+function playerResponse(videoId, origin, asr = false) {
   return {
     videoDetails: { videoId, title: 'Test ' + videoId, lengthSeconds: '16', isLiveContent: false },
     captions: { playerCaptionsTracklistRenderer: { captionTracks: [{
-      baseUrl: `${origin}/api/timedtext?v=${videoId}&lang=en`, languageCode: 'en', kind: '', isTranslatable: true,
-      name: { simpleText: 'English' },
+      baseUrl: `${origin}/api/timedtext?v=${videoId}&lang=en${asr ? '&kind=asr' : ''}`, languageCode: 'en', kind: asr ? 'asr' : '',
+      isTranslatable: true, name: { simpleText: asr ? 'English (auto-generated)' : 'English' },
     }] } },
   };
 }
@@ -23,8 +23,8 @@ function playerResponse(videoId, origin) {
 const VIDEO = '<video class="html5-main-video" src="/__test/video" style="width:100%;height:100%" playsinline></video>';
 const CONTROLS = '<div class="ytp-chrome-bottom" style="position:absolute;bottom:0;right:0"><div class="ytp-right-controls"></div></div>';
 
-function page(kind, videoId) {
-  const pr = JSON.stringify(playerResponse(videoId, 'https://www.youtube.com'));
+function page(kind, videoId, asr) {
+  const pr = JSON.stringify(playerResponse(videoId, 'https://www.youtube.com', asr));
   let body, script;
   if (kind === 'shorts') {
     body = `<ytd-reel-video-renderer is-active><div id="shorts-player" class="html5-video-player" style="position:relative;width:360px;height:640px">${VIDEO}</div></ytd-reel-video-renderer>`;
@@ -39,12 +39,13 @@ function page(kind, videoId) {
     `<body style="margin:0;background:#000">${body}<script>${script}</script></body></html>`;
 }
 
-/** videos: { [id]: [{ t: ms, d: ms, text }] } */
-async function installFakeYouTube(ctx, { videos, videoFile, onTimedtext } = {}) {
+/** videos: { [id]: [{ t: ms, d: ms, text }] }; asr: otomatik altyazı (kind:'asr') sayılacak video kimlikleri */
+async function installFakeYouTube(ctx, { videos, videoFile, onTimedtext, asr = [] } = {}) {
+  const isAsr = (id) => asr.includes(id);
   const handler = async (route) => {
     const u = new URL(route.request().url());
     let m;
-    if (u.pathname === '/watch') return route.fulfill({ contentType: 'text/html', body: page('watch', u.searchParams.get('v')) });
+    if (u.pathname === '/watch') return route.fulfill({ contentType: 'text/html', body: page('watch', u.searchParams.get('v'), isAsr(u.searchParams.get('v'))) });
     if ((m = /^\/shorts\/([\w-]{11})/.exec(u.pathname))) return route.fulfill({ contentType: 'text/html', body: page('shorts', m[1]) });
     if ((m = /^\/embed\/([\w-]{11})/.exec(u.pathname))) return route.fulfill({ contentType: 'text/html', body: page('embed', m[1]) });
     if (u.pathname === '/api/timedtext') {

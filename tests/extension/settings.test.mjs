@@ -24,3 +24,9 @@ test('sistem sesinde ve test motorunda (ikinci ses seçilmemişse) ayrım yok', 
   assert.equal(voiceForSpeaker(S({ speakerVoices: true, engineMode: 'mock', voice: 'mock-beep' }), 1), 'mock-beep');
   assert.equal(voiceForSpeaker(S({ speakerVoices: true, engineMode: 'mock', voice: 'mock-beep', voice2: 'mock-silent' }), 1), 'mock-silent');
 });
+
+test('fixAsrPunct varsayılan kapalı, değer normalleştirilir', () => {
+  assert.equal(S({}).fixAsrPunct, false);
+  assert.equal(S({ fixAsrPunct: 1 }).fixAsrPunct, true);
+  assert.equal(S({ fixAsrPunct: '' }).fixAsrPunct, false);
+});

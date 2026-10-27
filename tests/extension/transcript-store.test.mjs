@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_VIDEOS, loadTranscript, saveTranscript, clearTranscripts, transcriptStats, transcriptKey,
+  MAX_VIDEOS, loadTranscript, loadTranscriptEntry, saveTranscript, clearTranscripts, transcriptStats, transcriptKey,
 } from '../../extension/common/transcript-store.js';
 
 class FakeStorage {
@@ -56,4 +56,16 @@ test('boş liste kaydedilmez', async () => {
   const st = new FakeStorage();
   await saveTranscript(st, 'a', 'k', []);
   assert.equal(st.data.size, 0);
+});
+
+test('altyazı türü saklanır; eski kayıtlarda "manual" sayılır', async () => {
+  const st = new FakeStorage();
+  await saveTranscript(st, 'asrvideo', 'k', S, 'asr');
+  assert.equal((await loadTranscriptEntry(st, 'asrvideo', 'k')).kind, 'asr');
+  await saveTranscript(st, 'manvideo', 'k', S);
+  assert.equal((await loadTranscriptEntry(st, 'manvideo', 'k')).kind, 'manual');
+  // türü olmayan eski kayıt (B1 sürümü)
+  await st.set({ [transcriptKey('old', 'k')]: { savedAt: 1, sentences: [{ start: 0, end: 1, text: 'a', tr: null }] } });
+  assert.equal((await loadTranscriptEntry(st, 'old', 'k')).kind, 'manual');
+  assert.equal((await loadTranscript(st, 'old', 'k')).length, 1);
 });

@@ -59,6 +59,15 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
   (değişiklik bildirimi).
 - İsteğe bağlı: Chrome yerleşik Translator API (Google, cihaz üzerinde) — ayrı lisans gerektirmez.
 
+### İsteğe bağlı model — noktalama ve büyük harf (Apache-2.0)
+
+- Model: 1-800-BAD-CODE/punctuation_fullstop_truecase_english (`punct_cap_seg_en.onnx`, `spe_32k_lc_en.model`) —
+  Apache-2.0. https://huggingface.co/1-800-BAD-CODE/punctuation_fullstop_truecase_english
+  (sürüm `b26fd1c40e88678859048898218ea4edcc24c84a`). Eklentiye paketlenmez; kullanıcı ayarlar sayfasından isterse indirir.
+- `punct.js`, modelin çıktısını (noktalama, büyük harf, cümle sınırı etiketleri) metne dönüştüren mantığı, yazarın
+  `punctuators` paketinin (v0.0.7) çıktı çözümünü izleyerek JavaScript'te yeniden yazar. Paketin dağıtımında lisans
+  bilgisi yer almıyor; paket koduna bağlı değildir, ancak çözüm adımları aynıdır. Yazarın lisans bilgisi netleşirse bu satır güncellenmelidir.
+
 ## Seslendirme motoru (`engines/tts/`)
 
 ### Kod
