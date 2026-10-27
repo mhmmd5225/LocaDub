@@ -3,7 +3,7 @@
 // Protocol (all requests carry reqId; replies echo it):
 //   -> { type:'load',  reqId, voiceId, files:{ [name]: ArrayBuffer }, options:{ device, threads, steps } }
 //   <- { type:'loaded', reqId, info }
-//   -> { type:'synth', reqId, voiceId, text, speed, outputRate }
+//   -> { type:'synth', reqId, voiceId, text, speed, outputRate, tone:{ style, pitch, quality } }
 //   <- { type:'done',  reqId, pcm:Float32Array (transferred), sampleRate, stats }
 //   -> { type:'cancel', reqId }                 (queued: dropped; running: stops at the next chunk)
 //   -> { type:'unload', reqId, voiceId }        <- { type:'unloaded', reqId }
@@ -74,10 +74,10 @@ const info = (v) => ({
   crossOriginIsolated: !!self.crossOriginIsolated,
 });
 
-async function synth({ reqId, voiceId, text, speed, outputRate }) {
+async function synth({ reqId, voiceId, text, speed, outputRate, tone }) {
   const voice = voices.get(voiceId);
   if (!voice) throw new Error(`Ses yüklenmedi: ${voiceId}`);
-  return synthesizeText(voice, text, { speed, outputRate, isCancelled: () => cancelled.has(reqId) });
+  return synthesizeText(voice, text, { speed, outputRate, tone, isCancelled: () => cancelled.has(reqId) });
 }
 
 function reply(msg, transfer = []) {

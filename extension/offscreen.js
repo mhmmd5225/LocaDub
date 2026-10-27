@@ -3,6 +3,7 @@
 
 import { clearModels } from './engines/common/model-cache.js';
 import { encodePcmBase64 } from './common/pcm.js';
+import { normalizeTone } from './engines/tts/styles.js';
 import { restoreTexts, disposePunct } from './engines/mt/restore-engine.js';
 
 const PATHS = {
@@ -208,7 +209,8 @@ async function handle(msg) {
       // (motor bellekte iki ses tutar), böylece sesler arasında geçişte motor yeniden başlatılmaz.
       const mod = await ensure('tts', settings);
       const speed = Math.min(2, Math.max(0.5, Number(msg.speed) || 1));
-      const r = await run('tts', msg.tag, (signal) => mod.synthesize(text, { voice, speed, signal }));
+      const tone = normalizeTone(msg.tone);
+      const r = await run('tts', msg.tag, (signal) => mod.synthesize(text, { voice, speed, tone, signal }));
       if (r?.system) return { system: true };
       if (!r || !(r.pcm instanceof Float32Array) || !r.sampleRate) {
         throw new EngineError('Seslendirme motoru beklenmeyen sonuç döndürdü.', 'ENGINE_INVALID');

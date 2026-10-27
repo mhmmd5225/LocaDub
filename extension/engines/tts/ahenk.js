@@ -206,6 +206,7 @@ export class Ahenk {
     this.stoi = new Map(manifest.vocab.map((ch, i) => [ch, i]));
     this.alpha = new Set(manifest.vocab.filter((v) => v.length === 1));
     this.sampleRate = manifest.sample_rate || RATE;
+    this.styles = manifest.styles || []; // stil adları (indeks = text.onnx'un style girdisi)
   }
 
   static async create(ort, manifest, buffers, sessionOptions, opts) {
@@ -215,18 +216,21 @@ export class Ahenk {
     return new Ahenk(ort, manifest, s, opts);
   }
 
-  /** Text -> 48 kHz mono audio. speed > 1 speaks faster. isCancelled() is polled between pieces. */
-  async speak(text, { speed = 1, seed = 0, isCancelled, normalized = false } = {}) {
+  /**
+   * Text -> 48 kHz mono audio. speed > 1 speaks faster. isCancelled() is polled between pieces.
+   * style: a name from the manifest's styles (unknown -> 'neutral'); steps: flow steps for this call (default: this.steps).
+   */
+  async speak(text, { speed = 1, seed = 0, isCancelled, normalized = false, style = 'neutral', steps: stepsOpt } = {}) {
     const { ort, m } = this;
     const { text: textGraph, cond: condGraph, step: stepGraph, decoder } = this.sessions;
     const i64 = (arr) => BigInt64Array.from(arr, (x) => BigInt(x));
     const f32 = (arr, dims) => new ort.Tensor('float32', arr, dims);
     const scalar = (x) => f32(Float32Array.of(x), [1]);
     const D = m.latent_dim;
-    const steps = this.steps;
+    const steps = stepsOpt || this.steps;
     const { cfg } = m.defaults;
     const { window, context, max_word_frames, max_frames } = m.limits;
-    const style = Math.max(0, m.styles.indexOf('neutral'));
+    const styleIdx = m.styles.indexOf(style) >= 0 ? m.styles.indexOf(style) : Math.max(0, m.styles.indexOf('neutral'));
     const out = [];
     const parts = pieces(text, speed, this.alpha, normalized);
     for (let k = 0; k < parts.length; k++) {
@@ -237,7 +241,7 @@ export class Ahenk {
       const L = ids.length;
       const t1 = await textGraph.run({
         ids: new ort.Tensor('int64', i64(ids), [1, L]),
-        style: new ort.Tensor('int64', BigInt64Array.of(BigInt(style)), [1]),
+        style: new ort.Tensor('int64', BigInt64Array.of(BigInt(styleIdx)), [1]),
       });
       const p = plan(await tensorData(t1.dur), cw, speed, max_word_frames, max_frames);
       const { cond } = await condGraph.run({

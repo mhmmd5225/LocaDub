@@ -7,7 +7,8 @@
 import { Ahenk } from './ahenk.js';
 import { Antalia } from './antalia.js';
 import { normalizeText } from './normalize.js';
-import { concat, convertRate, timeStretch, trimSilence } from './dsp.js';
+import { concat, convertRate, shiftPitch, softLimit, timeStretch, trimSilence } from './dsp.js';
+import { pitchRatio, resolveTone } from './styles.js';
 
 /** Up to this speed the models' own duration control is used; the rest is WSOLA time-stretch (same pitch). */
 export const NATIVE_MAX_SPEED = 1.6;
@@ -90,35 +91,44 @@ export function splitText(text, max = MAX_CHUNK_CHARS) {
   return out.filter(([t]) => /\p{L}/u.test(t));
 }
 
-/** Split a requested speed into the model's native part and the time-stretch remainder. */
-export function speedPlan(speed) {
+/**
+ * Split a requested speed into the model's native part and the time-stretch remainder. With a pitch ratio k the
+ * model is asked for native/k (k times longer audio) and the result is resampled by k afterwards (shiftPitch), so
+ * the duration is the requested one; `model` is the speed the model actually receives (kept within its native range).
+ */
+export function speedPlan(speed, k = 1) {
   const s = Math.min(MAX_SPEED, Math.max(MIN_SPEED, Number(speed) || 1));
-  const native = Math.min(s, NATIVE_MAX_SPEED);
-  return { speed: s, native, stretch: s / native };
+  const native = Math.min(Math.max(s, MIN_SPEED * k), NATIVE_MAX_SPEED * k);
+  return { speed: s, native, model: native / k, stretch: Math.max(1, s / native) };
 }
 
 /**
  * Text -> mono PCM. Normalizes, splits long text, synthesizes each piece, trims model silence, joins with short
  * pauses and applies any speed beyond NATIVE_MAX_SPEED by time-stretching.
+ * tone { style, pitch, quality } (styles.js): voice-specific style/temperature, flow steps and a pitch shift.
  * @returns {Promise<{ pcm: Float32Array, sampleRate: number, stats: object }>}
  */
-export async function synthesizeText(voice, text, { speed = 1, seed = 0, isCancelled, outputRate, maxChars } = {}) {
+export async function synthesizeText(voice, text, { speed = 1, seed = 0, isCancelled, outputRate, maxChars, tone } = {}) {
   const t0 = now();
   const rate = voice.sampleRate;
-  const plan = speedPlan(speed);
+  const rt = resolveTone(tone, voice.model.styles || []);
+  const k = pitchRatio(rt.semitones);
+  const plan = speedPlan(speed, k);
+  const modelOpts = { style: rt.ahenkStyle, temperature: rt.temperature, steps: rt.steps };
   const spoken = normalizeText(text);
   const pieces = splitText(spoken, maxChars);
   const parts = [];
   for (let i = 0; i < pieces.length; i++) {
     if (isCancelled && isCancelled()) throw abortError();
     const [piece, gap] = pieces[i];
-    const audio = await voice.model.speak(piece, { speed: plan.native, seed, isCancelled, normalized: true });
+    const audio = await voice.model.speak(piece, { speed: plan.model, seed, isCancelled, normalized: true, ...modelOpts });
     const trimmed = trimSilence(audio, rate);
     if (!trimmed.length) continue;
     parts.push(trimmed);
-    if (gap && i < pieces.length - 1) parts.push(new Float32Array(Math.round((gap / plan.native) * rate)));
+    if (gap && i < pieces.length - 1) parts.push(new Float32Array(Math.round((gap / plan.model) * rate)));
   }
   let pcm = concat(parts);
+  if (rt.semitones) pcm = softLimit(shiftPitch(pcm, k));
   if (plan.stretch > 1.01) pcm = timeStretch(pcm, plan.stretch, rate);
   let sampleRate = rate;
   if (outputRate && outputRate !== rate) {
@@ -130,7 +140,7 @@ export async function synthesizeText(voice, text, { speed = 1, seed = 0, isCance
   return {
     pcm,
     sampleRate,
-    stats: { normalized: spoken, chunks: pieces.length, seconds, computeSec, rtf: seconds ? computeSec / seconds : 0, ...plan },
+    stats: { normalized: spoken, chunks: pieces.length, seconds, computeSec, rtf: seconds ? computeSec / seconds : 0, tone: rt, ...plan },
   };
 }
 

@@ -34,3 +34,24 @@ test('fixAsrPunct varsayılan kapalı, değer normalleştirilir', () => {
 test('dublaj varsayılan olarak kapalı (her açılışta kapalı davranışının dayanağı)', () => {
   assert.equal(S({}).enabled, false);
 });
+
+test('üslup, perde, kalite: varsayılanlar ve geçersiz değerler', () => {
+  const d = S({});
+  assert.equal(d.style, 'natural');
+  assert.equal(d.pitch, 0);
+  assert.equal(d.quality, 'fast');
+  assert.deepEqual([S({ style: 'lively' }).style, S({ style: 'calm' }).style], ['lively', 'calm']);
+  assert.equal(S({ style: 'robot' }).style, 'natural');
+  assert.equal(S({ style: 5 }).style, 'natural');
+  assert.equal(S({ quality: 'high' }).quality, 'high');
+  assert.equal(S({ quality: 'ultra' }).quality, 'fast');
+  assert.equal(S({ pitch: 1.5 }).pitch, 1.5);
+  assert.equal(S({ pitch: '2' }).pitch, 2);
+  assert.equal(S({ pitch: 9 }).pitch, 3);
+  assert.equal(S({ pitch: -9 }).pitch, -3);
+  assert.equal(S({ pitch: 0.7 }).pitch, 0.5); // 0.5 adıma yuvarlanır
+  assert.equal(S({ pitch: 'abc' }).pitch, 0);
+  assert.equal(S({ pitch: null }).pitch, 0);
+  assert.equal(S({ pitch: NaN }).pitch, 0);
+  assert.ok(Object.is(S({ pitch: -0.1 }).pitch, 0), '-0 olmamalı');
+});

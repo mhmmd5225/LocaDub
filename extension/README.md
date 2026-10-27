@@ -40,6 +40,9 @@ Ayarlar (`chrome.storage.local`):
 | Dublaj açık | TR düğmesiyle aynı |
 | Çeviri motoru / Ses | `listBackends()` / `listVoices()` listeleri; "Sistem sesi" = `chrome.tts` (Türkçe ses gerekir) |
 | Konuşma hızı | Temel TTS hızı (0.8–2.0). Cümle sığmazsa hız otomatik artırılır (toplam ≤ 1.6) |
+| Üslup | Doğal / Canlı / Sakin (`style`, varsayılan Doğal). **İnce ayardır, robot hissini ortadan kaldırmaz.** Ahenk Cep'te stil gömmesi (neutral / cheerful / calm), Antalia Mini'de örnekleme sıcaklığı; ikisinde de küçük bir hız çarpanı ve perde payı. Tablo tek yerde: `engines/tts/styles.js` (değerler başlangıç tahminidir, dinleyerek ayarlanacak). Sistem sesinde kullanılamaz |
+| Perde | Gelişmiş: −3…+3 yarım ton (`pitch`, adım 0.5); üslubun perdesine eklenir, toplam ±4 ile sınırlı. Süre değişmez; biçimlenti de kaydığı için küçük değerler önerilir |
+| Kalite | Gelişmiş: Hızlı (varsayılan) / Yüksek (`quality`): flow adımı 8 → 16, yaklaşık +0.1 UTMOS (Ahenk model kartı), sentez yaklaşık 1.2–1.9 kat uzun sürer (RTF tablosu: engines/tts/README.md). Sistem sesinde kullanılamaz |
 | Dublaj ses seviyesi | TTS kazancı (%0–200); YouTube'un ses düğmesiyle çarpılır |
 | Orijinal ses | Türkçe konuşma sırasında orijinal sesin seviyesi (ducking) |
 | Sözlük | Çeviri düzeltmeleri (altyazı + ses) ve okunuşlar (yalnızca ses): `kaynak => hedef` satırları, tam sözcük, Türkçe büyük/küçük harf duyarsız, `*` ekleri korur (`common/glossary.js`). Ham çeviri saklanır, sözlük kullanımda uygulanır |

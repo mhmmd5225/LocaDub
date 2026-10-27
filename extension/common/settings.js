@@ -1,5 +1,7 @@
 // Ortak ayarlar: varsayılanlar + chrome.storage.local yardımcıları.
 
+import { DEFAULT_STYLE, DEFAULT_QUALITY, normalizeStyle, normalizePitch, normalizeQuality } from '../engines/tts/styles.js';
+
 export const DEFAULTS = Object.freeze({
   enabled: false,          // dublaj açık mı (TR düğmesi / popup)
   engineMode: 'real',      // 'real' | 'mock' (test motoru)
@@ -11,6 +13,9 @@ export const DEFAULTS = Object.freeze({
   voice2: null,            // ikinci ses; null → birinci sesin karşıt cinsiyetlisi
   glossaryMt: '',          // çeviri düzeltmeleri ("yanlış => doğru" satırları, common/glossary.js)
   glossaryTts: '',         // okunuşlar (yalnızca seslendirmeden önce)
+  style: DEFAULT_STYLE,    // üslup: 'natural' | 'lively' | 'calm' (engines/tts/styles.js; sistem sesinde yok)
+  pitch: 0,                // perde, yarım ton (−3…+3, adım 0.5); üslubun perdesine eklenir
+  quality: DEFAULT_QUALITY, // 'fast' | 'high' (yüksek: 16 flow adımı, daha yavaş)
   originalVolume: 0.25,    // TTS sırasında orijinal ses çarpanı (0..1)
   ttsVolume: 1.0,          // TTS ses seviyesi (0..2)
   ttsSpeed: 1.0,           // temel TTS hızı (0.8..2.0)
@@ -44,6 +49,9 @@ export function normalizeSettings(raw = {}) {
   s.glossaryMt = String(s.glossaryMt ?? '').slice(0, 20000);
   s.glossaryTts = String(s.glossaryTts ?? '').slice(0, 20000);
   s.engineMode = s.engineMode === 'mock' ? 'mock' : 'real';
+  s.style = normalizeStyle(s.style);
+  s.pitch = normalizePitch(s.pitch);
+  s.quality = normalizeQuality(s.quality);
   s.ttsSpeed = clamp(Number(s.ttsSpeed) || 1, ...LIMITS.ttsSpeed);
   s.originalVolume = clamp(Number(s.originalVolume), ...LIMITS.originalVolume);
   if (!Number.isFinite(s.originalVolume)) s.originalVolume = DEFAULTS.originalVolume;

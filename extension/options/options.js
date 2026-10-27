@@ -98,6 +98,7 @@ const RANGES = {
   ttsVolume: (v) => `%${Math.round(v * 100)}`,
   originalVolume: (v) => `%${Math.round(v * 100)}`,
   lookaheadSec: (v) => `${v} sn`,
+  pitch: (v) => `${v > 0 ? '+' : ''}${String(v).replace('.', ',')}`,
 };
 
 for (const [id, fmt] of Object.entries(RANGES)) {
@@ -120,6 +121,25 @@ function renderGlossaryNote() {
   $('glossaryNote').textContent = a || b ? `${a} çeviri düzeltmesi, ${b} okunuş kuralı etkin.` : '';
 }
 
+// Üslup ve kalite: bölümlü seçiciler. Sistem sesinde (chrome.tts) kullanılamaz.
+for (const name of ['style', 'quality']) {
+  for (const input of document.querySelectorAll(`input[name="${name}"]`)) {
+    input.addEventListener('change', () => { if (input.checked) setSettings({ [name]: input.value }); });
+  }
+}
+function renderTone() {
+  const sys = settings.voice === 'system';
+  for (const name of ['style', 'quality']) {
+    for (const input of document.querySelectorAll(`input[name="${name}"]`)) {
+      input.checked = settings[name] === input.value;
+      input.disabled = sys;
+    }
+  }
+  $('pitch').disabled = sys;
+  $('styleNote').textContent = sys ? 'Sistem sesinde kullanılamaz.' : 'İnce ayardır; sesi kökten değiştirmez.';
+  $('qualityNote').textContent = sys ? 'Sistem sesinde kullanılamaz.' : 'Yüksek kalite daha yavaş hazırlanır.';
+}
+
 $('speakerVoices').addEventListener('change', (e) => setSettings({ speakerVoices: e.target.checked }));
 $('voice2').addEventListener('change', (e) => setSettings({ voice2: e.target.value || null }));
 
@@ -131,6 +151,7 @@ function renderMockRow() {
 
 function renderBasics() {
   renderMockRow();
+  renderTone();
   for (const id of ['glossaryMt', 'glossaryTts']) if (document.activeElement !== $(id)) $(id).value = settings[id];
   renderGlossaryNote();
   $('speakerVoices').checked = settings.speakerVoices;

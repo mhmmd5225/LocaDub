@@ -19,6 +19,31 @@ Sesler: `antalia-mini` (erkek, varsayılan), `ahenk-cep` (kadın), `system` (`{s
 Hız: 0.5–3'e kırpılır; ≤ 1.6 modelin süre tahmini (native), üstü WSOLA. Çıkış varsayılan 24 kHz
 (`init({outputRate:48000})` ile doğal hız).
 
+## Üslup, perde, kalite (`styles.js`)
+
+`synthesize(text, { voice, speed, tone: { style, pitch, quality } })` → worker → `core.js synthesizeText`. Tablo ve
+sınırlar yalnızca `styles.js`'te. **Bunlar ince ayardır; robot hissini ortadan kaldırmaz.** Sayılar başlangıç tahminidir,
+dinleyerek ayarlanacak.
+
+| Denetim | Ahenk Cep | Antalia Mini | Not |
+|---|---|---|---|
+| Üslup: stil | `text.onnx` style girdisi: Doğal `neutral`, Canlı `cheerful`, Sakin `calm` (manifestte yoksa `neutral`) | yok | Model kartına göre etki zayıf (`calm` ≈ %8 yavaş); `laughter` gömmesi var ama kahkaha eğitilmediği için sunulmaz |
+| Üslup: sıcaklık | yok | 0.6 / 0.8 / 0.4 (`speak()`'in `temperature`ı) | düşük = düz ve kararlı, yüksek = daha değişken tonlama |
+| Üslup: hız çarpanı | ×1 / 1.05 / 0.95 | aynı | motor çarpmaz; `content/app.js` temel hıza katar (`ttsSpeed × çarpan`), sığdırma hesabı (`chooseSynthSpeed`) bilir. Ahenk `calm` zaten ~%8 yavaştır, çarpanla birleşince Sakin ≈ %13 yavaşlar |
+| Perde | üslup perdesi (0 / +1 / −1) + kullanıcı (−3…+3), toplam ±4 yarım ton | aynı | modele `hız / k` verilir (k = 2^(yarımTon/12), ses k kat uzar), çıktı k oranında yeniden örneklenir: perde k kat, süre aynı kalır (`dsp.shiftPitch`, doğrusal aradeğerleme). Biçimlenti de kayar; WSOLA gerekmez |
+| Kalite | flow adımı 8 → 16 | flow adımı 8 → 16 | ölçülen RTF için aşağıya bakın |
+
+Hız ölçümü (Node, tek iş parçacığı, `onnxruntime-node` CPU; tarayıcıdaki WASM bundan ~%20–30 yavaştır; 3 cümle ≈ 15 sn ses, 24 kHz çıkış):
+
+| Ses | Kalite | Doğal | Canlı | Sakin |
+|---|---|---|---|---|
+| Antalia Mini | Hızlı (8 adım) | 0.162 | 0.165 | 0.148 |
+| Antalia Mini | Yüksek (16) | 0.250 | 0.313 | 0.290 |
+| Ahenk Cep | Hızlı (8 adım) | 0.244 | 0.293 | 0.247 |
+| Ahenk Cep | Yüksek (16) | 0.305 | 0.343 | 0.305 |
+
+(Perde +2 yarım ton ek maliyeti: Antalia 0.162 → 0.194, Ahenk 0.244 → 0.260; ses k kat uzun üretildiği için.)
+
 ## Üçüncü taraf bildirimleri (THIRD_PARTY_NOTICES.md'ye eklenmeli)
 
 - **Harfiyen** — https://github.com/ozcancelik/harfiyen — MIT License, Copyright (c) 2026 Özcan Çelik.
