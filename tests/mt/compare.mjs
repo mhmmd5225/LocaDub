@@ -10,7 +10,7 @@
 // çevrilir: "metin" (özgün) ve "asr" (küçük harf, noktalamasız — YouTube otomatik altyazısına benzer). Gemma modeli
 // (≈3.1 GB, q4) ilk çalıştırmada indirilir. Çıktılar .out/ altına yazılır.
 // --restore: "asr" girdisine çeviriden önce noktalama/büyük harf geri kazanımı uygulanır ve "asr+<yöntem>" satırı
-// eklenir (rules: engines/mt/restore.js; model/model-int8: engines/mt/punct.js, dosyalar .models/punct-en/ altında —
+// eklenir (rules: aşağıdaki taban çizgisi, eklentide yok; model/model-int8: engines/mt/punct.js, dosyalar .models/punct-en/ altında —
 // model: punct_cap_seg_en.onnx + spe_32k_lc_en.model HF'ten; model-int8: onnxruntime quantize_dynamic ile üretilir).
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -22,7 +22,6 @@ import { MarianTokenizer } from '../../extension/engines/mt/spm.js';
 import { fillDequantized } from '../../extension/engines/mt/onnx-patch.js';
 import { VARIANTS, DEFAULT_VARIANT } from '../../extension/engines/mt/models.js';
 import { prepareBatch, finishBatch } from '../../extension/engines/mt/preprocess.js';
-import { restoreRules } from '../../extension/engines/mt/restore.js';
 import { PunctRestorer } from '../../extension/engines/mt/punct.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +60,13 @@ function loadData() {
 
 // Otomatik altyazı biçimi: küçük harf, noktalama yok (kesme işareti kalır).
 const asrify = (s) => s.toLowerCase().replace(/[’‘]/g, "'").replace(/[^\p{L}\p{N}'\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+
+// Taban çizgisi (eklentiye girmedi: ölçümde kazanç sağlamadı): tek başına "i" ve kısaltmaları büyük, cümle başı büyük, sona nokta.
+function restoreRules(text) {
+  let s = String(text).trim().replace(/(^|[^\p{L}\p{N}'])i(?=('m|'ll|'ve|'d|'s)?(?![\p{L}\p{N}']))/gu, '$1I');
+  s = s.replace(/^(\P{L}*)(\p{L})/u, (_, pre, c) => pre + c.toUpperCase());
+  return /[.!?…]["'”’)\]]*$/.test(s) ? s : s + '.';
+}
 
 // Geri kazanım yöntemleri → { texts, ms } (cümle başına süre)
 async function restoreSet(method, list) {

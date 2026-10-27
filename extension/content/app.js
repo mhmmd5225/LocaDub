@@ -2,7 +2,7 @@
 
 import { getSettings, setSettings, onSettingsChanged, voiceForSpeaker } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
-import { loadTranscript, saveTranscript } from '../common/transcript-store.js';
+import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
 import { pageVideo, findPlayer, findVideo } from '../common/page.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
@@ -25,7 +25,7 @@ const PERSIST_MS = 15000;
 
 let settings = null;
 let session = null;
-const transcriptCache = new Map(); // videoId → { sentences:[{start,end,text,tr}], trKey }
+const transcriptCache = new Map(); // videoId → { sentences:[{start,end,text,tr,speaker?}], trKey, kind }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,8 +45,9 @@ function sameOrigin(url) {
   return u.toString();
 }
 
+// Çeviri önbelleği anahtarı: motor + (otomatik altyazıda) noktalama düzeltmesi açık mı.
 function trKey(s) {
-  return `${s.engineMode}|${s.mtBackend || ''}`;
+  return `${s.engineMode}|${s.mtBackend || ''}${s.fixAsrPunct ? '|p' : ''}`;
 }
 function audioKey(s) {
   return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${s.speakerVoices ? s.voice2 || '2' : ''}` +
@@ -219,15 +220,17 @@ class Session {
     const cached = transcriptCache.get(this.videoId);
     if (cached?.trKey === this._trKey) {
       this.sentences = cached.sentences.map((s, i) => ({ ...s, i, audio: null }));
+      this.trackKind = cached.kind;
       return;
     }
     // Daha önce izlenen video: altyazı ve çeviriler kalıcı önbellekten.
     try {
-      const stored = await loadTranscript(chrome.storage.local, this.videoId, this._trKey);
+      const stored = await loadTranscriptEntry(chrome.storage.local, this.videoId, this._trKey);
       if (stored && this.alive) {
-        this.sentences = stored.map((s, i) => ({ ...s, i, audio: null }));
-        this._savedCount = stored.filter((s) => s.tr != null).length;
-        console.info(LOG, `${stored.length} cümle önbellekten (${this._savedCount} çevrili)`);
+        this.sentences = stored.sentences.map((s, i) => ({ ...s, i, audio: null }));
+        this.trackKind = stored.kind;
+        this._savedCount = stored.sentences.filter((s) => s.tr != null).length;
+        console.info(LOG, `${stored.sentences.length} cümle önbellekten (${this._savedCount} çevrili)`);
         return;
       }
     } catch (e) {
@@ -235,6 +238,7 @@ class Session {
     }
     if (cached) {
       this.sentences = cached.sentences.map((s, i) => ({ ...s, i, tr: null, audio: null }));
+      this.trackKind = cached.kind;
       return;
     }
     let info = null;
@@ -291,7 +295,7 @@ class Session {
     const n = this.sentences.reduce((k, s) => k + (s.tr != null ? 1 : 0), 0);
     if (!n || n === this._savedCount) return;
     this._savedCount = n;
-    saveTranscript(chrome.storage.local, this.videoId, this._trKey, this.sentences)
+    saveTranscript(chrome.storage.local, this.videoId, this._trKey, this.sentences, this.trackKind)
       .catch((e) => console.warn(LOG, 'Önbelleğe yazılamadı', e));
   }
 
@@ -301,7 +305,8 @@ class Session {
     transcriptCache.delete(this.videoId);
     transcriptCache.set(this.videoId, {
       trKey: this._trKey,
-      sentences: this.sentences.map(({ start, end, text, tr }) => ({ start, end, text, tr: tr ?? null })),
+      kind: this.trackKind,
+      sentences: this.sentences.map(({ start, end, text, tr, speaker }) => ({ start, end, text, tr: tr ?? null, ...(speaker ? { speaker } : {}) })),
     });
     while (transcriptCache.size > CACHE_VIDEOS) transcriptCache.delete(transcriptCache.keys().next().value);
   }
@@ -398,7 +403,10 @@ class Session {
       const batch = needTr.slice(0, this.firstBatchDone ? TR_BATCH : TR_BATCH_FIRST);
       const gen = this.trGen;
       for (const i of batch) S[i].trPending = true;
-      const res = await sendBg({ type: 'mt.translate', sentences: batch.map((i) => S[i].text), tag: this.tag });
+      const res = await sendBg({
+        type: 'mt.translate', sentences: batch.map((i) => S[i].text), tag: this.tag,
+        restore: this.trackKind === 'asr', // otomatik altyazı: çeviri öncesi noktalama (ayar ve model açıksa)
+      });
       for (const i of batch) S[i].trPending = false;
       if (!this.alive || gen !== this.trGen) return true;
       if (!res.ok) {

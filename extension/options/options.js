@@ -1,7 +1,8 @@
 // Ayarlar sayfası: genel ayarlar, ses, model yönetimi (indir / sil / kullan), depolama ve durum.
 
 import { DEFAULTS, getSettings, setSettings, onSettingsChanged, secondVoice } from '../common/settings.js';
-import { listCached, deleteByPrefix } from '../engines/common/model-cache.js';
+import { listCached, deleteByPrefix, fetchModel } from '../engines/common/model-cache.js';
+import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 import { parseGlossary } from '../common/glossary.js';
 import { buildReport } from '../common/diagnostics.js';
@@ -12,7 +13,7 @@ let lists = { backends: [], voices: [], errors: {} };
 let systemVoices = [];
 let cached = []; // [{ url, size }]
 // Kartlarda gösterilen indirme: motor → { id, loaded, total, error }
-const downloads = { mt: null, tts: null };
+const downloads = { mt: null, tts: null, punct: null };
 
 // Chrome Translator dil paketi kullanıcı etkileşimi ister: modülü önceden yükle, tıklamada doğrudan çağır.
 let chromeTranslatorMod = null;
@@ -166,7 +167,7 @@ function modelCard({ engine, id, name, meta, prefix, downloaded, sizeMB, inUse, 
   if (canDownload && !downloaded && !busy) {
     actions.push(el('button', {
       class: 'small', textContent: have ? 'Devam et' : `İndir${sizeMB ? ` (${fmtMB(sizeMB)})` : ''}`,
-      disabled: settings.engineMode === 'mock', onclick: () => downloadModel(engine, id, sizeMB - bytesMB(have)),
+      disabled: engine !== 'punct' && settings.engineMode === 'mock', onclick: () => downloadModel(engine, id, sizeMB - bytesMB(have)),
     }));
   }
   if (canDownload && (downloaded || have > 0)) {
@@ -257,7 +258,23 @@ function renderModels() {
     extra: sel,
   }));
   $('ttsModels').replaceChildren(...tts);
+  $('punctModels').replaceChildren(punctCard());
   renderVoice2();
+}
+
+// Noktalama modeli: iki dosya da önbellekte mi; kart "Kullan" ile ayarı açar, indirme bitince kendiliğinden açılır.
+const punctDownloaded = () => PUNCT_MODEL.files.every((f) => cached.some((c) => c.url === punctUrl(f.name)));
+
+function punctCard() {
+  const downloaded = punctDownloaded();
+  const inUse = downloaded && settings.fixAsrPunct;
+  return modelCard({
+    engine: 'punct', id: 'punct-en', name: 'Noktalama ve büyük harf (İngilizce)',
+    meta: `Lisans: Apache-2.0 · HuggingFace: 1-800-BAD-CODE`,
+    prefix: PUNCT_MODEL.repo, downloaded, sizeMB: punctBytes() / 1e6, inUse,
+    onUse: downloaded ? () => setSettings({ fixAsrPunct: true }) : null,
+    extra: inUse ? el('button', { class: 'small secondary', textContent: 'Kapat', onclick: () => setSettings({ fixAsrPunct: false }) }) : null,
+  });
 }
 
 // İkinci konuşmacının sesi: birinci sesten farklı, indirilebilir sesler.
@@ -317,6 +334,7 @@ async function downloadModel(engine, id, remainingMB) {
   }
   downloads[engine] = { id, loaded: 0, total: 0 };
   renderModels();
+  if (engine === 'punct') return downloadPunct(id);
   await setSettings({ modelsApproved: true });
   const options = engine === 'mt' ? { backend: id } : { voice: id };
   const res = await bg({ type: 'engine.init', engine, options, userInitiated: true });
@@ -325,13 +343,31 @@ async function downloadModel(engine, id, remainingMB) {
   renderStatus();
 }
 
+// Noktalama modeli doğrudan bu sayfadan indirilir (ortak önbellek); bitince düzeltme açılır.
+async function downloadPunct(id) {
+  const total = punctBytes();
+  let base = 0;
+  try {
+    for (const f of PUNCT_MODEL.files) {
+      await fetchModel(punctUrl(f.name), { onProgress: (p) => { downloads.punct = { id, loaded: base + p.loaded, total }; renderModels(); } });
+      base += f.size;
+    }
+    await setSettings({ fixAsrPunct: true });
+    downloads.punct = null;
+  } catch (e) {
+    downloads.punct = { id, error: e?.message || String(e) };
+  }
+  await refreshModels();
+}
+
 async function deleteModel(engine, id, name, prefix, inUse) {
   const extra = inUse ? ' Bu model şu an kullanılıyor; dublaj için yeniden indirmeniz gerekecek.' : '';
   if (!(await confirmBox(`"${name}" bilgisayardan silinecek.${extra}`, 'Sil'))) return;
   await bg({ type: 'engine.reset', engine });
   await deleteByPrefix(prefix);
   // Kullanılan model silindiyse dublaj sormadan yeniden indirmesin.
-  if (inUse) await setSettings({ modelsApproved: false });
+  if (engine === 'punct') await setSettings({ fixAsrPunct: false });
+  else if (inUse) await setSettings({ modelsApproved: false });
   await refreshModels();
   renderStatus();
 }
@@ -420,7 +456,7 @@ $('clearAll').addEventListener('click', async () => {
   if (!(await confirmBox('İndirilen tüm modeller silinecek. Dublaj için yeniden indirmeniz gerekecek.', 'Tümünü sil'))) return;
   $('clearAll').disabled = true;
   const res = await bg({ type: 'models.clear' });
-  await setSettings({ modelsApproved: false });
+  await setSettings({ modelsApproved: false, fixAsrPunct: false });
   $('clearAll').disabled = false;
   $('storageNote').textContent = res.ok ? 'Tüm modeller silindi.' : 'Silinemedi: ' + res.error;
   await refreshModels();

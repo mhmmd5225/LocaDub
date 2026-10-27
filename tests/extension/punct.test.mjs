@@ -1,22 +1,7 @@
-// engines/mt/restore.js (kurallar) ve engines/mt/punct.js (model çıktısının çözümü; sahte belirteçleyiciyle).
+// engines/mt/punct.js: model çıktısının çözümü (sahte belirteçleyici ve sahte model çıktısıyla; model dosyası gerekmez).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { looksAsr, restoreRules } from '../../extension/engines/mt/restore.js';
 import { decode, tidyCase, tokenizeWords } from '../../extension/engines/mt/punct.js';
-
-test('looksAsr: yalnızca küçük harfli ve noktalamasız metin', () => {
-  assert.equal(looksAsr("so what i'm gonna do"), true);
-  assert.equal(looksAsr('So what I am going to do.'), false);
-  assert.equal(looksAsr('so, what'), false);
-  assert.equal(looksAsr('123 456'), false);
-});
-
-test('restoreRules: i ve kısaltmaları, cümle başı, son nokta', () => {
-  assert.equal(restoreRules("so i think i'm right and i'll go"), "So I think I'm right and I'll go.");
-  assert.equal(restoreRules('the iphone is in it'), 'The iphone is in it.');
-  assert.equal(restoreRules('Already Punctuated.'), 'Already Punctuated.');
-  assert.equal(restoreRules(''), '');
-});
 
 test('tidyCase: kısaltmalar korunur, karışık büyük harf düzelir', () => {
   assert.deepEqual(['BrEAkING', 'NASA', 'U.S.', 'mEtacomet', "I'm", 'JO25'].map(tidyCase),

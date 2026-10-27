@@ -42,6 +42,7 @@ Ayarlar (`chrome.storage.local`):
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
 | Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
+| Otomatik altyazıda noktalama | İsteğe bağlı model (Ayarlar → Modeller, 210 MB, HuggingFace): YouTube'un otomatik (küçük harfli, noktasız) altyazısına çeviriden önce noktalama ve büyük harf ekler; kıyasta chrF 51.1 → 53.1 (`engines/mt/punct.js`, `restore-engine.js`; `docs/MT-KIYAS.md`). Elle yazılmış altyazıya dokunmaz; indirme bitince kendiliğinden açılır |
 | Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, indirme yok |
 
 ## Mimari
@@ -100,6 +101,7 @@ xvfb-run -a node tests/extension/e2e/glossary.e2e.cjs
 xvfb-run -a node tests/extension/e2e/update-banner.e2e.cjs
 xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
 xvfb-run -a node tests/extension/e2e/shorts-embed.e2e.cjs
+xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punct-en/ yoksa atlanır
 ```
 
 **Sürüm yayınlama:** `manifest.json` → `version` artırılıp `main`'e birleştirilince site yeni ZIP'i ve

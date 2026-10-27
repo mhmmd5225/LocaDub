@@ -9,14 +9,21 @@
 
 import { parseSpmModel, SpmTokenizer } from './spm.js';
 
+const REPO = '1-800-BAD-CODE/punctuation_fullstop_truecase_english';
+const REVISION = 'b26fd1c40e88678859048898218ea4edcc24c84a'; // sabit sürüm: boyutlar ve çözüm mantığı bu sürüme göre
 export const PUNCT_MODEL = {
-  repo: 'https://huggingface.co/1-800-BAD-CODE/punctuation_fullstop_truecase_english/resolve/main/',
-  onnx: 'punct_cap_seg_en.onnx',
-  spm: 'spe_32k_lc_en.model',
+  repo: `https://huggingface.co/${REPO}/resolve/${REVISION}/`,
+  license: 'Apache-2.0 (1-800-BAD-CODE/punctuation_fullstop_truecase_english)',
+  files: [
+    { name: 'onnx', file: 'punct_cap_seg_en.onnx', size: 209532928 },
+    { name: 'spm', file: 'spe_32k_lc_en.model', size: 587902 },
+  ],
   maxLen: 256,
   postLabels: [null, '<ACRONYM>', '.', ',', '?'],
   preLabels: [null, '¿'],
 };
+export const punctUrl = (name) => PUNCT_MODEL.repo + PUNCT_MODEL.files.find((f) => f.name === name).file;
+export const punctBytes = () => PUNCT_MODEL.files.reduce((n, f) => n + f.size, 0);
 
 const SPACE = '▁';
 

@@ -21,22 +21,28 @@ async function touch(storage, key) {
   await storage.set({ [INDEX]: idx });
 }
 
-/** → [{ start, end, text, tr }] | null */
-export async function loadTranscript(storage, videoId, trKey) {
+/** → { sentences:[{ start, end, text, tr }], kind:'manual'|'asr'|'translated' } | null  (kind yoksa 'manual') */
+export async function loadTranscriptEntry(storage, videoId, trKey) {
   const key = transcriptKey(videoId, trKey);
   const { [key]: v } = await storage.get(key);
   if (!Array.isArray(v?.sentences) || !v.sentences.length) return null;
   await touch(storage, key);
-  return v.sentences;
+  return { sentences: v.sentences, kind: v.kind || 'manual' };
 }
 
-export async function saveTranscript(storage, videoId, trKey, sentences) {
+/** → [{ start, end, text, tr }] | null */
+export async function loadTranscript(storage, videoId, trKey) {
+  return (await loadTranscriptEntry(storage, videoId, trKey))?.sentences ?? null;
+}
+
+// kind: altyazı türü (otomatik altyazıda çeviri öncesi noktalama uygulanır)
+export async function saveTranscript(storage, videoId, trKey, sentences, kind = 'manual') {
   if (!videoId || !sentences?.length) return;
   const key = transcriptKey(videoId, trKey);
   const slim = sentences.map(({ start, end, text, tr, speaker }) => ({
     start, end, text, tr: tr ?? null, ...(speaker ? { speaker } : {}),
   }));
-  await storage.set({ [key]: { savedAt: Date.now(), sentences: slim } });
+  await storage.set({ [key]: { savedAt: Date.now(), kind, sentences: slim } });
   await touch(storage, key);
 }
 
