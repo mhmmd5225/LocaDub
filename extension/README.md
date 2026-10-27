@@ -36,6 +36,7 @@ Ayarlar (`chrome.storage.local`):
 | Konuşma hızı | Temel TTS hızı (0.8–2.0). Cümle sığmazsa hız otomatik artırılır (toplam ≤ 1.6) |
 | Dublaj ses seviyesi | TTS kazancı (%0–200); YouTube'un ses düğmesiyle çarpılır |
 | Orijinal ses | Türkçe konuşma sırasında orijinal sesin seviyesi (ducking) |
+| Sözlük | Çeviri düzeltmeleri (altyazı + ses) ve okunuşlar (yalnızca ses): `kaynak => hedef` satırları, tam sözcük, Türkçe büyük/küçük harf duyarsız, `*` ekleri korur (`common/glossary.js`). Ham çeviri saklanır, sözlük kullanımda uygulanır |
 | Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde iki ses sırayla konuşur (`speakerVoices`, `voice2`; varsayılan ikinci ses birincinin karşıt cinsiyetlisi) |
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
@@ -85,7 +86,7 @@ node --test tests/extension/
 ```
 
 Saf modüller (`content/captions.js`, `content/timing.js`, `common/pcm.js`, `common/settings.js`,
-`common/transcript-store.js`),
+`common/transcript-store.js`, `common/glossary.js`),
 `engines/common/model-cache.js` (sahte Cache Storage/fetch ile) ve sahte motorlar sınanır.
 
 Uçtan uca (gerçek Chromium + eklenti, sahte YouTube sayfası, test motoru; Playwright ve ffmpeg gerekir):
@@ -93,6 +94,7 @@ Uçtan uca (gerçek Chromium + eklenti, sahte YouTube sayfası, test motoru; Pla
 ```
 xvfb-run -a node tests/extension/e2e/transcript-cache.e2e.cjs
 xvfb-run -a node tests/extension/e2e/speaker-voices.e2e.cjs
+xvfb-run -a node tests/extension/e2e/glossary.e2e.cjs
 ```
 
 ## Bilinen sınırlamalar

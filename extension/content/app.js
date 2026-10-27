@@ -3,6 +3,7 @@
 import { getSettings, setSettings, onSettingsChanged, voiceForSpeaker } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
 import { loadTranscript, saveTranscript } from '../common/transcript-store.js';
+import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -38,8 +39,15 @@ function trKey(s) {
   return `${s.engineMode}|${s.mtBackend || ''}`;
 }
 function audioKey(s) {
-  return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${s.speakerVoices ? s.voice2 || '2' : ''}`;
+  return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${s.speakerVoices ? s.voice2 || '2' : ''}` +
+    `|${s.glossaryMt}|${s.glossaryTts}`;
 }
+
+// Çeviri ham olarak saklanır; sözlük kullanımda uygulanır (sözlük değişince yeniden çeviri gerekmez).
+const mtRules = glossaryCompiler();
+const ttsRules = glossaryCompiler();
+const shownText = (s) => applyGlossary(s.tr, mtRules(settings.glossaryMt));
+const spokenText = (s) => applyGlossary(shownText(s), ttsRules(settings.glossaryTts));
 
 async function waitFor(fn, { timeoutMs = 15000, intervalMs = 200, alive = () => true } = {}) {
   const t0 = Date.now();
@@ -413,10 +421,11 @@ class Session {
     const s = S[i];
     const gen = this.audioGen;
     const slot = slotSec(S, i);
-    const speed = chooseSynthSpeed(s.tr, slot, { base: settings.ttsSpeed });
+    const text = spokenText(s);
+    const speed = chooseSynthSpeed(text, slot, { base: settings.ttsSpeed });
     s.auPending = true;
     const res = await sendBg({
-      type: 'tts.synthesize', text: s.tr, voice: voiceForSpeaker(settings, s.speaker), speed, tag: this.tag,
+      type: 'tts.synthesize', text, voice: voiceForSpeaker(settings, s.speaker), speed, tag: this.tag,
     });
     s.auPending = false;
     if (!this.alive || gen !== this.audioGen) return;
@@ -506,7 +515,7 @@ class Session {
 
     const t = v.currentTime;
     const ai = activeIndex(S, t);
-    this.overlay.setText(settings.showSubtitles && ai >= 0 ? (S[ai].tr || '') : '');
+    this.overlay.setText(settings.showSubtitles && ai >= 0 ? (S[ai].tr ? shownText(S[ai]) : '') : '');
     if (this.enginesReady) this._updatePrep(t);
 
     if (v.paused || v.seeking || !this.enginesReady) return;
@@ -576,11 +585,12 @@ class Session {
   _playSystem(idx, remaining) {
     const s = this.sentences[idx];
     const base = settings.ttsSpeed;
-    const est = estimateSpeechSec(s.tr, base);
+    const text = spokenText(s);
+    const est = estimateSpeechSec(text, base);
     const { rate } = fitRate(est, remaining, base);
     this.playingIdx = idx;
     this.ducker.duck(settings.originalVolume);
-    this.sys.play(s.tr, {
+    this.sys.play(text, {
       rate: base * rate * this.video.playbackRate,
       volume: this.dubVolume(),
       voiceName: settings.systemVoiceName || undefined,

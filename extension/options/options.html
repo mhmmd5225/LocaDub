@@ -21,6 +21,7 @@
     <nav class="wrap tabs" aria-label="Bölümler">
       <a href="#genel">Genel</a>
       <a href="#ses">Ses</a>
+      <a href="#sozluk">Sözlük</a>
       <a href="#modeller">Modeller</a>
       <a href="#depolama">Depolama</a>
       <a href="#durum">Durum</a>
@@ -73,6 +74,21 @@
         <select id="voice2"></select>
         <small id="voice2Note"></small>
       </label>
+    </section>
+
+    <section id="sozluk" class="card">
+      <h2>Sözlük</h2>
+      <p class="intro">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Büyük-küçük harf fark etmez; yalnızca tam sözcükler değişir.
+        Sonuna <code>*</code> koyarsanız sözcüğün ekleri korunur (<code>zeka* =&gt; zekâ*</code> → "zekanın" "zekânın" olur). <code>#</code> ile başlayan satırlar yorumdur.</p>
+      <label class="row stack">
+        <span><b>Çeviri düzeltmeleri</b><small>Türkçe çeviride geçen ifadeyi değiştirir; altyazıda ve seste görünür. Yeniden çeviri gerekmez.</small></span>
+        <textarea id="glossaryMt" rows="5" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
+      </label>
+      <label class="row stack">
+        <span><b>Okunuşlar</b><small>Yalnızca seslendirmede uygulanır; altyazıda yazılış kalır. Kısaltmalar ve yabancı adlar için.</small></span>
+        <textarea id="glossaryTts" rows="5" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
+      </label>
+      <p class="note" id="glossaryNote"></p>
     </section>
 
     <section id="modeller" class="card">
