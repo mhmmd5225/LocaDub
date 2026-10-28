@@ -171,6 +171,29 @@ function passSubtitleNoise(text) {
  * @param {string} text
  * @returns {string}
  */
+// ---------------------------------------------------------------- phrasing (pauses and emphasis)
+
+/** Contrast/reason conjunctions that open a new clause; the models only phrase where there is punctuation. */
+const CLAUSE_CONJUNCTIONS = ['ama', 'fakat', 'çünkü', 'oysa', 'oysaki', 'halbuki'];
+const CONJ = new RegExp(`(\\p{L})\\s+(${CLAUSE_CONJUNCTIONS.join('|')})(?=\\s)`, 'giu');
+/** Only clauses at least this long get a comma: short ones ("küçük ama güçlü") read better in one breath. */
+export const MIN_CLAUSE_CHARS = 40;
+
+/**
+ * Add the comma a careful writer would put before "ama / fakat / çünkü / oysa / halbuki" in a long clause, so the
+ * voice phrases (short pause, new pitch arc) and the clause after it gets its own emphasis. Text between existing
+ * punctuation marks is checked on its own, so a clause already cut short by a comma is left alone.
+ */
+export function addClauseCommas(text) {
+  return text.replace(/[^.,;:!?…]+/gu, (clause) => {
+    if (clause.trim().length < MIN_CLAUSE_CHARS) return clause;
+    return clause.replace(CONJ, (m, before, conj, offset) => {
+      const head = clause.slice(0, offset + 1).trim();
+      return head.length >= 12 ? `${before}, ${conj}` : m;
+    });
+  });
+}
+
 export function normalizeText(text) {
   if (!text) return '';
   let t = String(text).normalize('NFC');
@@ -184,7 +207,7 @@ export function normalizeText(text) {
     // never fail synthesis on odd input: read what we have
     console.warn('[tts] trnorm failed, reading text as written', e);
   }
-  return t;
+  return addClauseCommas(t);
 }
 
 export { trnorm, attachSuffix, trLower };

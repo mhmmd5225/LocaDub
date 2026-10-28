@@ -7,12 +7,13 @@
 //   synthesize(text, { voice, speed = 1.0, tone, signal }) -> { pcm: Float32Array, sampleRate } | { system: true }
 //   dispose()
 //
-// Voices: 'antalia-mini' (male, Apache-2.0, default), 'ahenk-cep' (female, CC BY 4.0), 'ema-lightning' (female, Apache-2.0), 'system' (chrome.tts /
+// Voices: 'antalia-mini' (male, Apache-2.0, default), 'ahenk-cep' (female, CC BY 4.0), 'ema-lightning' (female, Apache-2.0),
+// 'supertonic-3:F1'…'supertonic-3:M5' (experimental, ten presets of one shared pack, OpenRAIL-M), 'system' (chrome.tts /
 // speechSynthesis fallback, played by the extension). See README.md in this folder.
 
 import { fetchModel, isCached } from '../common/model-cache.js';
 import { normalizeTone } from './styles.js';
-import { DEFAULT_VOICE, SYSTEM_VOICE, VOICES, voiceById, voiceBytes } from './voices.js';
+import { DEFAULT_VOICE, SYSTEM_VOICE, VOICES, packOf, voiceById, voiceBytes } from './voices.js';
 
 export const id = 'tts';
 
@@ -22,9 +23,15 @@ const DEFAULT_OUTPUT_RATE = 24000;
 let worker = null;
 let seq = 0;
 const pending = new Map(); // reqId -> { resolve, reject }
-const loaded = new Map(); // voiceId -> Promise<info>
+const loaded = new Map(); // pack (voiceId, or the shared pack of Supertonic presets) -> Promise<info>
 let options = { device: 'wasm', threads: 0, steps: 0, outputRate: DEFAULT_OUTPUT_RATE };
 let currentVoice = null;
+// WASM threads are fixed when the worker creates its first session. Voices that need more than one (catalog
+// `threads`: Supertonic) restart a single-threaded worker; if a multi-threaded load ever hangs (seen with
+// onnxruntime-web 1.22 in some Chromium builds, tests/tts/browser/threads-worker.js) we fall back to one thread.
+let workerThreads = 0; // 0: the worker has not loaded anything yet
+let threadsBroken = false;
+const THREADED_LOAD_TIMEOUT_MS = 90000;
 
 const abortError = () => new DOMException('İptal edildi', 'AbortError');
 
@@ -41,15 +48,52 @@ function getWorker() {
       p.reject(e);
     } else p.resolve(msg);
   };
-  worker.onerror = (ev) => {
-    const e = new Error(`TTS worker hatası: ${ev.message || 'bilinmiyor'}`);
-    for (const p of pending.values()) p.reject(e);
-    pending.clear();
-    loaded.clear();
-    worker?.terminate();
-    worker = null;
-  };
+  worker.onerror = (ev) => stopWorker(new Error(`TTS worker hatası: ${ev.message || 'bilinmiyor'}`));
   return worker;
+}
+
+function stopWorker(e) {
+  for (const p of pending.values()) p.reject(e);
+  pending.clear();
+  loaded.clear();
+  worker?.terminate();
+  worker = null;
+  workerThreads = 0;
+}
+
+/** WASM threads for a voice: an explicit init({ threads }) wins; otherwise the catalog hint, capped by the CPU. */
+function threadsFor(def) {
+  if (options.threads) return options.threads;
+  if (!def.threads || threadsBroken || !globalThis.crossOriginIsolated) return 1;
+  return Math.max(1, Math.min(def.threads, (globalThis.navigator?.hardwareConcurrency || 2) - 1));
+}
+
+/** Send the voice's files to the worker; with threads, give up after a while and retry on one thread. */
+async function loadInWorker(def, onProgress, signal) {
+  for (;;) {
+    const threads = threadsFor(def);
+    if (workerThreads && threads > workerThreads) stopWorker(new Error('TTS motoru iş parçacığı sayısını değiştirmek için yeniden başlatıldı'));
+    const files = {};
+    // sequential downloads keep the progress readable and memory flat (largest file: Supertonic's 257 MB graph)
+    for (const f of def.files) files[f.name] = await fetchModel(f.url, { onProgress, signal });
+    if (!workerThreads) workerThreads = threads;
+    const req = request(
+      { type: 'load', voiceId: def.id, files, options: { device: options.device, threads: workerThreads, steps: options.steps } },
+      Object.values(files),
+    );
+    if (workerThreads <= 1) return (await req).info;
+    let timer;
+    const hung = new Promise((resolve) => { timer = setTimeout(resolve, THREADED_LOAD_TIMEOUT_MS, 'hung'); });
+    try {
+      const r = await Promise.race([req, hung]);
+      if (r !== 'hung') return r.info;
+    } finally {
+      clearTimeout(timer);
+    }
+    console.warn('[tts] multi-threaded load did not finish, retrying with one thread');
+    threadsBroken = true;
+    stopWorker(new Error('TTS motoru tek iş parçacığıyla yeniden başlatıldı'));
+  }
 }
 
 function request(msg, transfer = [], signal) {
@@ -101,6 +145,8 @@ export async function listVoices() {
       default: v.id === DEFAULT_VOICE,
       homepage: v.homepage,
       attribution: v.attribution,
+      ...(v.pack ? { pack: v.pack, preset: v.preset } : {}),
+      ...(v.experimental ? { experimental: true } : {}),
       cachePrefix: commonPrefix(v.files.map((f) => f.url)),
     });
   }
@@ -109,25 +155,18 @@ export async function listVoices() {
 }
 
 async function loadVoice(voiceId, onProgress, signal) {
-  if (loaded.has(voiceId)) return loaded.get(voiceId);
   const def = voiceById(voiceId);
   if (!def) throw new Error(`Bilinmeyen ses: ${voiceId}`);
-  const p = (async () => {
-    const files = {};
-    // sequential downloads keep the progress readable and memory flat; the files are small (≤ 11 MB)
-    for (const f of def.files) files[f.name] = await fetchModel(f.url, { onProgress, signal });
-    const { info } = await request(
-      { type: 'load', voiceId, files, options: { device: options.device, threads: options.threads, steps: options.steps } },
-      Object.values(files),
-    );
-    return info;
-  })();
-  loaded.set(voiceId, p);
-  p.catch(() => loaded.delete(voiceId));
-  // keep at most two voices in memory
+  const key = packOf(def);
+  if (loaded.has(key)) return loaded.get(key);
+  const p = loadInWorker(def, onProgress, signal);
+  loaded.set(key, p);
+  p.catch(() => loaded.delete(key));
+  // keep at most two models in memory (all presets of a pack count as one)
+  const current = voiceById(currentVoice);
   if (loaded.size > 2) {
     for (const k of loaded.keys()) {
-      if (k === voiceId || k === currentVoice) continue;
+      if (k === key || (current && k === packOf(current))) continue;
       loaded.delete(k);
       request({ type: 'unload', voiceId: k }).catch(() => {});
       break;
@@ -180,4 +219,5 @@ export async function dispose() {
   currentVoice = null;
   worker?.terminate();
   worker = null;
+  workerThreads = 0;
 }

@@ -75,6 +75,40 @@ export function softLimit(x, ceiling = 0.98, threshold = 0.89) {
   return x;
 }
 
+/** Level every line is brought to (gated RMS, dBFS): voices and speakers sound equally loud. */
+export const TARGET_LEVEL_DB = -20;
+const MAX_GAIN_DB = 12;
+
+/**
+ * Gated RMS level in dBFS: 20 ms blocks, blocks under −60 dBFS (silence) and more than 20 dB below the mean (pauses,
+ * breaths) are left out, a simplified loudness gate. −Infinity for silence.
+ */
+export function speechLevel(x, rate) {
+  const B = Math.max(1, Math.round(0.02 * rate));
+  const blocks = [];
+  for (let s = 0; s + B <= x.length; s += B) {
+    let e = 0;
+    for (let i = s; i < s + B; i++) e += x[i] * x[i];
+    if (e / B > 1e-6) blocks.push(e / B);
+  }
+  if (!blocks.length) return -Infinity;
+  const mean = blocks.reduce((a, b) => a + b, 0) / blocks.length;
+  const kept = blocks.filter((ms) => ms >= mean / 100);
+  return 10 * Math.log10(kept.reduce((a, b) => a + b, 0) / kept.length);
+}
+
+/**
+ * Bring speech to `targetDb` (gain limited to ±12 dB), then soft-limit the peaks. In place; returns x.
+ * The models differ by up to ~6 dB and vary from line to line, which made speaker changes jump in loudness.
+ */
+export function normalizeLoudness(x, rate, targetDb = TARGET_LEVEL_DB) {
+  const lv = speechLevel(x, rate);
+  if (!Number.isFinite(lv)) return x;
+  const g = 10 ** (Math.min(MAX_GAIN_DB, Math.max(-MAX_GAIN_DB, targetDb - lv)) / 20);
+  for (let i = 0; i < x.length; i++) x[i] *= g;
+  return softLimit(x);
+}
+
 /** Windowed-sinc low-pass taps (Blackman), cutoff as a fraction of the sample rate. */
 function lowpassTaps(cutoff, n) {
   const h = new Float32Array(n);
@@ -110,10 +144,30 @@ export function downsample2(x) {
   return y;
 }
 
-/** Convert `x` from rate `from` to rate `to` (2:1 with a proper low-pass, otherwise linear interpolation). */
+/** FIR filter (same length, centred). */
+function filter(x, h) {
+  const n = h.length;
+  const m = (n - 1) >> 1;
+  const y = new Float32Array(x.length);
+  for (let k = 0; k < x.length; k++) {
+    let s = 0;
+    for (let j = 0; j < n; j++) {
+      const i = k + j - m;
+      if (i >= 0 && i < x.length) s += x[i] * h[j];
+    }
+    y[k] = s;
+  }
+  return y;
+}
+
+/**
+ * Convert `x` from rate `from` to rate `to`: 2:1 with a proper low-pass; other downsampling (Supertonic's 44.1 kHz ->
+ * 24 kHz) low-passes below the new Nyquist before linear interpolation, so no aliasing; upsampling interpolates.
+ */
 export function convertRate(x, from, to) {
   if (from === to) return x;
   if (from === 2 * to) return downsample2(x);
+  if (to < from) return resample(filter(x, lowpassTaps((0.46 * to) / from, 47)), from / to);
   return resample(x, from / to);
 }
 
