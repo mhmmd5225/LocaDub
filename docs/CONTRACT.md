@@ -83,9 +83,10 @@ eklenti tarafında yapılır, bkz. aşağı).
 ```js
 export const id = 'tts';
 export async function listVoices()
-  // → [{ id, label, gender:'female'|'male'|'unknown', sizeMB, license, available }]
+  // → [{ id, label, gender:'female'|'male'|'unknown', sizeMB, license, available, pack?, preset?, experimental? }]
+  //   pack: aynı dosyaları paylaşan hazır sesler (Supertonic: 'supertonic-3:F1' … 'supertonic-3:M5')
 export async function init({ voice, onProgress })
-export async function synthesize(text /* TR */, { voice, speed = 1.0, tone /* { style, pitch, quality }, styles.js */, signal } = {})
+export async function synthesize(text /* TR */, { voice, speed = 1.0, tone /* { style, pitch, quality, blend? }, styles.js */, signal } = {})
   // → Promise<{ pcm: Float32Array, sampleRate: number }>  (mono)
 export async function dispose()
 ```
