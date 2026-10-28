@@ -5,6 +5,8 @@ node_modules/
 
 # Test çıktıları
 tests/tts/out/*.wav
+tests/tts/out/compare/**/*.wav
+tests/tts/.venv/
 
 # Paketlenmiş arşivler
 *.rar

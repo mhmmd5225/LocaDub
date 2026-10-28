@@ -40,7 +40,7 @@ export const SENTENCES = [
 ];
 const SPEEDS = [1.0, 1.4, 2.0];
 
-const fileOf = (voice, f) => join(MODELS, voice.id, f.url.split('/').pop());
+const fileOf = (voice, f) => join(MODELS, voice.pack || voice.id, f.url.split('/').pop());
 const fmt = (x, d = 3) => x.toFixed(d);
 
 await mkdir(OUT, { recursive: true });
