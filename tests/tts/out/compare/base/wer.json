@@ -1,0 +1,1122 @@
+{
+ "antalia-mini/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "antalia-mini/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "antalia-mini/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor.  Çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "antalia-mini/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "antalia-mini/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "antalia-mini/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "antalia-mini/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "antalia-mini/12.wav": {
+  "hyp": "Harika. Sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "antalia-mini/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "antalia-mini/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere.  Hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "ahenk-cep/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "ahenk-cep/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "ahenk-cep/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "ahenk-cep/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "ahenk-cep/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "ahenk-cep/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "ahenk-cep/10.wav": {
+  "hyp": "Bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 1,
+  "chars": 29,
+  "charErrors": 5
+ },
+ "ahenk-cep/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "ahenk-cep/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "ahenk-cep/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "ema-lightning/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "ema-lightning/05.wav": {
+  "hyp": "Bilim insanları okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "ema-lightning/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor.  Çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "ema-lightning/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "ema-lightning/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "ema-lightning/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "ema-lightning/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "ema-lightning/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "ema-lightning/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "ema-lightning/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere.  Hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/12.wav": {
+  "hyp": "Harika, sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-F1/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/12.wav": {
+  "hyp": "Harika, sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-F2/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/10.wav": {
+  "hyp": "Peki, bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/12.wav": {
+  "hyp": "Harika, sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/13.wav": {
+  "hyp": "Dikkat edin, bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-F3/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/05.wav": {
+  "hyp": "Bilim insanları okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-F4/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.  Altyazı M.K.",
+  "words": 13,
+  "wordErrors": 3,
+  "chars": 102,
+  "charErrors": 12
+ },
+ "supertonic-3-F5/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecekmişsin.",
+  "words": 5,
+  "wordErrors": 2,
+  "chars": 36,
+  "charErrors": 2
+ },
+ "supertonic-3-F5/10.wav": {
+  "hyp": "Peki, bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-F5/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşça kalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/10.wav": {
+  "hyp": "Peki, bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/12.wav": {
+  "hyp": "Harika, sonunu da başardık.",
+  "words": 3,
+  "wordErrors": 2,
+  "chars": 23,
+  "charErrors": 2
+ },
+ "supertonic-3-M1/13.wav": {
+  "hyp": "Dikkat edin, bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-M1/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir.  Birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 1,
+  "chars": 144,
+  "charErrors": 4
+ },
+ "supertonic-3-M2/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-M2/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/05.wav": {
+  "hyp": "Bilim insanları okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor.  Çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/12.wav": {
+  "hyp": "Harika, sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-M3/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/05.wav": {
+  "hyp": "Bilim insanları okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/12.wav": {
+  "hyp": "Harika, sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-M4/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşça kalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/05.wav": {
+  "hyp": "Bilim insanları okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor.  Çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/12.wav": {
+  "hyp": "Harika sonu da başardık.",
+  "words": 3,
+  "wordErrors": 2,
+  "chars": 23,
+  "charErrors": 1
+ },
+ "supertonic-3-M5/13.wav": {
+  "hyp": "Dikkat edin, bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-M5/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/05.wav": {
+  "hyp": "Bilim insanları okyanusun derinliklerinde daha önce hiç görünmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 1,
+  "chars": 106,
+  "charErrors": 1
+ },
+ "antalia-mini@lively-fast/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor.  Çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/12.wav": {
+  "hyp": "Harika, sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/13.wav": {
+  "hyp": "Dikkat edin, bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "antalia-mini@lively-fast/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecek misin?",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 36,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/13.wav": {
+  "hyp": "Dikkat edin, bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "ahenk-cep@lively-fast/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere.  Hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/01.wav": {
+  "hyp": "Merhaba arkadaşlar, bugün yapay zekanın geleceği hakkında konuşacağız.",
+  "words": 8,
+  "wordErrors": 0,
+  "chars": 68,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/05.wav": {
+  "hyp": "Bilim insanları, okyanusun derinliklerinde daha önce hiç görülmemiş bir canlı türü keşfettiklerini açıkladı.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 106,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/06.wav": {
+  "hyp": "Bu yöntem ilk başta zor görünebilir ama birkaç denemeden sonra her şey çok daha kolay hale geliyor çünkü beyniniz yeni alışkanlığa uyum sağlıyor.",
+  "words": 23,
+  "wordErrors": 0,
+  "chars": 144,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/07.wav": {
+  "hyp": "İlk olarak malzemeleri hazırlayın, ardından fırını önceden ısıtın ve son olarak hamuru tepsiye yayın.",
+  "words": 14,
+  "wordErrors": 0,
+  "chars": 99,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/08.wav": {
+  "hyp": "Bunu gerçekten denediniz mi?",
+  "words": 4,
+  "wordErrors": 0,
+  "chars": 27,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/09.wav": {
+  "hyp": "Yarın sabah toplantıya gelecekmişsin.",
+  "words": 5,
+  "wordErrors": 2,
+  "chars": 36,
+  "charErrors": 2
+ },
+ "supertonic-3-F1@natural-high/10.wav": {
+  "hyp": "Peki bu neden bu kadar önemli?",
+  "words": 6,
+  "wordErrors": 0,
+  "chars": 29,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/12.wav": {
+  "hyp": "Harika sonunda başardık.",
+  "words": 3,
+  "wordErrors": 0,
+  "chars": 23,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/13.wav": {
+  "hyp": "Dikkat edin bu çok tehlikeli.",
+  "words": 5,
+  "wordErrors": 0,
+  "chars": 28,
+  "charErrors": 0
+ },
+ "supertonic-3-F1@natural-high/14.wav": {
+  "hyp": "Bu videoyu beğendiyseniz kanalıma abone olmayı unutmayın.  Bir sonraki videoda görüşmek üzere, hoşçakalın.",
+  "words": 13,
+  "wordErrors": 0,
+  "chars": 102,
+  "charErrors": 0
+ }
+}

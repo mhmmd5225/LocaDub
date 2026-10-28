@@ -18,25 +18,26 @@ Tek ölçüm, tek makine (4 çekirdek); sayılar oran fikri verir, mutlak değil
 
 | Ses | RTF | WER % | CER % | F0 sapma (yt) | F0 aralık (yt) | soru sonu (yt) | ünlem sonu (yt) | seviye dBFS |
 |---|---|---|---|---|---|---|---|---|
-| Antalia Mini | 0.088 | 2.1 | 0.2 | 2.04 | 6.76 | −2.43 | −2.40 | −18.9 (± 0.3) |
-| Ahenk Cep | 0.117 | 3.2 | 0.9 | 3.58 | 11.47 | −1.63 | −2.83 | −20.2 (± 0.4) |
-| EMA Lightning | 0.096 | 2.1 | 0.2 | 2.72 | 8.91 | −2.40 | −1.45 | −24.7 (± 1.4) |
-| Supertonic F1 | 0.398 | 2.1 | 0.2 | 3.16 | 9.63 | −1.81 | −4.03 | −24.1 (± 0.5) |
-| Supertonic F2 | 0.420 | 2.1 | 0.2 | 3.69 | 11.45 | −5.27 | −0.49 | −24.4 (± 0.9) |
-| Supertonic F3 | 0.377 | 2.1 | 0.2 | **3.89** | **12.02** | −4.47 | −4.33 | −25.1 (± 0.7) |
-| Supertonic F4 | 0.409 | 4.2 | 2.0 | 2.07 | 6.60 | 0.30 | −2.32 | −24.2 (± 0.5) |
+| Antalia Mini | 0.088 | 0.0 | 0.0 | 2.04 | 6.76 | −2.43 | −2.40 | −18.9 (± 0.3) |
+| Ahenk Cep | 0.117 | 1.1 | 0.8 | 3.58 | 11.47 | −1.63 | −2.83 | −20.2 (± 0.4) |
+| EMA Lightning | 0.096 | 0.0 | 0.0 | 2.72 | 8.91 | −2.40 | −1.45 | −24.7 (± 1.4) |
+| Supertonic F1 | 0.398 | 0.0 | 0.0 | 3.16 | 9.63 | −1.81 | −4.03 | −24.1 (± 0.5) |
+| Supertonic F2 | 0.420 | 0.0 | 0.0 | 3.69 | 11.45 | −5.27 | −0.49 | −24.4 (± 0.9) |
+| Supertonic F3 | 0.377 | 0.0 | 0.0 | **3.89** | **12.02** | −4.47 | −4.33 | −25.1 (± 0.7) |
+| Supertonic F4 | 0.409 | 3.2 | 1.8 | 2.07 | 6.60 | 0.30 | −2.32 | −24.2 (± 0.5) |
 | Supertonic F5 | 0.404 | 2.1 | 0.3 | 2.78 | 8.87 | −2.44 | −2.28 | −23.4 (± 0.5) |
-| Supertonic M1 | 0.399 | 4.2 | 0.5 | **3.87** | 11.44 | −3.79 | 2.46 | −24.2 (± 0.5) |
-| Supertonic M2 | 0.430 | 3.2 | 0.8 | 2.20 | 6.83 | −3.48 | 0.36 | −23.0 (± 0.6) |
-| Supertonic M3 | 0.423 | 2.1 | 0.2 | 2.67 | 8.03 | −3.40 | 1.46 | −23.5 (± 0.5) |
-| Supertonic M4 | 0.398 | **0.0** | **0.0** | 3.05 | 9.89 | −3.12 | −2.95 | −23.5 (± 0.5) |
-| Supertonic M5 | 0.385 | 4.2 | 0.3 | 2.71 | 8.80 | −2.94 | −2.10 | −23.7 (± 0.3) |
-| Antalia, Canlı | 0.091 | 3.2 | 0.3 | 2.02 | 6.69 | −2.36 | −2.35 | −18.7 (± 0.3) |
-| Ahenk, Canlı | 0.126 | 2.1 | 0.2 | 3.63 | 11.75 | −1.35 | −3.90 | −19.8 (± 0.6) |
-| Supertonic F1, 16 adım | 0.768 | 4.2 | 0.5 | 3.15 | 9.66 | −3.14 | −4.23 | −23.9 (± 0.4) |
+| Supertonic M1 | 0.399 | 2.1 | 0.3 | **3.87** | 11.44 | −3.79 | 2.46 | −24.2 (± 0.5) |
+| Supertonic M2 | 0.430 | 1.1 | 0.6 | 2.20 | 6.83 | −3.48 | 0.36 | −23.0 (± 0.6) |
+| Supertonic M3 | 0.423 | 0.0 | 0.0 | 2.67 | 8.03 | −3.40 | 1.46 | −23.5 (± 0.5) |
+| Supertonic M4 | 0.398 | 0.0 | 0.0 | 3.05 | 9.89 | −3.12 | −2.95 | −23.5 (± 0.5) |
+| Supertonic M5 | 0.385 | 2.1 | 0.2 | 2.71 | 8.80 | −2.94 | −2.10 | −23.7 (± 0.3) |
+| Antalia, Canlı | 0.091 | 1.1 | 0.2 | 2.02 | 6.69 | −2.36 | −2.35 | −18.7 (± 0.3) |
+| Ahenk, Canlı | 0.126 | 0.0 | 0.0 | 3.63 | 11.75 | −1.35 | −3.90 | −19.8 (± 0.6) |
+| Supertonic F1, 16 adım | 0.768 | 2.1 | 0.3 | 3.15 | 9.66 | −3.14 | −4.23 | −23.9 (± 0.4) |
 
-(Supertonic bu turda 8 gürültü giderme adımıyla. Hataların çoğu Whisper'dan: "hoşça kalın" → "hoşçakalın", bir kez
-"Altyazı M.K." uydurması; sonraki turda "hoşça kal" yazımı eşitlendi.)
+(Supertonic bu turda 8 gürültü giderme adımıyla. "hoşça kalın" / "hoşçakalın" yazımı eşitlendi. Kalan hataların bir
+kısmı Whisper'dan: F4'te bir kez "Altyazı M.K." uydurması; F5'te "gelecek misin" → "gelecekmişsin", M1/M5'te "sonunda" →
+"sonunu da" gerçek okuma hataları. Fark cümle başına bir iki sözcük, seslerin hepsi anlaşılır.)
 
 ### Antalia'nın üslup düğmeleri ezgiyi değiştirmiyor
 
