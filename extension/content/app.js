@@ -51,10 +51,11 @@ function trKey(s) {
   return `${s.engineMode}|${s.mtBackend || ''}${s.fixAsrPunct ? '|p' : ''}`;
 }
 function audioKey(s) {
-  return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${s.speakerVoices ? s.voice2 || '2' : ''}` +
+  const speakers = s.speakerVoices ? `${s.speakerCount}:${s.voice2 || ''}:${s.voice3 || ''}:${s.voice4 || ''}` : '';
+  return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${speakers}` +
     `|${s.glossaryMt}|${s.glossaryTts}` +
-    // üslup/perde/kalite sistem sesinde etkisizdir; yalnızca motor sesinde üretilmiş sesleri geçersiz kılar
-    (s.voice === 'system' ? '' : `|${s.style}|${s.pitch}|${s.quality}`);
+    // üslup/perde/kalite/karıştırma sistem sesinde etkisizdir; yalnızca motor sesinde üretilmiş sesleri geçersiz kılar
+    (s.voice === 'system' ? '' : `|${s.style}|${s.pitch}|${s.quality}|${s.voiceBlend ? `${s.voiceBlend.with}:${s.voiceBlend.amount}` : ''}`);
 }
 
 // Üslubun hız çarpanı temel hıza katılır (sığdırma hesabı bunu bilir); sistem sesinde üslup yok.

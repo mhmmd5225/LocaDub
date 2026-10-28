@@ -144,6 +144,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visi
 
 /* Seçim kartları (ses, çeviri motoru) */
 .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+#voiceChoice { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.slider-row.blend .lbl-pair { display: flex; align-items: center; gap: 8px; }
+.slider-row.blend select { font-size: 12.5px; padding: 2px 4px; }
 .choices.col { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .choice {
   display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer;
@@ -191,6 +194,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .adv[open] summary { margin-bottom: 10px; }
 .adv .sysrow { margin-left: 26px; }
 .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.trio.speakers { margin: 10px 0 0 26px; gap: 12px; }
+.trio.speakers .stack[hidden] { display: none; }
 
 /* Sözlük */
 .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }

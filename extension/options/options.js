@@ -1,7 +1,9 @@
 // Ayarlar sayfası: dört menü (İndirme, Seslendirme, AI Model, Diğer). Tüm paneller DOM'da kalır (hidden),
 // böylece her id'ye bağlanan kod ve motor ilerleme mesajları hangi menü açık olursa olsun çalışır.
 
-import { DEFAULTS, getSettings, setSettings, onSettingsChanged, secondVoice } from '../common/settings.js';
+import { DEFAULTS, getSettings, setSettings, onSettingsChanged, speakerVoice, voicesInUse } from '../common/settings.js';
+import { decodePcmBase64ToInt16, int16ToWav } from '../common/pcm.js';
+import { BLEND_MAX } from '../engines/tts/styles.js';
 import { listCached, deleteByPrefix, fetchModel } from '../engines/common/model-cache.js';
 import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
@@ -127,6 +129,7 @@ for (const name of ['style', 'quality']) {
     input.addEventListener('change', () => { if (input.checked) setSettings({ [name]: input.value }); });
   }
 }
+const renderToneNote = () => (settings.voice === 'system' ? 'Sistem sesinde kullanılamaz.' : 'İnce ayardır; sesi kökten değiştirmez.');
 function renderTone() {
   const sys = settings.voice === 'system';
   for (const name of ['style', 'quality']) {
@@ -136,12 +139,13 @@ function renderTone() {
     }
   }
   $('pitch').disabled = sys;
-  $('styleNote').textContent = sys ? 'Sistem sesinde kullanılamaz.' : 'İnce ayardır; sesi kökten değiştirmez.';
+  $('styleNote').textContent = renderToneNote();
   $('qualityNote').textContent = sys ? 'Sistem sesinde kullanılamaz.' : 'Yüksek kalite daha yavaş hazırlanır.';
 }
 
 $('speakerVoices').addEventListener('change', (e) => setSettings({ speakerVoices: e.target.checked }));
-$('voice2').addEventListener('change', (e) => setSettings({ voice2: e.target.value || null }));
+for (const id of ['voice2', 'voice3', 'voice4']) $(id).addEventListener('change', (e) => setSettings({ [id]: e.target.value || null }));
+$('speakerCount').addEventListener('change', (e) => setSettings({ speakerCount: Number(e.target.value) }));
 
 let speakerOpened = false; // konuşmacı bloğu, anahtar açıksa ilk çizimde açılır
 // Test motoru gizlidir: #gelistirici / ?dev=1 ile ya da motor zaten test modundaysa (kapatılabilsin) görünür.
@@ -155,7 +159,6 @@ function renderBasics() {
   for (const id of ['glossaryMt', 'glossaryTts']) if (document.activeElement !== $(id)) $(id).value = settings[id];
   renderGlossaryNote();
   $('speakerVoices').checked = settings.speakerVoices;
-  $('voice2Row').hidden = !settings.speakerVoices;
   if (settings.speakerVoices && !speakerOpened) { $('speakerBlock').open = true; speakerOpened = true; }
   $('enabled').checked = settings.enabled;
   $('enabledLabel').textContent = settings.enabled ? 'Dublaj açık' : 'Dublaj kapalı';
@@ -226,6 +229,10 @@ function progressBar(dl) {
 
 // Kısa adlar: satırlarda ve seçimlerde ayrıntı yerine yalnızca ad görünür.
 const SHORT = { 'opus-mt': 'OPUS-MT', 'antalia-mini': 'Antalia Mini', 'ahenk-cep': 'Ahenk Cep', 'ema-lightning': 'EMA Lightning' };
+const PACK_NAMES = { 'supertonic-3': 'Supertonic 3' };
+// Supertonic hazır sesleri tek paket: indirme ve seçimde bir satır, paketin sesleri seçicide.
+const packVoices = (pack) => lists.voices.filter((v) => v.pack === pack);
+const packOfId = (id) => lists.voices.find((v) => v.id === id)?.pack || null;
 const isMock = () => settings.engineMode === 'mock';
 const shortName = (m) => SHORT[m.id] || m.label.replace(/\s*\(.*\)\s*$/, '');
 // Parantez içindeki açıklama ("erkek, hızlı") ikinci satır olur.
@@ -291,10 +298,16 @@ function renderDownloads() {
       title: b.license ? `Lisans: ${b.license}` : undefined,
     }));
   }
+  const inUse = new Set(voicesInUse({ ...settings, voice: useVoice }));
+  const packs = new Set();
   for (const v of lists.voices.filter((x) => !x.system)) {
+    if (v.pack && packs.has(v.pack)) continue;
+    if (v.pack) packs.add(v.pack);
+    const members = v.pack ? packVoices(v.pack) : [v];
     rows.push(modelRow({
-      engine: 'tts', id: v.id, name: shortName(v), kind: 'ses', prefix: v.cachePrefix,
-      downloaded: !!v.cached || mock, canDownload: !mock, sizeMB: v.sizeMB, inUse: useVoice === v.id,
+      engine: 'tts', id: v.id, name: v.pack ? PACK_NAMES[v.pack] || v.pack : shortName(v), kind: v.pack ? `${members.length} ses` : 'ses',
+      prefix: v.cachePrefix, downloaded: !!v.cached || mock, canDownload: !mock, sizeMB: v.sizeMB,
+      inUse: members.some((m) => inUse.has(m.id)),
       title: v.license ? `Lisans: ${v.license}` : undefined,
     }));
   }
@@ -320,12 +333,33 @@ function choice({ name, value, checked, disabled, title, note, extra, onchange }
     el('span', {}, el('b', { textContent: title }), note ? el('small', { textContent: note }) : null, extra || null));
 }
 
+// Paket radyosu yeniden çizilirken son seçilen hazır ses korunur.
+const lastPreset = {};
+
 // Seslendirme menüsü: ses seçimi.
 function renderVoiceChoice() {
   const useVoice = effectiveVoiceId();
   const opts = [];
+  const packs = new Set();
   for (const v of lists.voices.filter((x) => !x.system)) {
     const missing = !v.cached && !isMock();
+    if (v.pack) {
+      if (packs.has(v.pack)) continue;
+      packs.add(v.pack);
+      const members = packVoices(v.pack);
+      const current = members.find((m) => m.id === useVoice) || members.find((m) => m.id === lastPreset[v.pack]) || members[0];
+      opts.push(choice({
+        name: 'voice', value: v.pack, checked: members.some((m) => m.id === useVoice), title: PACK_NAMES[v.pack] || v.pack,
+        note: [`${members.length} ses, canlı`, v.experimental ? 'deneysel' : '', missing ? 'indirilmedi' : ''].filter(Boolean).join(' · '),
+        onchange: () => setSettings({ voice: current.id, systemVoiceName: null }),
+      }));
+      // hazır ses seçici, paket seçiliyken radyoların altında (sistem sesi satırı gibi)
+      if (members.some((m) => m.id === useVoice)) {
+        $('preset').replaceChildren(...members.map((m) => el('option', { value: m.id, textContent: shortName(m).replace(/^Supertonic\s+/, ''), selected: m.id === current.id })));
+      }
+      $('presetRow').hidden = !members.some((m) => m.id === useVoice);
+      continue;
+    }
     opts.push(choice({
       name: 'voice', value: v.id, checked: useVoice === v.id, title: shortName(v),
       note: [subtitle(v), missing ? 'indirilmedi' : ''].filter(Boolean).join(' · '),
@@ -335,7 +369,7 @@ function renderVoiceChoice() {
   const sel = $('systemVoice');
   opts.push(choice({
     name: 'voice', value: 'system', checked: useVoice === 'system', title: 'Sistem sesi',
-    note: 'İndirme gerekmez, kalite daha düşük',
+    note: 'İndirmesiz, kalite düşük',
     onchange: () => setSettings({ voice: 'system', systemVoiceName: sel.value || null }),
   }));
   $('voiceChoice').replaceChildren(...opts);
@@ -348,9 +382,12 @@ function renderVoiceChoice() {
   $('systemVoiceRow').hidden = useVoice !== 'system';
 
   const v = lists.voices.find((x) => x.id === useVoice);
+  if (v?.pack) lastPreset[v.pack] = v.id;
+  $('preview').disabled = !v || (!v.system && !v.cached && !isMock());
   $('voiceNote').replaceChildren(...(v && !v.system && !v.cached && !isMock() ? ['Bu ses henüz indirilmedi. ', ...downloadHint()] : []));
 }
 $('systemVoice').addEventListener('change', (e) => setSettings({ voice: 'system', systemVoiceName: e.target.value || null }));
+$('preset').addEventListener('change', (e) => setSettings({ voice: e.target.value, systemVoiceName: null }));
 
 // Chrome dil paketi iletisi yeniden çizimlerde kaybolmasın.
 let chromeMsg = { text: '', err: false };
@@ -408,35 +445,99 @@ function renderModels() {
     renderVoiceChoice();
     renderMtChoice();
     renderPunctToggle();
-    renderVoice2();
+    renderSpeakerVoices();
+    renderBlend();
   });
 }
 
-// İkinci konuşmacının sesi: birinci sesten farklı, indirilebilir sesler.
-function renderVoice2() {
+// Konuşmacı sesleri (2.–4.): birinci sesten farklı, indirilebilir sesler. Seçilmemişse kendiliğinden seçilen gösterilir.
+function renderSpeakerVoices() {
   const first = effectiveVoiceId();
-  const want = secondVoice({ ...settings, voice: first });
-  const voices = lists.voices.filter((v) => !v.system && v.id !== first);
-  const sel = $('voice2');
-  sel.replaceChildren(...voices.map((v) => el('option', {
-    value: v.id, textContent: shortName(v) + (v.cached || isMock() ? '' : ' — indirilmedi'), selected: v.id === want,
-  })));
-  sel.disabled = !voices.length || first === 'system';
-  const v = voices.find((x) => x.id === want);
-  $('voice2Note').replaceChildren(...(first === 'system' ? ['Sistem sesi seçiliyken kullanılmaz.']
-    : v && !v.cached && !isMock() ? ['Bu ses henüz indirilmedi. ', ...downloadHint()] : []));
+  const s = { ...settings, voice: first };
+  for (let n = 1; n <= 3; n++) {
+    const id = `voice${n + 1}`;
+    $(`${id}Row`).hidden = !settings.speakerVoices || n >= settings.speakerCount;
+    const want = speakerVoice(s, n);
+    const voices = lists.voices.filter((v) => !v.system && v.id !== first);
+    const sel = $(id);
+    sel.replaceChildren(...voices.map((v) => el('option', {
+      value: v.id, textContent: shortName(v) + (v.cached || isMock() ? '' : ' — indirilmedi'), selected: v.id === want,
+    })));
+    sel.disabled = !voices.length || first === 'system';
+    const v = voices.find((x) => x.id === want);
+    $(`${id}Note`).replaceChildren(...(first === 'system' ? ['Sistem sesi seçiliyken kullanılmaz.']
+      : v && !v.cached && !isMock() ? ['Bu ses henüz indirilmedi. ', ...downloadHint()] : []));
+  }
+  $('speakerCountRow').hidden = !settings.speakerVoices;
+  $('speakerCount').value = String(settings.speakerCount);
 }
+
+// Ses karıştırma: yalnızca Supertonic hazır seslerinde; katılacak ses aynı paketin başka bir sesi.
+function renderBlend() {
+  const v = lists.voices.find((x) => x.id === effectiveVoiceId());
+  const show = !!v?.pack && !isMock();
+  $('blendRow').hidden = !show;
+  if (!show) return;
+  const others = packVoices(v.pack).filter((m) => m.id !== v.id);
+  const b = settings.voiceBlend;
+  const want = others.find((m) => m.preset === b?.with) || others[0];
+  $('blendWith').replaceChildren(...others.map((m) => el('option', { value: m.preset, textContent: shortName(m).replace(/^Supertonic\s+/, ''), selected: m === want })));
+  const amount = b && b.with !== v.preset ? b.amount : 0;
+  if (document.activeElement !== $('blendAmount')) $('blendAmount').value = String(amount);
+  $('blendAmountOut').textContent = `%${Math.round(amount * 100)}`;
+}
+$('blendAmount').max = String(BLEND_MAX);
+$('blendAmount').addEventListener('input', (e) => { $('blendAmountOut').textContent = `%${Math.round(Number(e.target.value) * 100)}`; });
+const saveBlend = () => {
+  const amount = Number($('blendAmount').value);
+  setSettings({ voiceBlend: amount > 0 ? { with: $('blendWith').value, amount } : null });
+};
+$('blendAmount').addEventListener('change', saveBlend);
+$('blendWith').addEventListener('change', saveBlend);
+
+// Dinle: seçili ses ve üslupla kısa bir örnek (dublajla aynı yol: arka plan → offscreen motor).
+const PREVIEW_TEXT = 'Merhaba! Bu ses size nasıl geldi? Videoları bu sesle Türkçe dinleyebilirsiniz.';
+let previewAudio = null;
+$('preview').addEventListener('click', async () => {
+  const voice = effectiveVoiceId();
+  const btn = $('preview');
+  btn.disabled = true;
+  $('styleNote').textContent = 'Örnek hazırlanıyor…';
+  try {
+    if (voice === 'system') {
+      chrome.tts.speak(PREVIEW_TEXT, { lang: 'tr-TR', voiceName: settings.systemVoiceName || undefined });
+      $('styleNote').textContent = renderToneNote();
+      return;
+    }
+    const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
+    const res = await bg({ type: 'tts.synthesize', text: PREVIEW_TEXT, voice, speed: settings.ttsSpeed, tone, tag: 'preview' });
+    if (!res.ok) throw new Error(res.error || 'Seslendirilemedi');
+    const { pcmBase64, sampleRate } = res.result;
+    previewAudio?.pause();
+    if (previewAudio) URL.revokeObjectURL(previewAudio.src);
+    previewAudio = new Audio(URL.createObjectURL(new Blob([int16ToWav(decodePcmBase64ToInt16(pcmBase64), sampleRate)], { type: 'audio/wav' })));
+    previewAudio.volume = Math.min(1, settings.ttsVolume);
+    await previewAudio.play();
+    $('styleNote').textContent = renderToneNote();
+  } catch (e) {
+    $('styleNote').textContent = `Örnek çalınamadı: ${e.message || e}`;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // Kullanılacak (seçili) modellerden indirilmemiş olanlar.
 function missingSelected() {
   const out = [];
   const b = lists.backends.find((x) => x.id === effectiveBackendId());
   if (b && b.id !== 'chrome-translator' && !b.downloaded) out.push({ engine: 'mt', id: b.id, label: b.label, mb: b.sizeMB - bytesMB(cachedBytes(b.cachePrefix)) });
-  const v = lists.voices.find((x) => x.id === effectiveVoiceId());
-  if (v && !v.system && !v.cached) out.push({ engine: 'tts', id: v.id, label: v.label, mb: v.sizeMB - bytesMB(cachedBytes(v.cachePrefix)) });
-  if (settings.speakerVoices && v && !v.system) {
-    const v2 = lists.voices.find((x) => x.id === secondVoice({ ...settings, voice: v.id }));
-    if (v2 && !v2.cached) out.push({ engine: 'tts', id: v2.id, label: v2.label, mb: v2.sizeMB - bytesMB(cachedBytes(v2.cachePrefix)) });
+  // birinci ses ve (açıksa) konuşmacı sesleri; bir paketin sesleri tek indirmedir
+  const prefixes = new Set();
+  for (const id of voicesInUse({ ...settings, voice: effectiveVoiceId() })) {
+    const v = lists.voices.find((x) => x.id === id);
+    if (!v || v.system || v.cached || prefixes.has(v.cachePrefix)) continue;
+    prefixes.add(v.cachePrefix);
+    out.push({ engine: 'tts', id: v.id, label: v.pack ? PACK_NAMES[v.pack] || v.label : v.label, mb: v.sizeMB - bytesMB(cachedBytes(v.cachePrefix)) });
   }
   return out;
 }

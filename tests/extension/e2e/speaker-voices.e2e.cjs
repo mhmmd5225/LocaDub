@@ -26,7 +26,9 @@ const videos = { [VID]: [
     await opt.waitForTimeout(500);
     const saved = await opt.evaluate((v) => chrome.storage.local.get(null)
       .then((all) => Object.entries(all).find(([k]) => k.startsWith('tr:' + v))?.[1]?.sentences), VID);
-    assert.deepEqual(saved.map((s) => s.speaker ?? 0), [0, 1, 0]);
+    // konuşmacı sayacı (captions.js SPEAKER_CYCLE); iki seste ses = sayaç mod 2
+    assert.deepEqual(saved.map((s) => s.speaker ?? 0), [0, 1, 2]);
+    assert.deepEqual(saved.map((s) => (s.speaker ?? 0) % 2), [0, 1, 0]);
     // Ses motoru iki sesi de kullandı mı: offscreen durumu birinci sesi göstermeli (ikinci ses motoru yeniden başlatmaz)
     const st = await opt.evaluate(() => chrome.runtime.sendMessage({ type: 'engine.status' }));
     assert.equal(st.result.tts.voice, 'mock-beep');

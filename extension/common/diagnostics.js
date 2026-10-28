@@ -24,7 +24,8 @@ export function pushError(list, { source, message, at = Date.now() }) {
   return out.slice(-MAX_ERRORS);
 }
 
-const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2',
+const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2', 'voice3', 'voice4',
+  'speakerCount', 'voiceBlend', 'style', 'pitch', 'quality',
   'ttsSpeed', 'ttsVolume', 'originalVolume', 'lookaheadSec', 'showSubtitles', 'modelsApproved', 'checkUpdates'];
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');

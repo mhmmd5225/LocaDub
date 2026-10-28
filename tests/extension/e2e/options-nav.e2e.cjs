@@ -122,12 +122,37 @@ const overflow = (page) => page.evaluate(() => {
     await page.waitForSelector('#voiceChoice input[value="ahenk-cep"]');
     await page.check('#voiceChoice input[value="ahenk-cep"]');
     await page.waitForFunction(() => chrome.storage.local.get('voice').then((s) => s.voice === 'ahenk-cep'));
+    // Supertonic: tek radyo + hazır ses seçici; İndirme'de tek satır; seçiliyken de sığar
+    await page.check('#voiceChoice input[value="supertonic-3"]');
+    await page.waitForFunction(() => chrome.storage.local.get('voice').then((s) => s.voice === 'supertonic-3:F1'));
+    await page.waitForSelector('#presetRow:not([hidden])');
+    await page.selectOption('#preset', 'supertonic-3:M2');
+    await page.waitForFunction(() => chrome.storage.local.get('voice').then((s) => s.voice === 'supertonic-3:M2'));
+    assert.ok(await page.isChecked('#voiceChoice input[value="supertonic-3"]'));
+    const os = await overflow(page);
+    assert.ok(os.v <= 0 && os.mainV <= 0, 'Supertonic seçiliyken sığar: ' + JSON.stringify(os));
+    await page.goto(url('', '#indirme'));
+    await page.waitForFunction(() => document.querySelectorAll('#modelRows .model').length > 0);
+    const names = await page.$$eval('#modelRows .model .name', (els) => els.map((e) => e.textContent));
+    assert.equal(names.filter((n) => n.startsWith('Supertonic')).length, 1, 'paket tek satır: ' + names.join(' | '));
+    await page.goto(url('', '#seslendirme'));
+    await page.waitForSelector('#voiceChoice input[value="ahenk-cep"]');
+    await page.check('#voiceChoice input[value="ahenk-cep"]');
+    await page.waitForFunction(() => chrome.storage.local.get('voice').then((s) => s.voice === 'ahenk-cep'));
     await page.goto(url('', '#ai-model'));
     await page.waitForSelector('#mtChoice input[value="opus-mt"]');
     await page.check('#mtChoice input[value="opus-mt"]');
     await page.waitForFunction(() => chrome.storage.local.get('mtBackend').then((s) => s.mtBackend === 'opus-mt'));
     await page.check('#mtChoice input[value=""]');
     await page.waitForFunction(() => chrome.storage.local.get('mtBackend').then((s) => s.mtBackend == null));
+
+    // Dinle: test motorunda örnek sesi çalar (hata iletisi yok)
+    await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'mock', modelsApproved: true, voice: null }));
+    await page.goto(url('', '#seslendirme'));
+    await page.waitForSelector('#preview:not([disabled])');
+    await page.click('#preview');
+    await page.waitForFunction(() => !/hazırlanıyor/i.test(document.getElementById('styleNote').textContent), null, { timeout: 15000 });
+    assert.ok(!/çalınamadı/.test(await page.textContent('#styleNote')), await page.textContent('#styleNote'));
 
     // (4) konsolda hata yok
     assert.deepEqual(problems, [], 'konsol/pageerror: ' + problems.join(' | '));
