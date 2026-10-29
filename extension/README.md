@@ -33,7 +33,7 @@ Karşılaştırma: [docs/TTS-KIYAS.md](../docs/TTS-KIYAS.md).
 **İndirme**: OPUS-MT, Antalia, Ahenk ve noktalama modeli için İndir / Sil, toplu indirme, model ve çeviri önbelleğini
 temizleme. **Seslendirme**: ses seçimi, konuşma hızı, dublaj ve orijinal ses seviyesi, konuşmacılara farklı ses.
 **AI Model**: çeviri motoru (Otomatik / OPUS-MT / Chrome çevirmeni), noktalama düzeltme. **Diğer**: Türkçe altyazı,
-sürüm denetimi, önceden hazırlama süresi, sözlük, **Tanılama bilgisini kopyala** (sürümler, ayarlar, motorlar,
+sürüm denetimi, önceden hazırlama süresi, ilk cümleye kadar bekletme, sözlük, **Tanılama bilgisini kopyala** (sürümler, ayarlar, motorlar,
 indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), varsayılana
 döndürme. Motor/model hatası olursa menü çubuğunun altında bir şerit görünür. Test motoru yalnızca `options.html#gelistirici`
 ya da `?dev=1` ile (veya motor zaten test modundaysa) "Diğer" menüsünde görünür.
@@ -55,6 +55,7 @@ Ayarlar (`chrome.storage.local`):
 | Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde 2–4 ses sırayla konuşur (`speakerVoices`, `speakerCount`, `voice2`–`voice4`). Seçilmeyen ses kendiliğinden gelir: önce karşıt cinsiyet, sonra aynı cinsiyetten başka bir ses; Supertonic'te aynı paketin sesleri (ek indirme yok). Altyazı kimin konuştuğunu söylemez, yalnızca değiştiğini: iki kişide 2 ses doğru eşleşir, 3–4 ses grup videoları içindir. Cümlede konuşmacı sayacı saklanır (`speaker`, mod 12), ses = sayaç mod `speakerCount` |
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
+| İlk cümle hazır olana kadar videoyu beklet | Varsayılan açık (`holdStart`). Dublaj açılınca video, yakındaki (8 sn) ilk cümlenin sesi hazır olana kadar duraklatılır, sonra kendiliğinden sürer (en fazla 25 sn; Oynat'a basınca beklemeden devam eder, reklamda bekletilmez). Böylece motorlar yüklenirken baştaki cümleler atlanmaz |
 | Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
 | Otomatik altyazıda noktalama | İsteğe bağlı model (Ayarlar → İndirme, 210 MB, HuggingFace): YouTube'un otomatik (küçük harfli, noktasız) altyazısına çeviriden önce noktalama ve büyük harf ekler; kıyasta chrF 51.1 → 53.1 (`engines/mt/punct.js`, `restore-engine.js`; `docs/MT-KIYAS.md`). Elle yazılmış altyazıya dokunmaz; indirme bitince kendiliğinden açılır |
 | Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, indirme yok |
@@ -81,6 +82,14 @@ offscreen.js                  engines/mt/index.js + engines/tts/index.js (dinami
 - **Cümleler** (`content/captions.js`): noktalama, > 700 ms duraklama, konuşmacı değişimi (`>>`; cümleye
   `speaker: 1` olarak taşınır, her işarette 0 ↔ 1),
   en fazla ~12 sn (mümkünse virgülde bölünür). Parça içi cümle sonları zamana orantılı bölünür.
+- **Başlangıç**: altyazı ve iki motor aynı anda istenir; her motor hazır olur olmaz kendi döngüsü başlar. Çeviri ve
+  seslendirme ayrı döngülerde paralel çalışır, ikisi de oynatma konumuna en yakın cümleden başlar (ilk çeviri grubu 2,
+  yakın cümleler 3, uzaktakiler 8 cümle). Hazırlık süreleri (altyazı, çeviri/ses motoru, ilk çeviri, ilk ses, bekletme)
+  konsola (`[yt-tr-dub] hazırlık: …`) ve tanılama raporuna ("Başlangıç süreleri", son 5) yazılır. Ölçüm:
+  `xvfb-run -a node tests/extension/e2e/startup.bench.cjs` (2 çekirdek için önüne `taskset -c 0,1`). Gerçek motorlarla,
+  modeller önbellekte, tarayıcı yeni açılmış (0.4.0 öncesi → sonrası, ortanca): 4 çekirdek 13.7–17.5 → 10.5 sn, 2 çekirdek
+  16.7 → 13.1 sn; dublaj artık videonun 13–17. saniyesinden değil 0.2. saniyesinden başlıyor (bekletme). Kalan sürenin
+  çoğu OPUS-MT oturumunun kurulması (≈ 8–10 sn; Chrome çevirmeni kullanılabiliyorsa bu adım yok).
 - **Zamanlama** (`content/timing.js`): cümle süresi = sonraki cümleye kadar (en fazla bitiş + 0.8 sn).
   Sentez hızı tahmini süreye göre seçilir (≤ 1.6), kalan taşma `<audio>.playbackRate` ile (perde korunur)
   giderilir; yine sığmazsa sıradaki cümle bekler (en fazla 1.2–4 sn gecikme, sonra atlanır).
@@ -115,6 +124,7 @@ xvfb-run -a node tests/extension/e2e/glossary.e2e.cjs
 xvfb-run -a node tests/extension/e2e/update-banner.e2e.cjs
 xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
 xvfb-run -a node tests/extension/e2e/shorts-embed.e2e.cjs
+xvfb-run -a node tests/extension/e2e/hold-start.e2e.cjs
 xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punct-en/ yoksa atlanır
 ```
 

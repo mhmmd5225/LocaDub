@@ -164,6 +164,7 @@ function renderBasics() {
   $('enabledLabel').textContent = settings.enabled ? 'Dublaj açık' : 'Dublaj kapalı';
   $('showSubtitles').checked = settings.showSubtitles;
   $('checkUpdates').checked = settings.checkUpdates;
+  $('holdStart').checked = settings.holdStart;
   $('mock').checked = settings.engineMode === 'mock';
   for (const [id, fmt] of Object.entries(RANGES)) {
     if (document.activeElement !== $(id)) $(id).value = settings[id];
@@ -174,6 +175,7 @@ function renderBasics() {
 $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
+$('holdStart').addEventListener('change', (e) => setSettings({ holdStart: e.target.checked }));
 $('mock').addEventListener('change', async (e) => {
   await setSettings({ engineMode: e.target.checked ? 'mock' : 'real', mtBackend: null, voice: null });
   await refreshModels();
@@ -744,13 +746,16 @@ async function browserInfo() {
 }
 
 async function diagnosticsReport() {
-  const [status, errors, info] = await Promise.all([bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), browserInfo()]);
+  const [status, errors, timings, info] = await Promise.all([
+    bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), bg({ type: 'diag.timings' }), browserInfo(),
+  ]);
   const models = [...lists.backends, ...lists.voices]
     .filter((m) => m.cachePrefix && cachedBytes(m.cachePrefix) > 0)
     .map((m) => ({ name: m.label, sizeMB: bytesMB(cachedBytes(m.cachePrefix)) }));
   return buildReport({
     version: chrome.runtime.getManifest().version, ...info, settings,
     status: status.ok ? status.result : null, models, errors: errors.ok ? errors.result : [],
+    timings: timings.ok ? timings.result : [],
     glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
   });
 }

@@ -7,7 +7,7 @@
 //   → {type:'dispose', id}                                      ← {type:'disposed', id}
 //   ← {type:'error', id, message}
 
-import * as ort from '../../lib/ort/ort.webgpu.min.mjs';
+import * as ort from '../../lib/ort/ort.wasm.min.mjs';
 import { PunctRestorer } from './punct.js';
 
 ort.env.wasm.wasmPaths = new URL('../../lib/ort/', import.meta.url).href;

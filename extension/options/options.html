@@ -180,13 +180,19 @@
       <div class="group">
         <h2>Genel</h2>
         <div class="trio">
-          <label class="check">
-            <input type="checkbox" id="showSubtitles">
-            <span>Türkçe altyazıyı göster</span>
-          </label>
-          <label class="check">
-            <input type="checkbox" id="checkUpdates">
-            <span>Yeni sürümleri denetle</span>
+          <div class="stack">
+            <label class="check">
+              <input type="checkbox" id="showSubtitles">
+              <span>Türkçe altyazıyı göster</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="checkUpdates">
+              <span>Yeni sürümleri denetle</span>
+            </label>
+          </div>
+          <label class="check" title="Dublaj açılınca video, ilk Türkçe cümle hazır olana kadar (en fazla 25 sn) duraklatılır; baştaki cümleler atlanmaz. Oynat'a basarsanız beklemeden devam eder.">
+            <input type="checkbox" id="holdStart">
+            <span>İlk cümle hazır olana kadar videoyu beklet</span>
           </label>
           <div class="slider-row mini">
             <label for="lookaheadSec">Önceden hazırlama</label>

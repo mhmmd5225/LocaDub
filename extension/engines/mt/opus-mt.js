@@ -13,6 +13,25 @@ let worker = null;
 let nextId = 1;
 const pending = new Map();
 let loaded = null; // { variant, info }
+// Translation runs on several WASM threads when the page is cross-origin isolated (worker.js imports the plain-WASM
+// onnxruntime build: no WebGPU here, and its 11 MB binary compiles in half the time of the 22 MB JSEP one).
+// onnxruntime-web 1.22 has been seen to hang creating a multi-threaded session in a module Worker on some Chromium
+// builds: if the threaded init does not finish in time, the worker is restarted single-threaded for the session.
+let threadsBroken = false;
+const THREADED_INIT_TIMEOUT_MS = 90000;
+
+/** Threads for translation: half the cores (speech synthesis runs at the same time), at most 4. */
+export function defaultThreads(cores = globalThis.navigator?.hardwareConcurrency, isolated = globalThis.crossOriginIsolated) {
+  return isolated ? Math.max(1, Math.min(4, Math.floor((cores || 2) / 2))) : 1;
+}
+
+function stopWorker(err) {
+  for (const p of pending.values()) p.reject(err);
+  pending.clear();
+  worker?.terminate();
+  worker = null;
+  loaded = null;
+}
 
 function startWorker() {
   if (worker) return worker;
@@ -26,14 +45,7 @@ function startWorker() {
     if (m.type === 'error') p.reject(Object.assign(new Error(m.message), { name: m.name }));
     else p.resolve(m);
   };
-  worker.onerror = (ev) => {
-    const err = new Error(`opus-mt worker: ${ev.message || 'failed to start'}`);
-    for (const p of pending.values()) p.reject(err);
-    pending.clear();
-    worker?.terminate();
-    worker = null;
-    loaded = null;
-  };
+  worker.onerror = (ev) => stopWorker(new Error(`opus-mt worker: ${ev.message || 'failed to start'}`));
   return worker;
 }
 
@@ -97,12 +109,8 @@ export function isSupported() {
   return typeof WebAssembly === 'object' && typeof Worker === 'function';
 }
 
-/**
- * Downloads (or reads from cache) and loads the model in the worker. Idempotent.
- * @param {{onProgress?:Function, variant?:string, modelBaseUrl?:string, numThreads?:number, signal?:AbortSignal}} o
- */
-export async function init({ onProgress, variant = DEFAULT_VARIANT, modelBaseUrl = HF_BASE, numThreads, signal } = {}) {
-  if (loaded && loaded.variant === variant && loaded.base === modelBaseUrl) return loaded.info;
+/** Model files from Cache Storage (downloaded first if missing), with download progress. */
+async function readModel({ onProgress, variant, modelBaseUrl, signal }) {
   const { fetchModel } = await import('../common/model-cache.js');
   const p = plan(variant, modelBaseUrl);
   const progress = new Map();
@@ -136,15 +144,48 @@ export async function init({ onProgress, variant = DEFAULT_VARIANT, modelBaseUrl
     decoder = { size: data.byteLength, parts: [{ start: 0, data }], holes: [] };
   }
   onProgress?.({ backend: 'opus-mt', phase: 'load', loaded: total, total, cached: true });
+  return { files, decoder };
+}
 
-  const transfer = [files.encoder, files.spm, files.vocab, ...decoder.parts.map((x) => x.data)];
-  const res = await call(
-    { type: 'init', encoder: files.encoder, decoder, spm: files.spm, vocab: files.vocab, numThreads },
-    { transfer, signal },
-  );
-  loaded = { variant, base: modelBaseUrl, info: res.info };
+/**
+ * Downloads (or reads from cache) and loads the model in the worker. Idempotent.
+ * @param {{onProgress?:Function, variant?:string, modelBaseUrl?:string, numThreads?:number, signal?:AbortSignal}} o
+ *   numThreads: WASM threads (default defaultThreads())
+ */
+export async function init({ onProgress, variant = DEFAULT_VARIANT, modelBaseUrl = HF_BASE, numThreads, signal } = {}) {
+  if (loaded && loaded.variant === variant && loaded.base === modelBaseUrl) return loaded.info;
+  for (;;) {
+    const threads = numThreads || (threadsBroken ? 1 : defaultThreads());
+    // the buffers are transferred to the worker, so a retry reads them from the cache again
+    const { files, decoder } = await readModel({ onProgress, variant, modelBaseUrl, signal });
+    const transfer = [files.encoder, files.spm, files.vocab, ...decoder.parts.map((x) => x.data)];
+    const req = call(
+      { type: 'init', encoder: files.encoder, decoder, spm: files.spm, vocab: files.vocab, numThreads: threads },
+      { transfer, signal },
+    );
+    let res = null;
+    if (threads > 1) {
+      let timer;
+      const hung = new Promise((resolve) => { timer = setTimeout(resolve, THREADED_INIT_TIMEOUT_MS, null); });
+      try {
+        res = await Promise.race([req, hung]);
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!res) {
+        console.warn('[mt] multi-threaded init did not finish, retrying with one thread');
+        threadsBroken = true;
+        stopWorker(new DOMException('restarted single-threaded', 'AbortError'));
+        req.catch(() => {});
+        continue;
+      }
+    } else res = await req;
+    loaded = { variant, base: modelBaseUrl, info: res.info };
+    break;
+  }
+  const total = sizeMB(variant) * 1e6;
   onProgress?.({ backend: 'opus-mt', phase: 'ready', loaded: total, total });
-  return res.info;
+  return loaded.info;
 }
 
 /** Translates cleaned-up spans (see preprocess.js). */

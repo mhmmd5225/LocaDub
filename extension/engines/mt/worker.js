@@ -14,7 +14,7 @@
 //   → {type:'cancel', id}      ← {type:'error', id, message, name}
 //   → {type:'dispose', id}     ← {type:'disposed', id}
 
-import * as ort from '../../lib/ort/ort.webgpu.min.mjs';
+import * as ort from '../../lib/ort/ort.wasm.min.mjs';
 import { MarianTranslator, TC_BIG_CONFIG } from './marian.js';
 import { MarianTokenizer } from './spm.js';
 import { assemble, fillDequantized } from './onnx-patch.js';
@@ -30,8 +30,8 @@ function setUpRuntime(numThreads) {
   if (runtimeReady) return ort.env.wasm.numThreads;
   runtimeReady = true;
   ort.env.wasm.wasmPaths = new URL('../../lib/ort/', import.meta.url).href;
-  // ort 1.22 hangs in InferenceSession.create with numThreads>1 inside a module Worker
-  // (seen on a crossOriginIsolated page), so stay single-threaded unless explicitly asked.
+  // ort 1.22 has hung in InferenceSession.create with numThreads>1 inside a module Worker on some builds: opus-mt.js asks
+  // for threads (defaultThreads) and restarts this worker single-threaded if the init does not finish.
   ort.env.wasm.numThreads = self.crossOriginIsolated && numThreads > 1
     ? Math.min(4, numThreads)
     : 1;

@@ -39,12 +39,14 @@ Bir ajan başka ajanın klasörüne yazmaz. Gerekirse yöneticiye sorar.
   ve ilgili `.wasm` dosyaları. Motorlar şöyle import eder:
   `import * as ort from '../../lib/ort/ort.wasm.min.mjs'` (WebGPU için `ort.webgpu.min.mjs`),
   ve `ort.env.wasm.wasmPaths = chrome.runtime.getURL('lib/ort/')`.
-- **KARAR (v1.22.0 hazır):** Her iki motor da `ort.webgpu.min.mjs` kullanır (WebGPU yoksa
-  `executionProviders:['wasm']` ile aynı derleme CPU'da çalışır). İki farklı ort derlemesi aynı
-  bağlamda import edilmez. Inference motorun kendi Worker'ında yapılır; Worker içinde
-  `ort.env.wasm.wasmPaths = new URL('../../lib/ort/', import.meta.url).href` (worker dosyasının
-  konumuna göre göreli yolu ayarla). **Worker'larda `numThreads = 1`** (ort 1.22, COI sayfadaki module
-  Worker'da numThreads>1 ile `InferenceSession.create`'te asılı kalıyor; yalnızca açıkça istenirse >1).
+- **KARAR (v1.22.0 hazır):** Ses motoru `ort.webgpu.min.mjs`, çeviri ve noktalama işçileri düz WASM derlemesi
+  `ort.wasm.min.mjs` kullanır (yalnızca `wasm` EP gerekir; 11 MB'lık ikili 22 MB'lık JSEP ikilisinin yarı sürede derlenir).
+  İki farklı ort derlemesi aynı bağlamda import edilmez (her işçi ayrı bağlamdır). Inference motorun kendi Worker'ında
+  yapılır; Worker içinde `ort.env.wasm.wasmPaths = new URL('../../lib/ort/', import.meta.url).href` (worker dosyasının
+  konumuna göre göreli yolu ayarla). **İş parçacıkları:** küçük sesler 1; çeviri çekirdeklerin yarısı (en çok 4), Supertonic
+  en çok 4 (çekirdek − 1), yalnızca crossOriginIsolated iken. ort 1.22 bazı Chromium sürümlerinde COI sayfadaki module
+  Worker'da numThreads>1 ile `InferenceSession.create`'te asılı kaldığı için çok iş parçacıklı yükleme 90 sn'de bitmezse
+  işçi tek iş parçacığıyla yeniden başlatılır.
 - Manifest CSP: `"extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"`.
 - Motorlar **offscreen document** içinde çalışır (window bağlamı: WebGPU, AudioContext,
   Chrome yerleşik `Translator` API kullanılabilir). Ağır iş için motor kendi Web Worker'ını
