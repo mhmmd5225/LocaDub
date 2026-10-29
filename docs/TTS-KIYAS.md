@@ -112,15 +112,55 @@ yalnızca ~3 kat. WebGPU bu test ortamında yoktu, ölçülmedi.
     90 sn'de bitmezse tek iş parçacığına düşer (ort 1.22'de bazı Chromium sürümlerinde görülen asılı kalma);
   - Hızlı kalite 5 adım; Yüksek (8 adım) 4 çekirdekli makinede yetişmez, 8+ çekirdek önerilir;
   - indirme ≈ 398 MB (resmî fp32 dosyalar, değiştirilmeden).
-- **Sonraki adım (önerilen):** vector_estimator'ın 8-bit kopyası (`onnxruntime.quantization.quantize_dynamic`, MatMul +
-  Conv, QUInt8) 257 MB'tan 65 MB'a iniyor ve 4 iş parçacığında RTF 0.57 → 0.38. Paket ≈ 210 MB'a düşer. Kopyanın
-  bir HuggingFace deposunda barındırılması gerekir (OpenRAIL-M türev dağıtımına izin verir, kullanım kısıtları aynen
-  aktarılmalı); anlaşılırlığı tam setle ayrıca ölçülmeli.
+- **8-bit paket (bölüm 4):** vector_estimator'ın 8-bit hâli anlaşılırlığı ve ezgiyi koruyup paketi 398 → 210 MB'a
+  indiriyor ve tarayıcıda ≈ 1.4 kat hızlı (3 iş parçacığında RTF 0.48). Eklentiye HuggingFace'te barındırıldıktan
+  sonra bağlanacak; 8-bit vocoder sesi bozduğu için pakete girmedi.
 - **Elenenler:** Chatterbox Multilingual (≥ 1.2 GB, otoregresif, gerçek zamanlı değil), Piper dfki ve MMS-TTS (ticari
   olmayan lisans), Okur (kartına göre EMA Lightning'den düşük UTMOS/WER, tek ses), Pocket TTS Türkçe ince ayarları
   (ONNX yok; ses klonlama için ileride bakılabilir), Kokoro/Kitten (Türkçe yok).
 - **Tüm sesler için:** ses seviyesi dengesi, cümle başına tohum ve uzun yan cümlelerde bağlaç öncesi virgül (modeller
   duraklamayı ve yeni ezgi yayını yalnızca noktalamadan alıyor).
+
+## 4. 8-bit Supertonic paketi
+
+`tools/tts/quantize-supertonic.py` (sürümler `tools/tts/requirements-quantize.txt`'te sabit; iki çalıştırmada SHA-256
+aynı). Dinamik nicemleme, MatMul / Gemm / Conv ağırlıkları QUInt8, tensör başına. Paketin geri kalanı değişmez.
+
+| Paket | Boyut | Ses | Node RTF | WER % | CER % | F0 sapma (yt) |
+|---|---|---|---|---|---|---|
+| fp32 (resmî) | 398 MB | F1 / F3 / M1 / M4 | 0.28 / 0.26 / 0.27 / 0.26 | 2.1 / 0.0 / 0.0 / 0.0 | 0.6 / 0.0 / 0.0 / 0.0 | 2.86 / 3.85 / 3.42 / 2.84 |
+| **8-bit vector_estimator** | **210 MB** | F1 / F3 / M1 / M4 | 0.22 / 0.21 / 0.21 / 0.22 | 2.1 / 0.0 / 0.0 / 2.1 | 0.3 / 0.0 / 0.0 / 0.3 | 2.93 / 3.77 / 3.68 / 2.91 |
+| 8-bit vector_estimator + vocoder | 134 MB | F1 / F3 / M1 / M4 | 0.19 / 0.18 / 0.19 / 0.18 | 96 / 92 / 71 / 95 | 88 / 77 / 59 / 86 | 1.04 / 1.37 / 0.80 / 1.04 |
+
+(5 adım, değişiklik sonrası çekirdek; 8 adımda 8-bit F1/M4 WER 0.0 / 0.0, RTF 0.30. 8-bit'teki tek hata "gelecek misin"
+→ "gelecekmişsin", fp32'nin F5'inde de görülen okuma.)
+
+Tarayıcı (Chromium WASM, F1, aynı tur):
+
+| Paket | 1 iş parçacığı | 3 (kendiliğinden) | 4 | 4, Yüksek (8 adım) |
+|---|---|---|---|---|
+| fp32 | 1.22 | 0.80 | 0.67 | — |
+| 8-bit vector_estimator | 0.89 | **0.48** | 0.45 | 0.63 |
+
+- **Karar:** 8-bit vector_estimator paketi kullanılır (≈ 210 MB). Anlaşılırlık ve ezgi fp32 ile aynı (fark tek ölçüm
+  gürültüsü içinde), tarayıcıda dublaj 3+ iş parçacığıyla rahat yetişir.
+- **8-bit vocoder elendi:** konuşma anlaşılmaz hâle geliyor (Whisper "Altyazı M.K." gibi uydurmalar yazıyor), perde
+  izlenemiyor. Vocoder dinamik nicemlemeye dayanıksız; fp16 ya da statik nicemleme ileride ayrıca denenebilir.
+- Paket OpenRAIL-M türevi olarak dağıtılır: `LICENSE`, `ORIGINAL_README.md`, değişikliği bildiren model kartı ve
+  nicemlenmiş grafikte ONNX metadata bildirimi (`modification_notice`) yanında gider.
+
+Yeniden üretme ve yükleme (yazma yetkili `HF_TOKEN` ile):
+
+```
+python3 -m venv .venv && .venv/bin/pip install -r tools/tts/requirements-quantize.txt
+node tools/tts/fetch-models.mjs supertonic-3
+.venv/bin/python tools/tts/quantize-supertonic.py --repo OWNER/supertonic-3-int8
+hf auth whoami
+hf repo create OWNER/supertonic-3-int8 --repo-type model
+hf upload OWNER/supertonic-3-int8 tests/tts/.models/supertonic-3-int8 . --commit-message "Supertonic 3, dynamic 8-bit vector_estimator"
+```
+
+Sonra `extension/engines/tts/voices.js` yeni depoya ve commit kimliğine sabitlenir.
 
 ## Yeniden üretmek
 
