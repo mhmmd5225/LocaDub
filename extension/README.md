@@ -23,6 +23,11 @@ Derleme adımı yoktur: düz ES module JavaScript.
 
 **Açılır pencere:** üstte seslendirme seçici ve dublaj anahtarı (seçici anahtarın solunda), altında durum kartı ile dublaj ve orijinal ses seviyesi. Dublaj her tarayıcı açılışında kapalı başlar.
 
+**Ses seçimi:** Antalia Mini (erkek, varsayılan), Ahenk Cep ve EMA Lightning (kadın) birer küçük model (23–35 MB);
+**Supertonic 3** (deneysel) 10 hazır sesli tek pakettir (≈ 210 MB 8-bit kopya, 5 kadın + 5 erkek, en canlı tonlama; tarayıcıda
+4 iş parçacığı ister). Seslendirme menüsündeki **Dinle** düğmesi seçili ses ve üslupla kısa bir örnek çalar.
+Karşılaştırma: [docs/TTS-KIYAS.md](../docs/TTS-KIYAS.md).
+
 **Ayarlar sayfası** (`options/`): kaydırmasız, dört menü (`#indirme`, `#seslendirme`, `#ai-model`, `#diger`; eski
 `#modeller`, `#ses`, `#genel`, `#sozluk`, `#depolama`, `#durum` bağlantıları eşlenir; sol/sağ ok tuşlarıyla gezilir).
 **İndirme**: OPUS-MT, Antalia, Ahenk ve noktalama modeli için İndir / Sil, toplu indirme, model ve çeviri önbelleğini
@@ -42,11 +47,12 @@ Ayarlar (`chrome.storage.local`):
 | Konuşma hızı | Temel TTS hızı (0.8–2.0). Cümle sığmazsa hız otomatik artırılır (toplam ≤ 1.6) |
 | Üslup | Doğal / Canlı / Sakin (`style`, varsayılan Doğal). **İnce ayardır, robot hissini ortadan kaldırmaz.** Ahenk Cep'te stil gömmesi (neutral / cheerful / calm), Antalia Mini'de örnekleme sıcaklığı; ikisinde de küçük bir hız çarpanı ve perde payı. Tablo tek yerde: `engines/tts/styles.js` (değerler başlangıç tahminidir, dinleyerek ayarlanacak). Sistem sesinde kullanılamaz |
 | Perde | Gelişmiş: −3…+3 yarım ton (`pitch`, adım 0.5); üslubun perdesine eklenir, toplam ±4 ile sınırlı. Süre değişmez; biçimlenti de kaydığı için küçük değerler önerilir |
-| Kalite | Gelişmiş: Hızlı (varsayılan) / Yüksek (`quality`): flow adımı 8 → 16, yaklaşık +0.1 UTMOS (Ahenk model kartı), sentez yaklaşık 1.2–1.9 kat uzun sürer (RTF tablosu: engines/tts/README.md). Sistem sesinde kullanılamaz |
-| Dublaj ses seviyesi | TTS kazancı (%0–200); YouTube'un ses düğmesiyle çarpılır |
+| Kalite | Gelişmiş: Hızlı (varsayılan) / Yüksek (`quality`): flow adımı 8 → 16, yaklaşık +0.1 UTMOS (Ahenk model kartı), sentez yaklaşık 1.2–1.9 kat uzun sürer (RTF tablosu: engines/tts/README.md). Supertonic'te gürültü giderme adımı 5 → 8. Sistem sesinde kullanılamaz |
+| Ses karıştırma | Gelişmiş, yalnızca Supertonic: seçili sese aynı paketten ikinci bir sesin rengi katılır (`voiceBlend: { with: 'M1', amount: 0–0.9 }`, %0 = kapalı) |
+| Dublaj ses seviyesi | TTS kazancı (%0–200); YouTube'un ses düğmesiyle çarpılır. Motor her cümleyi önce ortak seviyeye (−20 dBFS) getirir, sesler ve konuşmacılar arasında seviye sıçraması olmaz |
 | Orijinal ses | Türkçe konuşma sırasında orijinal sesin seviyesi (ducking) |
 | Sözlük | Çeviri düzeltmeleri (altyazı + ses) ve okunuşlar (yalnızca ses): `kaynak => hedef` satırları, tam sözcük, Türkçe büyük/küçük harf duyarsız, `*` ekleri korur (`common/glossary.js`). Ham çeviri saklanır, sözlük kullanımda uygulanır |
-| Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde iki ses sırayla konuşur (`speakerVoices`, `voice2`; varsayılan ikinci ses birincinin karşıt cinsiyetlisi) |
+| Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde 2–4 ses sırayla konuşur (`speakerVoices`, `speakerCount`, `voice2`–`voice4`). Seçilmeyen ses kendiliğinden gelir: önce karşıt cinsiyet, sonra aynı cinsiyetten başka bir ses; Supertonic'te aynı paketin sesleri (ek indirme yok). Altyazı kimin konuştuğunu söylemez, yalnızca değiştiğini: iki kişide 2 ses doğru eşleşir, 3–4 ses grup videoları içindir. Cümlede konuşmacı sayacı saklanır (`speaker`, mod 12), ses = sayaç mod `speakerCount` |
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
 | Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |

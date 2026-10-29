@@ -7,8 +7,9 @@
 import { Ahenk } from './ahenk.js';
 import { Antalia } from './antalia.js';
 import { Ema } from './ema.js';
+import { Supertonic } from './supertonic.js';
 import { normalizeText } from './normalize.js';
-import { concat, convertRate, shiftPitch, softLimit, timeStretch, trimSilence } from './dsp.js';
+import { concat, convertRate, normalizeLoudness, shiftPitch, timeStretch, trimSilence } from './dsp.js';
 import { pitchRatio, resolveTone } from './styles.js';
 
 /** Up to this speed the models' own duration control is used; the rest is WSOLA time-stretch (same pitch). */
@@ -44,6 +45,11 @@ export async function loadVoice(ort, voiceDef, buffers, opts = {}) {
   if (voiceDef.model === 'ahenk') model = await Ahenk.create(ort, manifest, b, sessionOptions, opts);
   else if (voiceDef.model === 'antalia') model = await Antalia.create(ort, manifest, b, sessionOptions, opts);
   else if (voiceDef.model === 'ema') model = await Ema.create(ort, manifest, b, sessionOptions);
+  else if (voiceDef.model === 'supertonic') {
+    const styles = {};
+    for (const f of voiceDef.files) if (f.name.startsWith('style:')) styles[f.name.slice(6)] = parseJson(buffers[f.name]);
+    model = await Supertonic.create(ort, manifest, parseJson(buffers.indexer), styles, b, sessionOptions, opts);
+  }
   else throw new Error(`unknown model ${voiceDef.model}`);
   return { id: voiceDef.id, def: voiceDef, model, sampleRate: model.sampleRate };
 }
@@ -106,18 +112,23 @@ export function speedPlan(speed, k = 1) {
 
 /**
  * Text -> mono PCM. Normalizes, splits long text, synthesizes each piece, trims model silence, joins with short
- * pauses and applies any speed beyond NATIVE_MAX_SPEED by time-stretching.
- * tone { style, pitch, quality } (styles.js): voice-specific style/temperature, flow steps and a pitch shift.
+ * pauses, applies any speed beyond NATIVE_MAX_SPEED by time-stretching and brings the line to a common loudness.
+ * seed: noise seed (default: a hash of the text); preset: Supertonic preset key (default: the voice's own).
+ * tone { style, pitch, quality, blend } (styles.js): voice-specific style/temperature, flow steps, a pitch shift and
+ * (Supertonic only) a blend with a second preset.
  * @returns {Promise<{ pcm: Float32Array, sampleRate: number, stats: object }>}
  */
-export async function synthesizeText(voice, text, { speed = 1, seed = 0, isCancelled, outputRate, maxChars, tone } = {}) {
+export async function synthesizeText(voice, text, { speed = 1, seed, isCancelled, outputRate, maxChars, tone, preset } = {}) {
   const t0 = now();
   const rate = voice.sampleRate;
-  const rt = resolveTone(tone, voice.model.styles || []);
+  const rt = resolveTone(tone, voice.model.styles || [], voice.def.model);
   const k = pitchRatio(rt.semitones);
   const plan = speedPlan(speed, k);
-  const modelOpts = { style: rt.ahenkStyle, temperature: rt.temperature, steps: rt.steps };
+  const modelOpts = { style: rt.ahenkStyle, temperature: rt.temperature, steps: rt.steps, preset: preset || voice.def.preset, blend: rt.blend };
   const spoken = normalizeText(text);
+  // a different (but repeatable) noise per line: with one fixed seed every line started from the same noise and
+  // the melodies sounded alike
+  if (seed === undefined) seed = textSeed(spoken);
   const pieces = splitText(spoken, maxChars);
   const parts = [];
   for (let i = 0; i < pieces.length; i++) {
@@ -130,8 +141,9 @@ export async function synthesizeText(voice, text, { speed = 1, seed = 0, isCance
     if (gap && i < pieces.length - 1) parts.push(new Float32Array(Math.round((gap / plan.model) * rate)));
   }
   let pcm = concat(parts);
-  if (rt.semitones) pcm = softLimit(shiftPitch(pcm, k));
+  if (rt.semitones) pcm = shiftPitch(pcm, k);
   if (plan.stretch > 1.01) pcm = timeStretch(pcm, plan.stretch, rate);
+  normalizeLoudness(pcm, rate);
   let sampleRate = rate;
   if (outputRate && outputRate !== rate) {
     pcm = convertRate(pcm, rate, outputRate);
@@ -144,6 +156,13 @@ export async function synthesizeText(voice, text, { speed = 1, seed = 0, isCance
     sampleRate,
     stats: { normalized: spoken, chunks: pieces.length, seconds, computeSec, rtf: seconds ? computeSec / seconds : 0, tone: rt, ...plan },
   };
+}
+
+/** 31-bit FNV-1a hash of the text: the default noise seed of a line. */
+export function textSeed(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0) & 0x7fffffff;
 }
 
 export async function releaseVoice(voice) {

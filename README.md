@@ -7,7 +7,10 @@ metin ve ses hiçbir sunucuya gönderilmez.
 - **Çeviri:** Chrome'un cihaz üzerindeki çevirmeni ya da
   [OPUS-MT tc-big EN→TR](https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-tr) (ONNX, ≈300 MB)
 - **Seslendirme:** [Antalia Mini](https://huggingface.co/cloud0day3/antalia-mini) (erkek, varsayılan),
-  [Ahenk Cep](https://huggingface.co/ozgurguler/ahenk-cep-tr) ve [EMA Lightning](https://huggingface.co/canberkkkkkk/ema-lightning) (kadın) ya da Windows'un Türkçe sistem sesi
+  [Ahenk Cep](https://huggingface.co/ozgurguler/ahenk-cep-tr) ve [EMA Lightning](https://huggingface.co/canberkkkkkk/ema-lightning) (kadın),
+  deneysel [Supertonic 3](https://huggingface.co/Supertone/supertonic-3) (10 ses, OpenRAIL-M; eklenti
+  [8-bit kopyasını](https://huggingface.co/teknikkent/supertonic-3-int8) indirir, 210 MB) ya da Windows'un Türkçe sistem sesi
+  ([ses kıyası](docs/TTS-KIYAS.md))
 - **Çalışma ortamı:** [onnxruntime-web](https://github.com/microsoft/onnxruntime) (WASM), Chrome MV3
   offscreen belgesi
 
@@ -34,6 +37,7 @@ Ayrıntılar: [extension/README.md](extension/README.md).
 | `site/` | Tanıtım sayfası: https://localdub.mhmmd.app (Netlify; yedek: GitHub Pages) |
 | `tools/` | Model indirme, simge üretme ve sayfa önizleme araçları |
 | `docs/CONTRACT.md` | Bileşenler arası sözleşme (mesajlar, motor API'leri) |
+| `docs/MT-KIYAS.md`, `docs/TTS-KIYAS.md` | Çeviri ve ses modeli kıyasları |
 
 ## Lisanslar
 

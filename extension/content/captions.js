@@ -147,8 +147,13 @@ export function splitCue(c) {
   });
 }
 
+// Konuşmacı sayacının döngüsü: 2, 3 ve 4'ün ortak katı. Ses = sayaç mod speakerCount (settings.js), böylece
+// konuşmacı sayısı değişince önbellekteki cümleler yeniden kurulmaz; eski önbellekteki 0/1 değerleri de geçerli kalır.
+export const SPEAKER_CYCLE = 12;
+
 // Parçaları cümlelere birleştirir. Sonuç saniye cinsinden: [{ start, end, text, speaker? }]
-// speaker: her konuşmacı değişiminde (>>) 0 ↔ 1 değişir; yalnızca 1 olduğunda yazılır.
+// speaker: konuşmacı değişimi (>>) sayacı, her değişimde bir artar (mod SPEAKER_CYCLE); yalnızca 0 değilse yazılır.
+// Altyazı kimin konuştuğunu söylemez: iki kişilik konuşmada 0 ↔ 1 doğru eşleşir, daha fazlasında sıra tahminidir.
 export function mergeSentences(rawCues, { pauseMs = 700, maxMs = 12000, minSplitMs = 4000 } = {}) {
   const out = [];
   let cur = null;
@@ -158,13 +163,13 @@ export function mergeSentences(rawCues, { pauseMs = 700, maxMs = 12000, minSplit
   const flush = () => {
     if (cur && cur.parts.length) {
       const text = cur.parts.join(' ').replace(/\s+([,.!?;:…])/g, '$1').replace(/\s+/g, ' ').trim();
-      if (text) out.push({ start: cur.start / 1000, end: cur.end / 1000, text, ...(cur.speaker ? { speaker: 1 } : {}) });
+      if (text) out.push({ start: cur.start / 1000, end: cur.end / 1000, text, ...(cur.speaker ? { speaker: cur.speaker } : {}) });
     }
     cur = null;
   };
   for (const c of cues || []) {
     if (!c || !c.text) continue;
-    if (c.speakerChange) speaker = 1 - speaker;
+    if (c.speakerChange) speaker = (speaker + 1) % SPEAKER_CYCLE;
     if (cur) {
       const gap = c.start - cur.end;
       const wouldBe = c.end - cur.start;

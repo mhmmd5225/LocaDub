@@ -3,14 +3,29 @@
 <title>TTS engine browser test</title>
 <style>body{font:14px system-ui;margin:16px}textarea{width:100%;height:4em}pre{white-space:pre-wrap}</style>
 <h1>engines/tts — browser test (onnxruntime-web WASM)</h1>
-<p>Query: <code>?voice=antalia-mini|ahenk-cep&amp;threads=1&amp;device=wasm|webgpu&amp;auto=1</code></p>
+<p>Query: <code>?voice=antalia-mini|ahenk-cep|ema-lightning|supertonic-3:F1&amp;threads=1&amp;device=wasm|webgpu&amp;steps=N&amp;quality=fast|high&amp;local=1&amp;auto=1</code>
+(<code>local=1</code>: model files from <code>tests/tts/.models/</code>, see tools/tts/fetch-models.mjs;
+<code>&amp;file=vector:.models/supertonic-3-int8/onnx/vector_estimator.int8.onnx</code> swaps one file)</p>
 <textarea id="t">Toplantı saat 14:30'da başlayacak ve yaklaşık 45 dakika sürecek.</textarea>
 <button id="go">Seslendir</button> <button id="bench">Benchmark</button>
 <pre id="log"></pre>
 <script type="module">
 import * as tts from '../../../extension/engines/tts/index.js';
+import { VOICES, packOf } from '../../../extension/engines/tts/voices.js';
 const q = new URLSearchParams(location.search);
 const voice = q.get('voice') || 'antalia-mini';
+const tone = { quality: q.get('quality') || 'fast' };
+if (q.get('local')) {
+  // serve the catalog's HuggingFace URLs from the local model folder
+  const local = new Map(VOICES.flatMap((v) => v.files.map((f) => [f.url, `../.models/${packOf(v)}/${f.url.split('/').pop()}`])));
+  // &file=name:path (relative to tests/tts/) swaps one catalog file, e.g. file=vector:.models/supertonic-3-int8/onnx/vector_estimator.int8.onnx
+  for (const spec of q.getAll('file')) {
+    const [name, path] = spec.split(':');
+    for (const v of VOICES) for (const f of v.files) if (f.name === name) local.set(f.url, `../${path}`);
+  }
+  const fetch0 = window.fetch.bind(window);
+  window.fetch = (url, opts) => fetch0(local.get(String(url)) || url, local.has(String(url)) ? {} : opts);
+}
 const log = (s) => { document.getElementById('log').textContent += s + '\n'; console.log(s); };
 const SENT = [
   'Merhaba arkadaşlar, bugün yapay zekânın geleceği hakkında konuşacağız.',
@@ -46,7 +61,7 @@ async function bench() {
   let A = 0, C = 0;
   for (const s of SENT) {
     const t0 = performance.now();
-    const r = await tts.synthesize(s, { voice, speed: 1 });
+    const r = await tts.synthesize(s, { voice, speed: 1, tone });
     const wall = (performance.now() - t0) / 1000, sec = r.pcm.length / r.sampleRate;
     A += sec; C += wall;
     log(`${sec.toFixed(2)} s audio, ${wall.toFixed(2)} s wall, RTF ${(wall / sec).toFixed(3)} @${r.sampleRate}`);

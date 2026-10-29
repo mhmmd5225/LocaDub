@@ -79,6 +79,9 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
 - **Antalia-2 Mini web demo** — https://huggingface.co/spaces/cloud0day3/antalia-mini
   (`js/tts.js`, `js/frontend.js` @ `2c24b406`) — Apache-2.0, Copyright 2026 PatientDesk AI.
   `frontend-data.json.gz`, CMU Pronouncing Dictionary verisini içerir (BSD-2-Clause).
+- **Supertonic web örneği** — https://github.com/supertone-inc/supertonic (`web/helper.js`) — MIT, Copyright (c) 2025
+  Supertone Inc. `supertonic.js` bu dosyanın metin ön işlemesini, parçalayıcısını ve grafik çağrılarını JavaScript'e
+  uyarlar (düz typed array'ler, tohumlu gürültü, hazır ses karıştırma eklendi).
 
 ### Ses modelleri (eklentiye paketlenmez, ilk kullanımda HuggingFace'ten indirilir)
 
@@ -88,6 +91,15 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
   Atıf: "Ses: Ahenk Cep (ozgurguler), CC BY 4.0". Üretilen ses yapaydır (yapay zekâ ile sentezlenmiştir).
 - **EMA Lightning** (kadın) — ağırlıklar https://huggingface.co/canberkkkkkk/ema-lightning, ONNX dışa aktarımı
   https://huggingface.co/ozcancelik/ema-lightning-onnx (`13c431d`) — Apache-2.0. Üretilen ses yapaydır.
+- **Supertonic 3** (deneysel, 10 hazır ses: F1–F5 kadın, M1–M5 erkek) — https://huggingface.co/Supertone/supertonic-3
+  (commit `3cadd1ee6394adea1bd021217a0e650ede09a323`) — BigScience OpenRAIL-M, Supertone Inc. Lisans, modelin
+  kullanımına sınırlamalar koyar (Ek A: yasa dışı kullanım, başkasını taklit ederek yanıltma, rıza dışı kişisel veri vb.
+  yasak); bu sınırlamalar eklentinin kullanıcıları için de geçerlidir. Model eklentiye paketlenmez;
+  ses karıştırma yalnızca hazır stil vektörlerini çalışma anında harmanlar. Üretilen ses yapaydır.
+  Eklentinin indirdiği kopya: https://huggingface.co/teknikkent/supertonic-3-int8 (commit
+  `605d35c25d57eca4749939b85f16a24aa83e4561`) — aynı lisans; **değiştirildi:** `vector_estimator` dinamik 8-bit
+  nicemlendi (`tools/tts/quantize-supertonic.py`), diğer dosyalar resmî dosyaların aynısı. Depo lisansı, özgün model
+  kartını, değişiklik bildirimini ve kullanım kısıtlarını içerir.
 
 ## Referans proje
 

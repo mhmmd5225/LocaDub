@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences, splitCue, cleanText,
+  pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences, splitCue, cleanText, SPEAKER_CYCLE,
 } from '../../extension/content/captions.js';
 
 const T = (languageCode, kind = '', extra = {}) => ({
@@ -169,7 +169,16 @@ test('mergeSentences: konuşmacı bilgisi cümlelere taşınır (>> her seferind
   ] });
   const s = mergeSentences(cues);
   assert.deepEqual(s.map((x) => [x.text, x.speaker ?? 0]), [
-    ['are you ready?', 0], ['yes I am.', 1], ['Let us go.', 1], ['okay then.', 0],
+    ['are you ready?', 0], ['yes I am.', 1], ['Let us go.', 1], ['okay then.', 2],
   ]);
+  // iki sesle 0 ↔ 1 döner (eski davranış)
+  assert.deepEqual(s.map((x) => (x.speaker ?? 0) % 2), [0, 1, 1, 0]);
   assert.ok(!('speaker' in s[0]), 'ilk konuşmacıda alan yazılmaz');
+});
+
+test('mergeSentences: konuşmacı sayacı SPEAKER_CYCLE ile döner', () => {
+  const events = Array.from({ length: 14 }, (_, i) => ({ tStartMs: i * 1000, dDurationMs: 1000, segs: [{ utf8: `${i ? '>> ' : ''}line ${i}.` }] }));
+  const s = mergeSentences(parseJson3({ events }));
+  assert.deepEqual(s.map((x) => x.speaker ?? 0), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1]);
+  assert.equal(SPEAKER_CYCLE % 12, 0);
 });

@@ -95,7 +95,8 @@ function renderVoices() {
   if (ready.length) {
     const g = document.createElement('optgroup');
     g.label = 'İndirilmiş';
-    for (const v of ready) g.append(option(v.id, `${name(v)}${gender(v) ? ` · ${gender(v)}` : ''}`, { selected: current === v.id }));
+    // Supertonic hazır seslerinin adı cinsiyeti zaten söyler
+    for (const v of ready) g.append(option(v.id, `${name(v)}${gender(v) && !v.pack ? ` · ${gender(v)}` : ''}`, { selected: current === v.id }));
     sel.append(g);
   }
   const sys = document.createElement('optgroup');
@@ -113,7 +114,13 @@ function renderVoices() {
   if (missing.length) {
     const g = document.createElement('optgroup');
     g.label = 'İndirilmemiş';
-    for (const v of missing) g.append(option(MORE + v.id, `${name(v)} (indir)`));
+    // bir paketin sesleri tek indirmedir: paket bir kez listelenir
+    const packs = new Set();
+    for (const v of missing) {
+      if (v.pack && packs.has(v.pack)) continue;
+      if (v.pack) packs.add(v.pack);
+      g.append(option(MORE + v.id, `${v.pack ? 'Supertonic 3, 10 ses' : name(v)} (indir)`));
+    }
     sel.append(g);
   }
   // Seçili ses indirilmemişse (ör. silindi) listede yine görünsün.

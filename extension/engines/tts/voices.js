@@ -68,6 +68,68 @@ export const VOICES = [
   },
 ];
 
+// Supertonic 3: one set of graphs, ten preset voices (style vectors). Every preset is a voice of its own in the
+// catalog, all sharing the pack's files (downloaded, cached and loaded once; `pack` is the shared key).
+const SUPERTONIC_FP32 = 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/';
+/**
+ * The 8-bit copy (tools/tts/quantize-supertonic.py, docs/TTS-KIYAS.md section 4): 210 MB instead of 398 MB, same
+ * intelligibility and melody, ≈ 1.4× faster in the browser. Set to { repo: 'OWNER/supertonic-3-int8', rev: '<commit>' }
+ * (published: https://huggingface.co/teknikkent/supertonic-3-int8); null falls back to the official fp32 files.
+ */
+export const SUPERTONIC_INT8 = { repo: 'teknikkent/supertonic-3-int8', rev: '605d35c25d57eca4749939b85f16a24aa83e4561' };
+const SUPERTONIC_STYLES = {
+  F1: 292046, F2: 292423, F3: 290794, F4: 291808, F5: 291479,
+  M1: 291748, M2: 292055, M3: 290198, M4: 291522, M5: 291469,
+};
+
+/** The pack's file list: the official fp32 release, or (source = { repo, rev }) the 8-bit copy with the same layout. */
+export function supertonicFiles(source = SUPERTONIC_INT8) {
+  const base = source ? `https://huggingface.co/${source.repo}/resolve/${source.rev}/` : SUPERTONIC_FP32;
+  const vector = source
+    ? { name: 'vector', url: base + 'onnx/vector_estimator.int8.onnx', bytes: 65361204, kind: 'onnx' }
+    : { name: 'vector', url: base + 'onnx/vector_estimator.onnx', bytes: 256534781, kind: 'onnx' };
+  return [
+    { name: 'manifest', url: base + 'onnx/tts.json', bytes: 8253, kind: 'json' },
+    { name: 'indexer', url: base + 'onnx/unicode_indexer.json', bytes: 277676, kind: 'json' },
+    { name: 'duration', url: base + 'onnx/duration_predictor.onnx', bytes: 3700147, kind: 'onnx' },
+    { name: 'text', url: base + 'onnx/text_encoder.onnx', bytes: 36416150, kind: 'onnx' },
+    vector,
+    { name: 'vocoder', url: base + 'onnx/vocoder.onnx', bytes: 101424195, kind: 'onnx' },
+    ...Object.entries(SUPERTONIC_STYLES).map(([k, bytes]) => ({ name: `style:${k}`, url: `${base}voice_styles/${k}.json`, bytes, kind: 'json' })),
+  ];
+}
+
+export const SUPERTONIC_PACK = {
+  id: 'supertonic-3',
+  label: 'Supertonic 3 (10 ses)',
+  license: 'OpenRAIL-M',
+  model: 'supertonic',
+  sampleRate: 44100,
+  homepage: SUPERTONIC_INT8 ? `https://huggingface.co/${SUPERTONIC_INT8.repo}` : 'https://huggingface.co/Supertone/supertonic-3',
+  attribution: 'Supertonic 3 by Supertone Inc. (OpenRAIL-M; sample code MIT)' +
+    (SUPERTONIC_INT8 ? `, 8-bit copy ${SUPERTONIC_INT8.repo}` : ''),
+  experimental: true,
+  // single-threaded WASM is slower than real time for this model (docs/TTS-KIYAS.md): index.js runs it on up to
+  // four threads when the page is cross-origin isolated
+  threads: 4,
+  // the fp32 graphs, or the 8-bit copy; the denoising steps are run from JS
+  files: supertonicFiles(),
+  // once the 8-bit copy is used, index.js deletes the fp32 files a user downloaded before (398 MB)
+  legacyPrefixes: SUPERTONIC_INT8 ? [SUPERTONIC_FP32] : [],
+};
+for (const preset of Object.keys(SUPERTONIC_STYLES)) {
+  const female = preset[0] === 'F';
+  const { files, model, license, sampleRate, homepage, attribution, experimental, threads, legacyPrefixes } = SUPERTONIC_PACK;
+  VOICES.push({
+    id: `supertonic-3:${preset}`,
+    label: `Supertonic ${female ? 'Kadın' : 'Erkek'} ${preset[1]}`,
+    gender: female ? 'female' : 'male',
+    pack: SUPERTONIC_PACK.id,
+    preset,
+    license, model, sampleRate, homepage, attribution, experimental, threads, legacyPrefixes, files,
+  });
+}
+
 export const SYSTEM_VOICE = {
   id: 'system',
   label: 'Sistem sesi (chrome.tts / speechSynthesis)',
@@ -84,3 +146,9 @@ export const DEFAULT_VOICE = 'antalia-mini';
 export const voiceById = (id) => VOICES.find((v) => v.id === id) || null;
 
 export const voiceBytes = (v) => v.files.reduce((n, f) => n + f.bytes, 0);
+
+/** The key a voice's files and loaded model are shared under (the pack for Supertonic presets, else the voice). */
+export const packOf = (v) => v.pack || v.id;
+
+/** Presets of the same pack (Supertonic), for blending; [] for single-voice models. */
+export const presetsOf = (packId) => VOICES.filter((v) => v.pack === packId);

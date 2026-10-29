@@ -6,19 +6,21 @@
 //   -> { type:'synth', reqId, voiceId, text, speed, outputRate, tone:{ style, pitch, quality } }
 //   <- { type:'done',  reqId, pcm:Float32Array (transferred), sampleRate, stats }
 //   -> { type:'cancel', reqId }                 (queued: dropped; running: stops at the next chunk)
-//   -> { type:'unload', reqId, voiceId }        <- { type:'unloaded', reqId }
+//   -> { type:'unload', reqId, voiceId }        <- { type:'unloaded', reqId }   (unloads the voice's whole pack)
+//
+// Supertonic presets share one loaded model (their pack); a synth request names the preset voice.
 //   <- { type:'error', reqId, name, message }
 //
 // Requests run one at a time (onnxruntime-web sessions must not run concurrently).
 
 import * as ort from '../../lib/ort/ort.webgpu.min.mjs';
-import { voiceById } from './voices.js';
+import { packOf, voiceById } from './voices.js';
 import { loadVoice, releaseVoice, synthesizeText } from './core.js';
 
 ort.env.wasm.wasmPaths = new URL('../../lib/ort/', import.meta.url).href;
 ort.env.logLevel = 'error';
 
-const voices = new Map(); // voiceId -> loaded voice
+const voices = new Map(); // pack (voiceId, or the shared pack of Supertonic presets) -> loaded voice
 const cancelled = new Set();
 let configured = false;
 let device = 'wasm';
@@ -29,7 +31,8 @@ function configure(options = {}) {
   configured = true;
   // Single-threaded by default. Measured (Chromium, onnxruntime-web 1.22.0, cross-origin isolated): numThreads > 1
   // inside a module Worker hangs InferenceSession.create (tests/tts/browser/threads-worker.js), while 1 thread meets
-  // the RTF target with the default voice. Threads only when explicitly requested (and SharedArrayBuffer exists).
+  // the RTF target with the default voice. Threads only when requested (and SharedArrayBuffer exists): index.js asks
+  // for them for voices whose catalog entry says so (Supertonic) and falls back to one thread if loading hangs.
   ort.env.wasm.numThreads = self.crossOriginIsolated && options.threads > 1 ? Math.min(8, options.threads) : 1;
   ort.env.wasm.proxy = false;
 }
@@ -44,9 +47,9 @@ async function providersFor(requested) {
 
 async function load({ voiceId, files, options = {} }) {
   configure(options);
-  if (voices.has(voiceId)) return info(voices.get(voiceId));
   const def = voiceById(voiceId);
   if (!def) throw new Error(`Bilinmeyen ses: ${voiceId}`);
+  if (voices.has(packOf(def))) return info(voices.get(packOf(def)));
   const providers = await providersFor(options.device);
   let voice;
   try {
@@ -59,9 +62,9 @@ async function load({ voiceId, files, options = {} }) {
   }
   device = providers[0];
   voice.providers = providers;
-  voices.set(voiceId, voice);
+  voices.set(packOf(def), voice);
   // warm-up: the first run of each graph allocates and picks kernels
-  await synthesizeText(voice, 'Merhaba.', {});
+  await synthesizeText(voice, 'Merhaba.', { preset: def.preset });
   return info(voice);
 }
 
@@ -75,9 +78,10 @@ const info = (v) => ({
 });
 
 async function synth({ reqId, voiceId, text, speed, outputRate, tone }) {
-  const voice = voices.get(voiceId);
+  const def = voiceById(voiceId);
+  const voice = def && voices.get(packOf(def));
   if (!voice) throw new Error(`Ses yüklenmedi: ${voiceId}`);
-  return synthesizeText(voice, text, { speed, outputRate, tone, isCancelled: () => cancelled.has(reqId) });
+  return synthesizeText(voice, text, { speed, outputRate, tone, preset: def.preset, isCancelled: () => cancelled.has(reqId) });
 }
 
 function reply(msg, transfer = []) {
@@ -99,8 +103,10 @@ self.onmessage = (ev) => {
         const { pcm, sampleRate, stats } = await synth(msg);
         reply({ type: 'done', reqId, pcm, sampleRate, stats }, [pcm.buffer]);
       } else if (msg.type === 'unload') {
-        const v = voices.get(msg.voiceId);
-        voices.delete(msg.voiceId);
+        const def = voiceById(msg.voiceId);
+        const key = def ? packOf(def) : msg.voiceId;
+        const v = voices.get(key);
+        voices.delete(key);
         await releaseVoice(v);
         reply({ type: 'unloaded', reqId });
       } else throw new Error(`unknown message ${msg.type}`);
