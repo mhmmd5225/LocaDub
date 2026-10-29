@@ -4,7 +4,8 @@
 <style>body{font:14px system-ui;margin:16px}textarea{width:100%;height:4em}pre{white-space:pre-wrap}</style>
 <h1>engines/tts — browser test (onnxruntime-web WASM)</h1>
 <p>Query: <code>?voice=antalia-mini|ahenk-cep|ema-lightning|supertonic-3:F1&amp;threads=1&amp;device=wasm|webgpu&amp;steps=N&amp;quality=fast|high&amp;local=1&amp;auto=1</code>
-(<code>local=1</code>: model files from <code>tests/tts/.models/</code>, see tools/tts/fetch-models.mjs)</p>
+(<code>local=1</code>: model files from <code>tests/tts/.models/</code>, see tools/tts/fetch-models.mjs;
+<code>&amp;file=vector:.models/supertonic-3-int8/onnx/vector_estimator.int8.onnx</code> swaps one file)</p>
 <textarea id="t">Toplantı saat 14:30'da başlayacak ve yaklaşık 45 dakika sürecek.</textarea>
 <button id="go">Seslendir</button> <button id="bench">Benchmark</button>
 <pre id="log"></pre>
@@ -17,6 +18,11 @@ const tone = { quality: q.get('quality') || 'fast' };
 if (q.get('local')) {
   // serve the catalog's HuggingFace URLs from the local model folder
   const local = new Map(VOICES.flatMap((v) => v.files.map((f) => [f.url, `../.models/${packOf(v)}/${f.url.split('/').pop()}`])));
+  // &file=name:path (relative to tests/tts/) swaps one catalog file, e.g. file=vector:.models/supertonic-3-int8/onnx/vector_estimator.int8.onnx
+  for (const spec of q.getAll('file')) {
+    const [name, path] = spec.split(':');
+    for (const v of VOICES) for (const f of v.files) if (f.name === name) local.set(f.url, `../${path}`);
+  }
   const fetch0 = window.fetch.bind(window);
   window.fetch = (url, opts) => fetch0(local.get(String(url)) || url, local.has(String(url)) ? {} : opts);
 }

@@ -4,11 +4,13 @@
 // speed (RTF), melody movement (F0 spread, prosody.mjs), question endings and loudness. Intelligibility (WER/CER)
 // comes from Whisper in a second step (wer.py) over the WAVs written here.
 //
-//   node compare.mjs [--voices id,id] [--variants id@style/quality,...] [--threads N] [--tag name]
+//   node compare.mjs [--voices id,id] [--variants id@style/quality,...] [--threads N] [--tag name] [--file name=path,...]
 //   ../../.venv/bin/python wer.py out/compare/<tag>        (optional, needs faster-whisper)
 //   node compare.mjs --summary out/compare/<tag>
 //
 // A variant is a voice with a tone: `ahenk-cep@lively/high`, `supertonic-3:F2@natural/fast`.
+// --file replaces catalog files by name for every voice that has them, e.g. the 8-bit Supertonic graph:
+//   --file vector=.models/supertonic-3-int8/onnx/vector_estimator.int8.onnx
 
 import * as ort from 'onnxruntime-node';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -55,6 +57,7 @@ async function run() {
   const models = join(here, '.models');
   const only = arg('--voices', null)?.split(',');
   const variants = (arg('--variants', '') || '').split(',').filter(Boolean);
+  const files = Object.fromEntries((arg('--file', '') || '').split(',').filter(Boolean).map((kv) => kv.split('=')));
   const configs = VOICES.filter((v) => !only || only.includes(v.id)).map((v) => ({ id: v.id, tone: {} }));
   for (const s of variants) {
     const [id, t = ''] = s.split('@');
@@ -72,7 +75,7 @@ async function run() {
       for (const v of loaded.values()) await releaseVoice(v);
       loaded.clear();
       const buffers = {};
-      for (const f of def.files) buffers[f.name] = await readFile(join(models, pack, f.url.split('/').pop()));
+      for (const f of def.files) buffers[f.name] = await readFile(files[f.name] || join(models, pack, f.url.split('/').pop()));
       const voice = await loadVoice(ort, def, buffers, {
         sessionOptions: { executionProviders: ['cpu'], intraOpNumThreads: THREADS, interOpNumThreads: 1 },
       });
@@ -92,7 +95,7 @@ async function run() {
     const mine = rows.filter((r) => r.config === name);
     console.log(`${name.padEnd(36)} RTF ${fmt(mean(mine.map((r) => r.compute)) / mean(mine.map((r) => r.seconds)), 3)}  F0 sd ${fmt(mean(mine.map((r) => r.f0Std)))} st  level ${fmt(mean(mine.map((r) => r.levelDb)), 1)} dB`);
   }
-  await writeFile(join(out, 'results.json'), JSON.stringify({ threads: THREADS, rows }, null, 2));
+  await writeFile(join(out, 'results.json'), JSON.stringify({ threads: THREADS, files, rows }, null, 2));
   console.log(`\n${join(out, 'results.json')}`);
 }
 
