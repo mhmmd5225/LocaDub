@@ -64,6 +64,7 @@
         <div class="sysrow" id="presetRow" hidden>
           <label for="preset">Supertonic sesi</label>
           <select id="preset"></select>
+          <span id="presetFav"></span>
           <small class="note" id="presetNote"></small>
         </div>
         <div class="sysrow" id="systemVoiceRow" hidden>
@@ -126,11 +127,16 @@
       </details>
 
       <details class="adv" id="speakerBlock">
-        <summary>Konuşmacılara farklı ses</summary>
+        <summary>Konuşmacı sesleri</summary>
         <div class="speakers-head">
+          <label class="check" title="Videonun kendi sesinden konuşanın perdesi ölçülür (yerel, internete bir şey gitmez). Konuşan ~1 sn duyulunca öğrenilir: videonun ve yeni bir konuşmacının ilk cümlesi yanlış sesle çıkabilir.">
+            <input type="checkbox" id="genderVoices">
+            <span>Kadın ve erkek sesini otomatik seç</span>
+          </label>
+          <small class="note" id="genderNote"></small>
           <label class="check" title="Sistem sesinde kullanılmaz.">
             <input type="checkbox" id="speakerVoices">
-            <span>Konuşmacı değişince (&gt;&gt;) başka sesle konuş</span>
+            <span id="speakerVoicesLabel">Konuşmacı değişince (&gt;&gt;) başka sesle konuş</span>
           </label>
           <span class="count" id="speakerCountRow" hidden>
             <select id="speakerCount" aria-label="Ses sayısı" title="Altyazı yalnızca konuşmacının değiştiğini söyler, kim olduğunu söylemez: sesler sırayla döner. İki kişilik konuşmada 2 ses doğru eşleşir; 3–4 ses grup videoları içindir.">

@@ -146,9 +146,30 @@ const overflow = (page) => page.evaluate(() => {
     await page.check('#mtChoice input[value=""]');
     await page.waitForFunction(() => chrome.storage.local.get('mtBackend').then((s) => s.mtBackend == null));
 
+    // ★ Favori: kartta favori kadın/erkek sesi; aynı cinsiyetin eskisinin yerine geçer, ikinci basış kaldırır;
+    // favori ses seçiliyken üslup değişikliği favorinin tonuna da yazılır
+    await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'real', voice: 'ahenk-cep', style: 'lively', pitch: 1, favFemale: null, favMale: null }));
+    await page.goto(url('', '#seslendirme'));
+    await page.waitForSelector('[data-fk="fav:ahenk-cep"]');
+    await page.click('[data-fk="fav:ahenk-cep"]');
+    await page.waitForFunction(() => chrome.storage.local.get('favFemale').then((s) => s.favFemale?.voice === 'ahenk-cep' && s.favFemale.style === 'lively' && s.favFemale.pitch === 1));
+    await page.waitForSelector('[data-fk="fav:ahenk-cep"].on');
+    await page.check('#styleChoice input[value="calm"]');
+    await page.waitForFunction(() => chrome.storage.local.get('favFemale').then((s) => s.favFemale?.style === 'calm'));
+    await page.click('[data-fk="fav:ema-lightning"]');
+    await page.waitForFunction(() => chrome.storage.local.get('favFemale').then((s) => s.favFemale?.voice === 'ema-lightning'));
+    assert.equal(await page.isChecked('#voiceChoice input[value="ahenk-cep"]'), true, 'yıldız sesi seçmez');
+    await page.click('[data-fk="fav:antalia-mini"]');
+    await page.waitForFunction(() => chrome.storage.local.get('favMale').then((s) => s.favMale?.voice === 'antalia-mini'));
+    assert.match(await page.textContent('#genderNote'), /Kadın: EMA Lightning ★.*Erkek: Antalia Mini ★/);
+    await page.click('[data-fk="fav:ema-lightning"]');
+    await page.waitForFunction(() => chrome.storage.local.get('favFemale').then((s) => s.favFemale == null));
+    await opt.evaluate(() => chrome.storage.local.set({ favFemale: null, favMale: null, style: 'natural', pitch: 0 }));
+
     // Konuşmacılara 4 ses açıkken de (bölüm açık, modeller indirilmemiş) Seslendirme sığar
     for (const voice of ['supertonic-3:F2', 'antalia-mini']) {
-      await opt.evaluate((v) => chrome.storage.local.set({ engineMode: 'real', voice: v, speakerVoices: true, speakerCount: 4 }), voice);
+      // 2.–4. ses seçicileri yalnızca otomatik cinsiyet kapalıyken görünür
+      await opt.evaluate((v) => chrome.storage.local.set({ engineMode: 'real', voice: v, speakerVoices: true, speakerCount: 4, genderVoices: false }), voice);
       for (const [w, h] of SIZES) {
         await page.setViewportSize({ width: w, height: h });
         await page.goto(url('', '#seslendirme'));
@@ -158,6 +179,12 @@ const overflow = (page) => page.evaluate(() => {
         assert.ok(ov.v <= 0 && ov.mainV <= 0, `4 konuşmacı sesiyle sığar (${voice} ${w}x${h}): ` + JSON.stringify(ov));
       }
     }
+    // otomatik cinsiyet açıkken: sırayla seçeneği "aynı cinsiyetten" anlamına gelir, ses seçicileri gizli, sığar
+    await opt.evaluate(() => chrome.storage.local.set({ genderVoices: true }));
+    await page.waitForSelector('#voice2Row[hidden]', { state: 'attached' });
+    assert.match(await page.textContent('#speakerVoicesLabel'), /Aynı cinsiyetten/);
+    const og = await overflow(page);
+    assert.ok(og.v <= 0 && og.mainV <= 0, 'cinsiyet moduyla sığar: ' + JSON.stringify(og));
     await opt.evaluate(() => chrome.storage.local.set({ speakerVoices: false, speakerCount: 2 }));
 
     // Dinle: test motorunda örnek sesi çalar (hata iletisi yok)

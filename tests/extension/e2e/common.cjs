@@ -17,7 +17,7 @@ function testVideo() {
   return f;
 }
 
-async function launch({ videos, settings = {}, onTimedtext, asr } = {}) {
+async function launch({ videos, settings = {}, onTimedtext, asr, videoFile } = {}) {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'locadub-prof-')), {
     headless: false,
     args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--autoplay-policy=no-user-gesture-required'],
@@ -26,7 +26,7 @@ async function launch({ videos, settings = {}, onTimedtext, asr } = {}) {
   });
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
   const id = sw.url().split('/')[2];
-  await installFakeYouTube(ctx, { videos, videoFile: testVideo(), onTimedtext, asr });
+  await installFakeYouTube(ctx, { videos, videoFile: videoFile || testVideo(), onTimedtext, asr });
   const opt = await ctx.newPage();
   await opt.goto(`chrome-extension://${id}/options/options.html`);
   await opt.evaluate((s) => chrome.storage.local.set({ enabled: true, engineMode: 'mock', ...s }), settings);

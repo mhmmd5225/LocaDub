@@ -1,7 +1,7 @@
 // Ayarlar sayfası: dört menü (İndirme, Seslendirme, AI Model, Diğer). Tüm paneller DOM'da kalır (hidden),
 // böylece her id'ye bağlanan kod ve motor ilerleme mesajları hangi menü açık olursa olsun çalışır.
 
-import { DEFAULTS, getSettings, setSettings, onSettingsChanged, speakerVoice, voicesInUse } from '../common/settings.js';
+import { DEFAULTS, getSettings, setSettings, onSettingsChanged, speakerVoice, voicesInUse, genderVoice } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav } from '../common/pcm.js';
 import { BLEND_MAX } from '../engines/tts/styles.js';
 import { listCached, deleteByPrefix, fetchModel } from '../engines/common/model-cache.js';
@@ -106,7 +106,7 @@ const RANGES = {
 for (const [id, fmt] of Object.entries(RANGES)) {
   const input = $(id), out = $(id + 'Out');
   input.addEventListener('input', () => { out.textContent = fmt(Number(input.value)); });
-  input.addEventListener('change', () => setSettings({ [id]: Number(input.value) }));
+  input.addEventListener('change', () => setSettings({ [id]: Number(input.value), ...(id === 'pitch' ? favToneUpdate({ pitch: Number(input.value) }) : {}) }));
 }
 
 // Sözlük: yazarken kısa gecikmeyle kaydedilir.
@@ -126,8 +126,45 @@ function renderGlossaryNote() {
 // Üslup ve kalite: bölümlü seçiciler. Sistem sesinde (chrome.tts) kullanılamaz.
 for (const name of ['style', 'quality']) {
   for (const input of document.querySelectorAll(`input[name="${name}"]`)) {
-    input.addEventListener('change', () => { if (input.checked) setSettings({ [name]: input.value }); });
+    input.addEventListener('change', () => {
+      if (input.checked) setSettings({ [name]: input.value, ...(name === 'style' ? favToneUpdate({ style: input.value }) : {}) });
+    });
   }
+}
+
+// ---------- Favori ses ve ton ----------
+// Kadın ve erkek için birer favori ({ voice, style, pitch }); otomatik kadın/erkek seçiminde önceliklidir. Seçili ses
+// favoriyse üslup ve perde değişikliği favorinin tonuna da yazılır.
+const STYLE_LABELS = { natural: 'Doğal', lively: 'Canlı', calm: 'Sakin' };
+const genderWord = (g) => (g === 'female' ? 'kadın' : 'erkek');
+const favKey = (g) => (g === 'female' ? 'favFemale' : 'favMale');
+const favOf = (id) => [settings.favFemale, settings.favMale].find((f) => f && f.voice === id) || null;
+const toneText = (f) => `${STYLE_LABELS[f.style] || f.style}${f.pitch ? `, perde ${f.pitch > 0 ? '+' : ''}${String(f.pitch).replace('.', ',')}` : ''}`;
+
+function favToneUpdate(patch) {
+  const id = effectiveVoiceId();
+  const v = lists.voices.find((x) => x.id === id);
+  const fav = favOf(id);
+  return fav && v ? { [favKey(v.gender)]: { ...fav, ...patch } } : {};
+}
+
+function favButton(v) {
+  if (!v || (v.gender !== 'female' && v.gender !== 'male')) return null;
+  const fav = favOf(v.id);
+  const g = genderWord(v.gender);
+  const btn = el('button', {
+    type: 'button', class: 'fav' + (fav ? ' on' : ''), textContent: fav ? '★' : '☆',
+    'aria-pressed': fav ? 'true' : 'false', 'aria-label': `${shortName(v)}: favori ${g} sesi`,
+    title: fav ? `Favori ${g} sesi (${toneText(fav)}). Kaldırmak için tıklayın.`
+      : `Favori ${g} sesi yap (şu anki üslup ve perdeyle). Otomatik ${g} sesi seçiminde önceliklidir.`,
+  });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSettings({ [favKey(v.gender)]: fav ? null : { voice: v.id, style: settings.style, pitch: settings.pitch } });
+  });
+  btn.dataset.fk = `fav:${v.id}`;
+  return btn;
 }
 const renderToneNote = () => (settings.voice === 'system' ? 'Sistem sesinde kullanılamaz.' : 'İnce ayardır; sesi kökten değiştirmez.');
 function renderTone() {
@@ -145,6 +182,7 @@ function renderTone() {
 
 $('speakerVoices').addEventListener('change', (e) => setSettings({ speakerVoices: e.target.checked }));
 for (const id of ['voice2', 'voice3', 'voice4']) $(id).addEventListener('change', (e) => setSettings({ [id]: e.target.value || null }));
+$('genderVoices').addEventListener('change', (e) => setSettings({ genderVoices: e.target.checked }));
 $('speakerCount').addEventListener('change', (e) => setSettings({ speakerCount: Number(e.target.value) }));
 
 let speakerOpened = false; // konuşmacı bloğu, anahtar açıksa ilk çizimde açılır
@@ -328,11 +366,11 @@ function keepFocus(fn) {
   if (key) document.querySelector(`[data-fk="${key}"]`)?.focus();
 }
 
-function choice({ name, value, checked, disabled, title, note, extra, onchange }) {
+function choice({ name, value, checked, disabled, title, note, extra, onchange, aside, tip }) {
   const input = el('input', { type: 'radio', name, value, checked, disabled: !!disabled, onchange });
   input.dataset.fk = `${name}:${value}`;
-  return el('label', { class: 'choice' }, input,
-    el('span', {}, el('b', { textContent: title }), note ? el('small', { textContent: note }) : null, extra || null));
+  return el('label', { class: 'choice', title: tip || undefined }, input,
+    el('span', {}, el('b', { textContent: title }), note ? el('small', { textContent: note }) : null, extra || null), aside || null);
 }
 
 // Paket radyosu yeniden çizilirken son seçilen hazır ses korunur.
@@ -352,12 +390,17 @@ function renderVoiceChoice() {
       const current = members.find((m) => m.id === useVoice) || members.find((m) => m.id === lastPreset[v.pack]) || members[0];
       opts.push(choice({
         name: 'voice', value: v.pack, checked: members.some((m) => m.id === useVoice), title: PACK_NAMES[v.pack] || v.pack,
-        note: [`${members.length} ses`, v.experimental ? 'deneysel' : '', missing ? 'indirilmedi' : ''].filter(Boolean).join(' · '),
+        // kart iki satırda kalsın: "deneysel" ipucunda (panel kaydırmasız)
+        note: [`${members.length} ses`, missing ? 'indirilmedi' : v.experimental ? 'deneysel' : ''].filter(Boolean).join(' · '),
+        tip: v.experimental ? 'Deneysel: tarayıcıda çok iş parçacığıyla çalışır, zayıf bilgisayarda yetişmeyebilir.' : undefined,
         onchange: () => setSettings({ voice: current.id, systemVoiceName: null }),
       }));
       // hazır ses seçici, paket seçiliyken radyoların altında (sistem sesi satırı gibi)
       if (members.some((m) => m.id === useVoice)) {
-        $('preset').replaceChildren(...members.map((m) => el('option', { value: m.id, textContent: shortName(m).replace(/^Supertonic\s+/, ''), selected: m.id === current.id })));
+        $('preset').replaceChildren(...members.map((m) => el('option', {
+          value: m.id, textContent: shortName(m).replace(/^Supertonic\s+/, '') + (favOf(m.id) ? ' ★' : ''), selected: m.id === current.id,
+        })));
+        $('presetFav').replaceChildren(...[favButton(current)].filter(Boolean));
       }
       $('presetRow').hidden = !members.some((m) => m.id === useVoice);
       continue;
@@ -366,6 +409,7 @@ function renderVoiceChoice() {
       name: 'voice', value: v.id, checked: useVoice === v.id, title: shortName(v),
       note: [subtitle(v), missing ? 'indirilmedi' : ''].filter(Boolean).join(' · '),
       onchange: () => setSettings({ voice: v.id, systemVoiceName: null }),
+      aside: favButton(v),
     }));
   }
   const sel = $('systemVoice');
@@ -459,9 +503,22 @@ function renderModels() {
 function renderSpeakerVoices() {
   const first = effectiveVoiceId();
   const s = { ...settings, voice: first };
+  $('genderVoices').checked = settings.genderVoices;
+  $('genderVoices').disabled = first === 'system';
+  const name = (id) => {
+    const v = lists.voices.find((x) => x.id === id);
+    return v ? `${shortName(v)}${favOf(id) ? ' ★' : ''}${v.cached || isMock() ? '' : ' (indirilmedi)'}` : '—';
+  };
+  $('genderNote').replaceChildren(...(first === 'system' ? ['Sistem sesinde kullanılmaz.']
+    : settings.genderVoices ? ['Kadın: ', el('b', { textContent: name(genderVoice(s, 'female')) }), ' · Erkek: ', el('b', { textContent: name(genderVoice(s, 'male')) })]
+      : []));
+  // otomatik cinsiyetle birlikte sırayla seçeneği aynı cinsiyetten konuşmacıları ayırır (o cinsiyetin ikinci sesi);
+  // 2.–4. ses seçicileri yalnızca cinsiyet modu kapalıyken anlamlı
+  const byGender = settings.genderVoices && first !== 'system';
+  $('speakerVoicesLabel').textContent = byGender ? 'Aynı cinsiyetten konuşmacılara da farklı ses (>>)' : 'Konuşmacı değişince (>>) başka sesle konuş';
   for (let n = 1; n <= 3; n++) {
     const id = `voice${n + 1}`;
-    $(`${id}Row`).hidden = !settings.speakerVoices || n >= settings.speakerCount;
+    $(`${id}Row`).hidden = byGender || !settings.speakerVoices || n >= settings.speakerCount;
     const want = speakerVoice(s, n);
     const voices = lists.voices.filter((v) => !v.system && v.id !== first);
     const sel = $(id);
@@ -475,7 +532,7 @@ function renderSpeakerVoices() {
     $(`${id}Note`).replaceChildren(...(first === 'system' ? ['Sistem sesi seçiliyken kullanılmaz.']
       : v && !v.cached && !isMock() && !samePack ? downloadHint() : [])); // seçenek adı zaten "— indirilmedi" der
   }
-  $('speakerCountRow').hidden = !settings.speakerVoices;
+  $('speakerCountRow').hidden = byGender || !settings.speakerVoices;
   $('speakerCount').value = String(settings.speakerCount);
 }
 

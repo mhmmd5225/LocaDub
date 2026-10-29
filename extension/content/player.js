@@ -125,6 +125,39 @@ export class SystemVoice {
 // Orijinal sesi kısar. Tercihen Web Audio Gain (YouTube'un ses ayarına dokunmaz),
 // bağlam çalışmıyorsa video.volume ile.
 const videoGains = new WeakMap();
+const videoAnalysers = new WeakMap();
+
+// Videonun Web Audio grafiği: kaynak → kazanç (kısma) → hoparlör; kaynağa paralel bir analizör (konuşanın perdesi,
+// content/gender.js) kısmadan önce bağlanır. Yalnızca MSE (blob:) kaynakta ve bağlam çalışırken kurulur; bir video
+// öğesi için tek kaynak oluşturulabildiği için ikisi birlikte kurulur.
+function videoGraph(v) {
+  if (videoGains.has(v)) return { gain: videoGains.get(v), analyser: videoAnalysers.get(v) };
+  // Çapraz kaynaklı medya Web Audio'da sessizleşir; yalnızca MSE (blob:) ya da aynı kökenli kaynakta kullan.
+  const src0 = String(v.currentSrc || v.src);
+  let sameOrigin = false;
+  try { sameOrigin = new URL(src0, location.href).origin === location.origin; } catch { /* yoksay */ }
+  if (!src0.startsWith('blob:') && !sameOrigin) return null;
+  const c = audioContext();
+  if (!c || c.state !== 'running') return null;
+  try {
+    const src = c.createMediaElementSource(v);
+    const gain = c.createGain();
+    src.connect(gain).connect(c.destination);
+    const analyser = c.createAnalyser();
+    analyser.fftSize = 2048;
+    src.connect(analyser);
+    videoGains.set(v, gain);
+    videoAnalysers.set(v, analyser);
+    return { gain, analyser };
+  } catch {
+    return null;
+  }
+}
+
+/** Orijinal sesin analizörü (kısmadan bağımsız) ya da kurulamıyorsa null. */
+export function videoAnalyser(v) {
+  return videoGraph(v)?.analyser || null;
+}
 
 export class Ducker {
   constructor(video) {
@@ -146,21 +179,7 @@ export class Ducker {
   }
 
   _gainNode() {
-    let g = videoGains.get(this.v);
-    if (g) return g;
-    // Çapraz kaynaklı (MSE olmayan) medya Web Audio'da sessizleşir; yalnızca blob: kaynakta kullan.
-    if (!String(this.v.currentSrc || this.v.src).startsWith('blob:')) return null;
-    const c = audioContext();
-    if (!c || c.state !== 'running') return null;
-    try {
-      const src = c.createMediaElementSource(this.v);
-      g = c.createGain();
-      src.connect(g).connect(c.destination);
-      videoGains.set(this.v, g);
-      return g;
-    } catch {
-      return null;
-    }
+    return videoGraph(this.v)?.gain || null;
   }
 
   _setVolume(x) {

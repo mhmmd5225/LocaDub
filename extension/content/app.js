@@ -1,7 +1,9 @@
 // YouTube içerik uygulaması: altyazı → çeviri → seslendirme → senkron çalma.
 
-import { getSettings, setSettings, onSettingsChanged, voiceForSpeaker } from '../common/settings.js';
-import { toneFromSettings, styleSpeed } from '../engines/tts/styles.js';
+import { getSettings, setSettings, onSettingsChanged, chooseVoice, toneFor, voiceGender, genderVoice } from '../common/settings.js';
+import { styleSpeed } from '../engines/tts/styles.js';
+import { DEFAULT_VOICE } from '../engines/tts/voices.js';
+import { GenderTracker, estimateF0, predictGender, turnGender } from './gender.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
 import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
@@ -13,7 +15,7 @@ import {
 } from './timing.js';
 import { callMain, sendBg } from './bridge.js';
 import { Overlay, ensureToggleButton } from './overlay.js';
-import { DubAudio, SystemVoice, Ducker, resumeAudio } from './player.js';
+import { DubAudio, SystemVoice, Ducker, resumeAudio, videoAnalyser } from './player.js';
 
 const LOG = '[yt-tr-dub]';
 const TICK_MS = 100;
@@ -21,6 +23,7 @@ const KEEP_BEHIND_SEC = 90;
 const KEEP_AHEAD_EXTRA_SEC = 120;
 const CACHE_VIDEOS = 5;
 const PERSIST_MS = 15000;
+const PITCH_MS = 50;
 
 let settings = null;
 let session = null;
@@ -53,11 +56,10 @@ function audioKey(s) {
   return `${s.engineMode}|${s.voice || ''}|${s.ttsSpeed}|${s.systemVoiceName || ''}|${speakers}` +
     `|${s.glossaryMt}|${s.glossaryTts}` +
     // üslup/perde/kalite/karıştırma sistem sesinde etkisizdir; yalnızca motor sesinde üretilmiş sesleri geçersiz kılar
-    (s.voice === 'system' ? '' : `|${s.style}|${s.pitch}|${s.quality}|${s.voiceBlend ? `${s.voiceBlend.with}:${s.voiceBlend.amount}` : ''}`);
+    (s.voice === 'system' ? '' : `|${s.style}|${s.pitch}|${s.quality}|${s.voiceBlend ? `${s.voiceBlend.with}:${s.voiceBlend.amount}` : ''}` +
+      `|${s.genderVoices ? 'g' : ''}|${JSON.stringify(s.favFemale)}|${JSON.stringify(s.favMale)}`);
 }
 
-// Üslubun hız çarpanı temel hıza katılır (sığdırma hesabı bunu bilir); sistem sesinde üslup yok.
-const baseSpeed = () => settings.ttsSpeed * (settings.voice === 'system' ? 1 : styleSpeed(settings.style));
 
 // Çeviri ham olarak saklanır; sözlük kullanımda uygulanır (sözlük değişince yeniden çeviri gerekmez).
 const mtRules = glossaryCompiler();
@@ -108,6 +110,9 @@ class Session {
     // başlangıç süreleri (ms, oturum başından): altyazı, motorlar, ilk çeviri, ilk ses, aktif
     this.timing = { t0: performance.now() };
     this._hold = { done: false, active: false, since: 0, ours: false };
+    // konuşanın cinsiyeti (content/gender.js): perde örnekleri, konuşmacı sırası → cinsiyet, en son duyulan
+    this.pitch = new GenderTracker();
+    this.genders = { turns: new Map(), recent: new Map(), last: null, fallback: null };
     this._listeners = [];
     this._lastErrAt = 0;
     this._trKey = trKey(settings);
@@ -144,6 +149,7 @@ class Session {
     this._setBtn('preparing', 'altyazılar alınıyor');
     // bekletme ve altyazı göstergesi altyazı gelmeden de çalışsın; motorlar altyazıyla aynı anda yüklenir
     this._tick = setInterval(() => this.tick(), TICK_MS);
+    this._pitchTimer = setInterval(() => this._samplePitch(), PITCH_MS);
     const engines = this.initEngines();
     try {
       await this.loadCaptions();
@@ -201,6 +207,7 @@ class Session {
     if (!this.alive) return;
     this.alive = false;
     clearInterval(this._tick);
+    clearInterval(this._pitchTimer);
     clearInterval(this._persistTimer);
     this._wakeUp();
     for (const [el, ev, fn] of this._listeners) el.removeEventListener(ev, fn);
@@ -224,6 +231,7 @@ class Session {
     const v = this.video;
     on(v, 'seeking', () => { this.stopSpeech(); this._wakeUp(); });
     on(v, 'seeked', () => {
+      this.pitch.prune(v.currentTime);
       this.lastPlayed = lastPlayedAfterSeek(this.sentences, v.currentTime);
       this._wakeUp();
     });
@@ -500,6 +508,7 @@ class Session {
     if (needAu.length) {
       await this.synth(needAu[0]);
       this._mark('firstAudio');
+      this._prewarmVoices();
       return true;
     }
     this._evict(t);
@@ -512,13 +521,16 @@ class Session {
     const gen = this.audioGen;
     const slot = slotSec(S, i);
     const text = spokenText(s);
-    const speed = chooseSynthSpeed(text, slot, { base: baseSpeed() });
+    const voice = this.voiceFor(s);
+    const tone = toneFor(settings, voice);
+    // üslubun hız çarpanı temel hıza katılır (sığdırma hesabı bunu bilir); favori sesin üslubu kendi tonundan
+    const speed = chooseSynthSpeed(text, slot, { base: settings.ttsSpeed * (voice === 'system' ? 1 : styleSpeed(tone.style)) });
     s.auPending = true;
-    const res = await sendBg({
-      type: 'tts.synthesize', text, voice: voiceForSpeaker(settings, s.speaker), speed, tone: toneFromSettings(settings), tag: this.tag,
-    });
+    const res = await sendBg({ type: 'tts.synthesize', text, voice, speed, tone, tag: this.tag });
     s.auPending = false;
     if (!this.alive || gen !== this.audioGen) return;
+    // sentez sürerken konuşanın cinsiyeti değiştiyse bu ses atılır, döngü doğru sesle yeniden üretir
+    if (res.ok && this.voiceFor(s) !== voice) return;
     if (!res.ok) {
       if (res.code === 'ABORTED') return;
       s.auFail = (s.auFail || 0) + 1;
@@ -526,13 +538,89 @@ class Session {
       throw new Error('Seslendirme hatası: ' + res.error);
     }
     const r = res.result || {};
-    if (r.system) { s.audio = { system: true, speed }; return; }
-    if (!r.pcmBase64) { s.audio = { empty: true }; return; }
+    console.debug(LOG, `ses ${i}: ${voice}`);
+    if (r.system) { s.audio = { system: true, speed, voice }; return; }
+    if (!r.pcmBase64) { s.audio = { empty: true, voice }; return; }
     const sr = r.sampleRate || 22050;
     const i16 = trimSilenceInt16(decodePcmBase64ToInt16(r.pcmBase64), sr);
-    if (!i16.length) { s.audio = { empty: true }; return; }
+    if (!i16.length) { s.audio = { empty: true, voice }; return; }
     const url = URL.createObjectURL(new Blob([int16ToWav(i16, sr)], { type: 'audio/wav' }));
-    s.audio = { url, duration: i16.length / sr, speed };
+    s.audio = { url, duration: i16.length / sr, speed, voice };
+  }
+
+  // ---- konuşanın cinsiyeti (settings.genderVoices) ----
+
+  // Cümlenin sesi: cinsiyet modu açıksa tahmin edilen cinsiyetin sesi (favori öncelikli), değilse konuşmacı sırası.
+  voiceFor(s) {
+    const G = this.genders;
+    const gender = settings.genderVoices && settings.voice !== 'system' ? predictGender(s, {
+      ...G, fallback: voiceGender(settings, settings.voice || DEFAULT_VOICE),
+    }) : null;
+    // sırayla modunda aynı cinsiyetten iki konuşmacı: komşu sıra da bu cinsiyettense ikinci ses
+    const turn = s.speaker || 0;
+    const neighbour = G.turns.get(turn - 1) ?? G.turns.get(turn + 1);
+    const alt = gender && neighbour === gender ? turn % 2 : 0;
+    return chooseVoice(settings, { speaker: s.speaker, gender, alt });
+  }
+
+  // İlk ses hazır olunca diğer cinsiyetin sesini arka planda yükle: konuşan ilk kez değiştiğinde model yüklenirken
+  // dublaj takılmasın (motor en çok iki modeli bellekte tutar; Supertonic sesleri tek pakettir).
+  _prewarmVoices() {
+    if (this._prewarmed || !settings.genderVoices || settings.voice === 'system') return;
+    this._prewarmed = true;
+    const primary = this.voiceFor({});
+    for (const g of ['female', 'male']) {
+      const v = genderVoice(settings, g);
+      if (v && v !== primary) sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: v, speed: 1, tone: toneFor(settings, v), tag: this.tag }).catch(() => {});
+    }
+  }
+
+  _samplePitch() {
+    if (!settings.genderVoices || settings.voice === 'system' || this.inAd) return;
+    const v = this.video;
+    if (!v || v.paused || v.seeking) return;
+    const an = this._analyser || (this._analyser = videoAnalyser(v));
+    if (!an) return;
+    const buf = this._pitchBuf || (this._pitchBuf = new Float32Array(an.fftSize));
+    an.getFloatTimeDomainData(buf);
+    this.pitch.push(v.currentTime, estimateF0(buf, an.context.sampleRate));
+  }
+
+  // Biten cümlelerin perdesini ölç; konuşmacı sırasının cinsiyetini güncelle (gender.js turnGender).
+  _measureGender(t) {
+    if (!settings.genderVoices || settings.voice === 'system') return;
+    const G = this.genders;
+    let changed = false;
+    for (const s of this.sentences) {
+      if (s.measured || s.end > t || s.end < t - 5) continue;
+      s.measured = true;
+      const m = this.pitch.measure(s.start, s.end);
+      if (!m?.gender) continue;
+      s.gender = m.gender;
+      const turn = s.speaker || 0;
+      if (!G.recent.has(turn)) G.recent.set(turn, []);
+      const maj = turnGender(G.recent.get(turn), m);
+      if (G.turns.get(turn) !== maj || G.last !== maj) {
+        changed = true;
+        console.info(LOG, `konuşan: ${maj === 'female' ? 'kadın' : 'erkek'} (${m.hz} Hz, ${t.toFixed(1)} sn)`);
+      }
+      G.turns.set(turn, maj);
+      G.last = maj;
+    }
+    if (changed) this._regender(t);
+  }
+
+  // Tahmin değişti: henüz çalınmamış ve artık uymayan sesle hazırlanmış cümleleri bırak (yeniden üretilecekler).
+  _regender(t) {
+    let n = 0;
+    for (const s of this.sentences) {
+      if (s.start <= t || s.i === this.playingIdx || !s.audio?.voice) continue;
+      if (s.audio.voice === this.voiceFor(s)) continue;
+      if (s.audio.url) URL.revokeObjectURL(s.audio.url);
+      s.audio = null;
+      n++;
+    }
+    if (n) { console.debug(LOG, `${n} cümle yeni sesle hazırlanacak`); this._wakeUp(); }
   }
 
   _evict(t) {
@@ -606,6 +694,7 @@ class Session {
     if (ad) return;
 
     const t = v.currentTime;
+    this._measureGender(t);
     const ai = activeIndex(S, t);
     this.overlay.setText(settings.showSubtitles && ai >= 0 ? (S[ai].tr ? shownText(S[ai]) : '') : '');
     if (this.enginesReady) this._updatePrep(t);
