@@ -1,6 +1,6 @@
 // Ortak ayarlar: varsayılanlar + chrome.storage.local yardımcıları.
 
-import { DEFAULT_STYLE, DEFAULT_QUALITY, normalizeStyle, normalizePitch, normalizeQuality, normalizeBlend } from '../engines/tts/styles.js';
+import { DEFAULT_STYLE, DEFAULT_QUALITY, normalizeStyle, normalizePitch, normalizeQuality, normalizeBlend, normalizeTone } from '../engines/tts/styles.js';
 import { DEFAULT_VOICE, VOICES, voiceById } from '../engines/tts/voices.js';
 
 export const DEFAULTS = Object.freeze({
@@ -16,6 +16,9 @@ export const DEFAULTS = Object.freeze({
   voice4: null,
   speakerCount: 2,         // konuşmacı değişimlerinde (>>) sırayla dönen ses sayısı (2–4)
   voiceBlend: null,        // ses karıştırma (yalnızca Supertonic): { with: 'F1'…'M5', amount: 0…0.9 } | null
+  genderVoices: true,      // konuşanın cinsiyetine göre kadın / erkek sesi (videonun sesinden perde ölçülür, content/gender.js)
+  favFemale: null,         // favori kadın sesi ve tonu: { voice, style, pitch } | null (otomatik seçimde öncelikli)
+  favMale: null,           // favori erkek sesi ve tonu
   glossaryMt: '',          // çeviri düzeltmeleri ("yanlış => doğru" satırları, common/glossary.js)
   glossaryTts: '',         // okunuşlar (yalnızca seslendirmeden önce)
   style: DEFAULT_STYLE,    // üslup: 'natural' | 'lively' | 'calm' (engines/tts/styles.js; sistem sesinde yok)
@@ -61,6 +64,9 @@ export function normalizeSettings(raw = {}) {
   s.pitch = normalizePitch(s.pitch);
   s.quality = normalizeQuality(s.quality);
   s.voiceBlend = normalizeBlend(s.voiceBlend);
+  s.genderVoices = !!s.genderVoices;
+  s.favFemale = normalizeFavorite(s.favFemale, 'female');
+  s.favMale = normalizeFavorite(s.favMale, 'male');
   s.speakerCount = clamp(Math.round(Number(s.speakerCount)) || 2, ...LIMITS.speakerCount);
   s.ttsSpeed = clamp(Number(s.ttsSpeed) || 1, ...LIMITS.ttsSpeed);
   s.originalVolume = clamp(Number(s.originalVolume), ...LIMITS.originalVolume);
@@ -69,6 +75,23 @@ export function normalizeSettings(raw = {}) {
   if (!Number.isFinite(s.ttsVolume)) s.ttsVolume = DEFAULTS.ttsVolume;
   s.lookaheadSec = clamp(Number(s.lookaheadSec) || 30, 10, 120);
   return s;
+}
+
+/** Favori: { voice, style, pitch } ya da null. Katalogda cinsiyeti başka olan ses o cinsiyetin favorisi olamaz. */
+export function normalizeFavorite(f, gender) {
+  if (!f || typeof f !== 'object' || typeof f.voice !== 'string' || !f.voice || f.voice === 'system') return null;
+  const def = voiceById(f.voice);
+  if (def && def.gender !== gender) return null;
+  return { voice: f.voice, style: normalizeStyle(f.style), pitch: normalizePitch(f.pitch) };
+}
+
+/** Bir sesin cinsiyeti: katalogdan, yoksa (test motoru) favori yuvasından; bilinmiyorsa null. */
+export function voiceGender(s, id) {
+  const def = voiceById(id);
+  if (def) return def.gender === 'female' || def.gender === 'male' ? def.gender : null;
+  if (s.favFemale?.voice === id) return 'female';
+  if (s.favMale?.voice === id) return 'male';
+  return null;
 }
 
 // Konuşmacı sesleri. Kendiliğinden seçimde önce karşıt cinsiyet, sonra aynı cinsiyetten başka bir ses gelir;
@@ -117,11 +140,60 @@ export function voiceForSpeaker(s, speaker) {
   return speakerVoice(s, n);
 }
 
-/** Seçili ayarlarla konuşabilecek bütün sesler (indirme denetimi için): birinci ses + açıksa konuşmacı sesleri. */
+/**
+ * Bir cinsiyetin sesleri, öncelik sırasıyla: favori → birinci ses (o cinsiyettense) → kendiliğinden seçilenler
+ * (Supertonic'te aynı paket, küçük seslerde Antalia ↔ Ahenk/EMA). Test motorunda yalnızca favori (cinsiyet bilgisi yok).
+ */
+export function genderVoiceList(s, gender) {
+  const primary = s.voice || DEFAULT_VOICE;
+  const fav = gender === 'female' ? s.favFemale : s.favMale;
+  const out = [];
+  if (fav) out.push(fav.voice);
+  if (s.engineMode !== 'mock') {
+    if (voiceGender(s, primary) === gender) out.push(primary);
+    for (const id of autoVoices(primary)) if (voiceGender(s, id) === gender) out.push(id);
+  }
+  return [...new Set(out)];
+}
+
+/** O cinsiyetin `alt`. sesi (sırayla modunda aynı cinsiyetten ikinci konuşmacı için 1); yoksa undefined. */
+export function genderVoice(s, gender, alt = 0) {
+  const list = genderVoiceList(s, gender);
+  return list.length ? list[alt % list.length] : undefined;
+}
+
+/**
+ * Cümlenin sesi. Cinsiyet modu açıksa ve cinsiyet tahmini varsa o cinsiyetin sesi (favori öncelikli); yoksa konuşmacı
+ * sırasına göre (voiceForSpeaker). alt: aynı cinsiyetten farklı konuşmacı (sırayla modunda).
+ */
+export function chooseVoice(s, { speaker, gender, alt = 0 } = {}) {
+  if (s.voice === 'system') return 'system';
+  if (s.genderVoices && gender) {
+    const v = genderVoice(s, gender, s.speakerVoices ? alt : 0);
+    if (v) return v;
+  }
+  return voiceForSpeaker(s, speaker);
+}
+
+/** Cümlenin tonu: ses favoriyse favorinin üslubu ve perdesi, değilse genel ayar (kalite ve karıştırma ortak). */
+export function toneFor(s, voice) {
+  const fav = [s.favFemale, s.favMale].find((f) => f && f.voice === voice);
+  const base = fav || s;
+  return normalizeTone({ style: base.style, pitch: base.pitch, quality: s.quality, blend: s.voiceBlend });
+}
+
+/** Seçili ayarlarla konuşabilecek bütün sesler (indirme denetimi için): birinci ses + açıksa konuşmacı ve cinsiyet sesleri. */
 export function voicesInUse(s) {
   const out = [s.voice || DEFAULT_VOICE];
-  if (s.speakerVoices && s.voice !== 'system' && s.engineMode !== 'mock') for (let n = 1; n < s.speakerCount; n++) out.push(speakerVoice(s, n));
-  return [...new Set(out)];
+  if (s.voice === 'system' || s.engineMode === 'mock') return out;
+  if (s.speakerVoices) for (let n = 1; n < s.speakerCount; n++) out.push(speakerVoice(s, n));
+  if (s.genderVoices) {
+    for (const g of ['female', 'male']) {
+      out.push(genderVoice(s, g));
+      if (s.speakerVoices) out.push(genderVoice(s, g, 1));
+    }
+  }
+  return [...new Set(out.filter(Boolean))];
 }
 
 export async function getSettings() {

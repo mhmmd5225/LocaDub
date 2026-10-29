@@ -52,7 +52,9 @@ Ayarlar (`chrome.storage.local`):
 | Dublaj ses seviyesi | TTS kazancı (%0–200); YouTube'un ses düğmesiyle çarpılır. Motor her cümleyi önce ortak seviyeye (−20 dBFS) getirir, sesler ve konuşmacılar arasında seviye sıçraması olmaz |
 | Orijinal ses | Türkçe konuşma sırasında orijinal sesin seviyesi (ducking) |
 | Sözlük | Çeviri düzeltmeleri (altyazı + ses) ve okunuşlar (yalnızca ses): `kaynak => hedef` satırları, tam sözcük, Türkçe büyük/küçük harf duyarsız, `*` ekleri korur (`common/glossary.js`). Ham çeviri saklanır, sözlük kullanımda uygulanır |
-| Konuşmacılara farklı ses | Altyazıda `>>` ile işaretli konuşmacı değişimlerinde 2–4 ses sırayla konuşur (`speakerVoices`, `speakerCount`, `voice2`–`voice4`). Seçilmeyen ses kendiliğinden gelir: önce karşıt cinsiyet, sonra aynı cinsiyetten başka bir ses; Supertonic'te aynı paketin sesleri (ek indirme yok). Altyazı kimin konuştuğunu söylemez, yalnızca değiştiğini: iki kişide 2 ses doğru eşleşir, 3–4 ses grup videoları içindir. Cümlede konuşmacı sayacı saklanır (`speaker`, mod 12), ses = sayaç mod `speakerCount` |
+| Kadın ve erkek sesini otomatik seç | Varsayılan açık (`genderVoices`). Videonun kendi sesinden konuşanın perdesi ölçülür (Web Audio analizörü, yerel; `content/gender.js`): < 155 Hz erkek, > 170 Hz kadın, arası belirsiz. Kadın konuşurken kadın, erkek konuşurken erkek sesi kullanılır; konuşan değişince henüz çalınmamış cümleler doğru sesle yeniden hazırlanır. Ses önceden hazırlandığı için konuşan ~1 cümle duyulunca öğrenilir: videonun ve yeni bir konuşmacının ilk cümlesi yanlış sesle çıkabilir; arka plan müziği ölçümü bozabilir. Konuşmacı sırası (`>>`) varsa her sıranın cinsiyeti ayrı tutulur |
+| Favori ses ve ton | Seslendirme menüsünde ses kartındaki ★ (Supertonic'te hazır ses seçicinin yanında): o ses, o anki üslup ve perdeyle kendi cinsiyetinin favorisi olur (`favFemale`, `favMale` = `{ voice, style, pitch }`); aynı cinsiyetin eskisinin yerine geçer, yeniden basınca kalkar. Otomatik kadın/erkek seçiminde öncelik favoride (sonra birinci ses, sonra kendiliğinden seçilen); favori sesle okunan cümle favorinin tonuyla okunur. Favori ses seçiliyken üslup/perde değişikliği favoriye de yazılır |
+| Konuşmacılara farklı ses | Otomatik cinsiyet açıkken "aynı cinsiyetten konuşmacılara da farklı ses": aynı cinsiyetten iki konuşmacı sırayla konuşursa o cinsiyetin ikinci sesi kullanılır. Kapalıyken altyazıda `>>` ile işaretli konuşmacı değişimlerinde 2–4 ses sırayla konuşur (`speakerVoices`, `speakerCount`, `voice2`–`voice4`). Seçilmeyen ses kendiliğinden gelir: önce karşıt cinsiyet, sonra aynı cinsiyetten başka bir ses; Supertonic'te aynı paketin sesleri (ek indirme yok). Altyazı kimin konuştuğunu söylemez, yalnızca değiştiğini: iki kişide 2 ses doğru eşleşir, 3–4 ses grup videoları içindir. Cümlede konuşmacı sayacı saklanır (`speaker`, mod 12), ses = sayaç mod `speakerCount` |
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
 | İlk cümle hazır olana kadar videoyu beklet | Varsayılan açık (`holdStart`). Dublaj açılınca video, yakındaki (8 sn) ilk cümlenin sesi hazır olana kadar duraklatılır, sonra kendiliğinden sürer (en fazla 25 sn; Oynat'a basınca beklemeden devam eder, reklamda bekletilmez). Böylece motorlar yüklenirken baştaki cümleler atlanmaz |
@@ -125,6 +127,7 @@ xvfb-run -a node tests/extension/e2e/update-banner.e2e.cjs
 xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
 xvfb-run -a node tests/extension/e2e/shorts-embed.e2e.cjs
 xvfb-run -a node tests/extension/e2e/hold-start.e2e.cjs
+xvfb-run -a node tests/extension/e2e/gender-voices.e2e.cjs
 xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punct-en/ yoksa atlanır
 ```
 
