@@ -25,7 +25,7 @@ export function pushError(list, { source, message, at = Date.now() }) {
 }
 
 const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2', 'voice3', 'voice4',
-  'speakerCount', 'voiceBlend', 'style', 'pitch', 'quality',
+  'speakerCount', 'voiceBlend', 'style', 'pitch', 'quality', 'holdStart',
   'ttsSpeed', 'ttsVolume', 'originalVolume', 'lookaheadSec', 'showSubtitles', 'modelsApproved', 'checkUpdates'];
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -33,6 +33,7 @@ const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
 /**
  * @param {{ version:string, browser:string, platform:string, settings:object, status?:object,
  *           models?:{ name:string, sizeMB:number }[], errors?:object[], glossary?:{ mt:number, tts:number },
+ *           timings?:{ at:number, line:string }[],
  *           now?:number }} d
  */
 export function buildReport(d) {
@@ -54,6 +55,9 @@ export function buildReport(d) {
   L.push('', '[İndirilen modeller]');
   if (!d.models?.length) L.push('yok');
   for (const m of d.models || []) L.push(`${m.name}: ${m.sizeMB.toFixed(1)} MB`);
+  L.push('', `[Başlangıç süreleri (${d.timings?.length || 0})]`);
+  if (!d.timings?.length) L.push('yok');
+  for (const t of d.timings || []) L.push(`${iso(t.at)} ${t.line}`);
   L.push('', `[Son hatalar (${d.errors?.length || 0})]`);
   if (!d.errors?.length) L.push('yok');
   for (const e of d.errors || []) L.push(`${iso(e.at)} ${e.source}${e.count > 1 ? ` ×${e.count}` : ''}: ${e.message}`);

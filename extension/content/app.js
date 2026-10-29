@@ -9,7 +9,7 @@ import { pageVideo, findPlayer, findVideo } from '../common/page.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
-  prepStatus,
+  prepStatus, shouldHold, trBatchSize, HOLD_MAX_MS,
 } from './timing.js';
 import { callMain, sendBg } from './bridge.js';
 import { Overlay, ensureToggleButton } from './overlay.js';
@@ -17,8 +17,6 @@ import { DubAudio, SystemVoice, Ducker, resumeAudio } from './player.js';
 
 const LOG = '[yt-tr-dub]';
 const TICK_MS = 100;
-const TR_BATCH_FIRST = 3;
-const TR_BATCH = 8;
 const KEEP_BEHIND_SEC = 90;
 const KEEP_AHEAD_EXTRA_SEC = 120;
 const CACHE_VIDEOS = 5;
@@ -97,14 +95,19 @@ class Session {
     this.sentences = [];
     this.lastPlayed = -1;
     this.playingIdx = -1;
-    this.enginesReady = false;
+    this.enginesReady = false; // iki motorun başlatılması bitti (düğme/ilerleme durumu)
+    this.mtReady = false; // çeviri döngüsü çalışabilir
+    this.ttsReady = false; // seslendirme döngüsü çalışabilir
     this.ttsBroken = false;
     this.waitingApproval = false;
     this.firstBatchDone = false;
     this.audioGen = 0;
     this.trGen = 0;
     this.inAd = false;
-    this._wake = null;
+    this._wakers = new Set();
+    // başlangıç süreleri (ms, oturum başından): altyazı, motorlar, ilk çeviri, ilk ses, aktif
+    this.timing = { t0: performance.now() };
+    this._hold = { done: false, active: false, since: 0, ours: false };
     this._listeners = [];
     this._lastErrAt = 0;
     this._trKey = trKey(settings);
@@ -139,8 +142,12 @@ class Session {
 
     this.overlay.setStatus('Türkçe dublaj 1/4: İngilizce altyazılar alınıyor…');
     this._setBtn('preparing', 'altyazılar alınıyor');
+    // bekletme ve altyazı göstergesi altyazı gelmeden de çalışsın; motorlar altyazıyla aynı anda yüklenir
+    this._tick = setInterval(() => this.tick(), TICK_MS);
+    const engines = this.initEngines();
     try {
       await this.loadCaptions();
+      this._mark('captions');
     } catch (e) {
       if (!this.alive) return;
       const msg = e instanceof UserError ? e.message : 'Altyazılar alınamadı: ' + (e?.message || e);
@@ -148,16 +155,46 @@ class Session {
       this._setBtn(e instanceof UserError ? 'warn' : 'error', msg);
       console.warn(LOG, e);
       sendBg({ type: 'diag.error', source: 'altyazı', message: msg });
+      this._releaseHold();
       return;
     }
     if (!this.alive) return;
-    this.overlay.clearStatus();
-    this._tick = setInterval(() => this.tick(), TICK_MS);
+    if (this.enginesReady) this.overlay.clearStatus();
+    else if (!this.waitingApproval) {
+      this._setBtn('preparing', 'motorlar yükleniyor');
+      this._engineStatus();
+    }
     // Çeviriler kalıcı önbelleğe yazılır (sekme kapanırsa da kaybolmasın).
     this._persistTimer = setInterval(() => this._persist(), PERSIST_MS);
     this._on(window, 'pagehide', () => this._persist());
-    await this.initEngines();
-    this.loop();
+    // çeviri ve seslendirme ayrı döngülerde: ilk cümlenin sesi hazırlanırken sonraki cümleler çevrilir
+    this.loopTr();
+    this.loopAu();
+    await engines;
+  }
+
+  _mark(k) {
+    if (this.timing[k] == null) this.timing[k] = Math.round(performance.now() - this.timing.t0);
+  }
+
+  _engineStatus() {
+    const n = this.sentences.length;
+    const wait = this._hold.active ? ' Video hazır olunca devam edecek.' : '';
+    this.overlay.setStatus(`Türkçe dublaj 2/4: çeviri ve ses motorları yükleniyor…${n ? ` (${n} cümle bulundu)` : ''}${wait}`);
+  }
+
+  // İlk "aktif": hazırlık sürelerini konsola ve tanılama kaydına yaz (yavaş sistemleri teşhis için).
+  _reportTiming() {
+    if (this._timingSent) return;
+    this._timingSent = true;
+    this._mark('active');
+    const T = this.timing;
+    const f = (k) => (T[k] != null ? `${(T[k] / 1000).toFixed(1)} sn` : '—');
+    const held = T.heldMs ? `, video ${(T.heldMs / 1000).toFixed(1)} sn bekletildi` : '';
+    const line = `aktif ${f('active')} (altyazı ${f('captions')}, çeviri motoru ${f('mt')}, ses motoru ${f('tts')}, ` +
+      `ilk çeviri ${f('firstTr')}, ilk ses ${f('firstAudio')}${held})`;
+    console.info(LOG, 'hazırlık:', line);
+    sendBg({ type: 'diag.timing', line });
   }
 
   destroy() {
@@ -169,6 +206,7 @@ class Session {
     for (const [el, ev, fn] of this._listeners) el.removeEventListener(ev, fn);
     this._listeners = [];
     this.stopSpeech();
+    this._releaseHold();
     this.ducker?.destroy();
     this.overlay?.destroy();
     sendBg({ type: 'jobs.cancel', tag: this.tag });
@@ -195,6 +233,8 @@ class Session {
       this.ducker.release(0);
     });
     on(v, 'play', () => {
+      // bekletme sırasında kullanıcı oynatırsa bekletme biter (videoyu ikinci kez durdurmayız)
+      if (this._hold.active && !this._hold.resuming) this._endHold();
       resumeAudio();
       if (this.audio.busy || this.sys.busy) {
         this.ducker.duck(settings.originalVolume);
@@ -328,30 +368,44 @@ class Session {
 
   async _initEngines() {
     this.enginesReady = false;
+    this.mtReady = false;
+    this.ttsReady = false;
     if (settings.engineMode === 'real' && !settings.modelsApproved) {
       this.waitingApproval = true;
       this.overlay.setStatus('Dublaj için modeller hazırlanmalı: eklenti simgesine tıklayıp "Modelleri hazırla" düğmesine basın.', { kind: 'warn' });
       this._setBtn('warn', 'modeller hazırlanmalı');
+      this._releaseHold();
       return false;
     }
     this.waitingApproval = false;
-    this._setBtn('preparing', 'motorlar yükleniyor');
-    this.overlay.setStatus(`Türkçe dublaj 2/4: çeviri ve ses motorları yükleniyor… (${this.sentences.length} cümle bulundu)`);
+    if (this.sentences.length) {
+      this._setBtn('preparing', 'motorlar yükleniyor');
+      this._engineStatus();
+    }
     const useSystem = settings.voice === 'system';
+    // her motor hazır olur olmaz kendi döngüsünü başlatır (önbellekte çevirisi olan video çeviri motorunu beklemez)
+    const t0 = performance.now();
     const [mt, tts] = await Promise.all([
-      sendBg({ type: 'engine.init', engine: 'mt' }),
-      useSystem ? Promise.resolve({ ok: true }) : sendBg({ type: 'engine.init', engine: 'tts' }),
+      sendBg({ type: 'engine.init', engine: 'mt' }).then((r) => {
+        if (r.ok && this.alive) { this.timing.mt ??= Math.round(performance.now() - t0); this.mtReady = true; this._wakeUp(); }
+        return r;
+      }),
+      (useSystem ? Promise.resolve({ ok: true }) : sendBg({ type: 'engine.init', engine: 'tts' })).then((r) => {
+        if (r.ok && this.alive) { if (!useSystem) this.timing.tts ??= Math.round(performance.now() - t0); this.ttsReady = true; this._wakeUp(); }
+        return r;
+      }),
     ]);
     if (!this.alive) return false;
     if (!mt.ok) {
       this.overlay.setStatus('Çeviri motoru başlatılamadı: ' + mt.error, { kind: 'error' });
       this._setBtn('error', 'çeviri motoru başlatılamadı');
+      this._releaseHold();
       return false;
     }
     this.ttsBroken = !tts.ok;
     if (!tts.ok) {
       this.overlay.setStatus('Ses motoru başlatılamadı, yalnızca altyazı gösterilecek: ' + tts.error, { kind: 'warn', timeoutMs: 12000 });
-    } else {
+    } else if (this.sentences.length) {
       this.overlay.clearStatus();
     }
     this.enginesReady = true;
@@ -371,74 +425,83 @@ class Session {
   // ---- ileri-bakış hattı ----
 
   _wakeUp() {
-    const w = this._wake;
-    this._wake = null;
-    w?.();
+    const ws = [...this._wakers];
+    this._wakers.clear();
+    for (const w of ws) w();
   }
 
   _sleepWake(ms) {
     return new Promise((resolve) => {
-      const t = setTimeout(() => { this._wake = null; resolve(); }, ms);
-      this._wake = () => { clearTimeout(t); resolve(); };
+      const done = () => { clearTimeout(t); this._wakers.delete(done); resolve(); };
+      const t = setTimeout(done, ms);
+      this._wakers.add(done);
     });
   }
 
-  async loop() {
+  // Çeviri ve seslendirme birbirini beklemeden çalışır (ayrı motorlar, ayrı iş parçacıkları).
+  async loopTr() {
+    await this._loop(() => this.mtReady, () => this.stepTr());
+  }
+
+  async loopAu() {
+    await this._loop(() => this.ttsReady && !this.ttsBroken && settings.voice !== 'system', () => this.stepAu());
+  }
+
+  async _loop(ready, step) {
     while (this.alive) {
       let did = false;
-      if (this.enginesReady && !this.inAd) {
+      if (ready() && !this.inAd && this.sentences.length) {
         try {
-          did = await this.step();
+          did = await step();
         } catch (e) {
           this._reportError(e);
           await this._sleepWake(1500);
         }
       }
       if (!this.alive) break;
-      if (!did) await this._sleepWake(this.enginesReady ? 400 : 1000);
+      if (!did) await this._sleepWake(ready() ? 400 : 1000);
     }
   }
 
-  async step() {
+  // Oynatma konumuna en yakın çevrilmemiş cümlelerden başlayarak çevirir.
+  async stepTr() {
     const S = this.sentences;
     const t = this.video.currentTime;
-    const ahead = settings.lookaheadSec;
-
-    // 1) Çeviri
-    const needTr = windowIndices(S, t, ahead, (s) => s.tr == null && !s.trPending);
-    if (needTr.length) {
-      const batch = needTr.slice(0, this.firstBatchDone ? TR_BATCH : TR_BATCH_FIRST);
-      const gen = this.trGen;
-      for (const i of batch) S[i].trPending = true;
-      const res = await sendBg({
-        type: 'mt.translate', sentences: batch.map((i) => S[i].text), tag: this.tag,
-        restore: this.trackKind === 'asr', // otomatik altyazı: çeviri öncesi noktalama (ayar ve model açıksa)
-      });
-      for (const i of batch) S[i].trPending = false;
-      if (!this.alive || gen !== this.trGen) return true;
-      if (!res.ok) {
-        if (res.code === 'ABORTED') return true;
-        for (const i of batch) {
-          S[i].trFail = (S[i].trFail || 0) + 1;
-          if (S[i].trFail >= 3) S[i].tr = '';
-        }
-        throw new Error('Çeviri hatası: ' + res.error);
+    const needTr = windowIndices(S, t, settings.lookaheadSec, (s) => s.tr == null && !s.trPending);
+    if (!needTr.length) return false;
+    const batch = needTr.slice(0, trBatchSize(S[needTr[0]], t, { first: !this.firstBatchDone }));
+    const gen = this.trGen;
+    for (const i of batch) S[i].trPending = true;
+    const res = await sendBg({
+      type: 'mt.translate', sentences: batch.map((i) => S[i].text), tag: this.tag,
+      restore: this.trackKind === 'asr', // otomatik altyazı: çeviri öncesi noktalama (ayar ve model açıksa)
+    });
+    for (const i of batch) S[i].trPending = false;
+    if (!this.alive || gen !== this.trGen) return true;
+    if (!res.ok) {
+      if (res.code === 'ABORTED') return true;
+      for (const i of batch) {
+        S[i].trFail = (S[i].trFail || 0) + 1;
+        if (S[i].trFail >= 3) S[i].tr = '';
       }
-      batch.forEach((i, k) => { S[i].tr = String(res.result[k] ?? '').trim(); });
-      this.firstBatchDone = true;
+      throw new Error('Çeviri hatası: ' + res.error);
+    }
+    batch.forEach((i, k) => { S[i].tr = String(res.result[k] ?? '').trim(); });
+    this.firstBatchDone = true;
+    this._mark('firstTr');
+    this._wakeUp(); // seslendirme döngüsü yeni çeviriyi beklemesin
+    return true;
+  }
+
+  // Çevirisi hazır, sesi olmayan en yakın cümleyi seslendirir (sistem sesi önceden sentez gerektirmez).
+  async stepAu() {
+    const t = this.video.currentTime;
+    const needAu = windowIndices(this.sentences, t, settings.lookaheadSec, (s) => s.tr && !s.audio && !s.auPending && !s.auFailed);
+    if (needAu.length) {
+      await this.synth(needAu[0]);
+      this._mark('firstAudio');
       return true;
     }
-
-    // 2) Seslendirme (sistem sesi önceden sentez gerektirmez)
-    if (!this.ttsBroken && settings.voice !== 'system') {
-      const needAu = windowIndices(S, t, ahead, (s) => s.tr && !s.audio && !s.auPending && !s.auFailed);
-      if (needAu.length) {
-        await this.synth(needAu[0]);
-        return true;
-      }
-    }
-
-    // 3) Bellek temizliği
     this._evict(t);
     return false;
   }
@@ -528,7 +591,9 @@ class Session {
   }
 
   tick() {
-    if (!this.alive || !this.sentences.length) return;
+    if (!this.alive) return;
+    this._tickHold();
+    if (!this.sentences.length) return;
     const v = this.video;
     const S = this.sentences;
 
@@ -545,7 +610,7 @@ class Session {
     this.overlay.setText(settings.showSubtitles && ai >= 0 ? (S[ai].tr ? shownText(S[ai]) : '') : '');
     if (this.enginesReady) this._updatePrep(t);
 
-    if (v.paused || v.seeking || !this.enginesReady) return;
+    if (v.paused || v.seeking || !(this.mtReady || this.ttsReady)) return;
     if (this.audio.busy || this.sys.busy) return; // sıradaki bekler
 
     const due = nextDue(S, t, this.lastPlayed);
@@ -577,7 +642,7 @@ class Session {
     const p = prepStatus(this.sentences, t, settings.lookaheadSec, { needAudio });
     if (p) this._setBtn('preparing', p.phase === 'translate' ? 'çevriliyor' : 'ses hazırlanıyor');
     else if (this.ttsBroken) this._setBtn('warn', 'ses motoru yok, yalnızca altyazı');
-    else this._setBtn('active');
+    else { this._setBtn('active'); this._reportTiming(); }
 
     const st = this.overlay.status;
     const ours = st.dataset.kind === 'prep';
@@ -586,10 +651,53 @@ class Session {
       if (ours) this.overlay.clearStatus();
       return;
     }
-    const text = p.phase === 'translate'
+    const wait = this._hold.active ? ' Video hazır olunca devam edecek.' : '';
+    const text = (p.phase === 'translate'
       ? `Türkçe dublaj 3/4: Türkçeye çevriliyor… (${p.done}/${p.total} cümle hazır)`
-      : `Türkçe dublaj 4/4: Türkçe ses hazırlanıyor… (${p.done}/${p.total} cümle hazır)`;
+      : `Türkçe dublaj 4/4: Türkçe ses hazırlanıyor… (${p.done}/${p.total} cümle hazır)`) + wait;
     if (!ours || st.textContent !== text) this.overlay.setStatus(text, { kind: 'prep' });
+  }
+
+  // ---- ilk cümleye kadar bekletme (settings.holdStart) ----
+
+  _tickHold() {
+    const h = this._hold;
+    if (h.done || !settings.holdStart || !this.video) return;
+    const v = this.video;
+    if (this.player?.classList.contains('ad-showing')) return; // reklamda bekletme yok
+    const needAudio = !this.ttsBroken && settings.voice !== 'system';
+    const hold = shouldHold(this.sentences, v.currentTime, { loaded: this.sentences.length > 0, needAudio });
+    if (!h.active) {
+      if (!hold) { if (this.sentences.length && (this.mtReady || this.ttsReady)) h.done = true; return; }
+      if (v.paused) return; // kullanıcı durdurmuşsa beklemeye gerek yok; oynatınca yeniden bakılır
+      h.active = true;
+      h.ours = true;
+      h.since = performance.now();
+      v.pause();
+      if (this.sentences.length && !this.enginesReady && !this.waitingApproval) this._engineStatus();
+      return;
+    }
+    if (!hold || performance.now() - h.since > HOLD_MAX_MS) this._releaseHold();
+  }
+
+  // Bekletmeyi bitir; videoyu biz durdurduysak sürdür.
+  _releaseHold() {
+    const h = this._hold;
+    if (!h.active) { h.done = true; return; }
+    const ours = h.ours;
+    this._endHold();
+    if (ours && this.video?.paused && this.alive) {
+      h.resuming = true;
+      this.video.play().catch(() => {}).finally(() => { h.resuming = false; });
+    }
+  }
+
+  _endHold() {
+    const h = this._hold;
+    if (h.active) this.timing.heldMs = Math.round(performance.now() - h.since);
+    h.active = false;
+    h.ours = false;
+    h.done = true;
   }
 
   _playPcm(idx, remaining) {

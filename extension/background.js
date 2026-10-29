@@ -218,6 +218,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'diag.error':
       recordError(String(msg.source || 'sayfa'), String(msg.message || ''));
       return false;
+    case 'diag.timing':
+      // son 5 başlangıcın hazırlık süreleri (tanılama raporu için)
+      chrome.storage.session.get('timings').then(({ timings = [] }) =>
+        chrome.storage.session.set({ timings: [...timings, { at: Date.now(), line: String(msg.line || '').slice(0, 300) }].slice(-5) }))
+        .catch(() => {});
+      return false;
+    case 'diag.timings':
+      chrome.storage.session.get('timings').then(({ timings = [] }) => sendResponse({ ok: true, result: timings }));
+      return true;
     case 'diag.errors':
       chrome.storage.session.get('errors').then(({ errors = [] }) => sendResponse({ ok: true, result: errors }));
       return true;

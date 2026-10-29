@@ -102,3 +102,33 @@ export function prepStatus(sentences, t, ahead, { needAudio = true, soonSec = 3 
   }
   return null;
 }
+
+// ---- başlangıç: ilk cümleye kadar bekletme ve çeviri grubu boyu ----
+
+/** Bekletme yalnızca sıradaki cümle bu kadar saniye içinde başlıyorsa yapılır (uzaktaki cümle için video durmaz). */
+export const HOLD_HORIZON_SEC = 8;
+/** Bekletmenin üst sınırı: motorlar çok yavaşsa video yine de devam eder. */
+export const HOLD_MAX_MS = 25000;
+
+/**
+ * "İlk cümleye kadar beklet": video duraklatılmış kalsın mı? Altyazı daha gelmediyse evet; gelmişse ancak yakındaki
+ * ilk cümle hazır değilse (çevirisi ya da — needAudio ise — sesi yoksa).
+ */
+export function shouldHold(sentences, t, { loaded, needAudio = true, horizon = HOLD_HORIZON_SEC } = {}) {
+  if (!loaded) return true;
+  const win = windowIndices(sentences, t, horizon, (s) => s.end > t);
+  if (!win.length) return false;
+  const next = sentences[win[0]];
+  if (next.tr == null) return true;
+  if (next.tr === '') return false;
+  return !!(needAudio && !next.audio && !next.auFailed);
+}
+
+/**
+ * Çeviri grubu boyu: ilk grup ve oynatma konumuna yakın cümleler küçük gruplarla (ilk ses çabuk gelsin), uzaktakiler
+ * büyük gruplarla (toplu çeviri cümle başına daha ucuz). `next` sıradaki çevrilmemiş cümle.
+ */
+export function trBatchSize(next, t, { first = false, urgentSec = 10, small = 3, large = 8 } = {}) {
+  if (first) return 2;
+  return next && next.start < t + urgentSec ? small : large;
+}
