@@ -11,7 +11,7 @@
 // 'supertonic-3:F1'…'supertonic-3:M5' (experimental, ten presets of one shared pack, OpenRAIL-M), 'system' (chrome.tts /
 // speechSynthesis fallback, played by the extension). See README.md in this folder.
 
-import { fetchModel, isCached } from '../common/model-cache.js';
+import { deleteByPrefix, fetchModel, isCached } from '../common/model-cache.js';
 import { normalizeTone } from './styles.js';
 import { DEFAULT_VOICE, SYSTEM_VOICE, VOICES, packOf, voiceById, voiceBytes } from './voices.js';
 
@@ -160,6 +160,10 @@ async function loadVoice(voiceId, onProgress, signal) {
   const key = packOf(def);
   if (loaded.has(key)) return loaded.get(key);
   const p = loadInWorker(def, onProgress, signal);
+  // the pack moved to new files (Supertonic fp32 -> 8-bit): drop the old copy once the new one works
+  if (def.legacyPrefixes?.length) {
+    p.then(() => Promise.all(def.legacyPrefixes.map((prefix) => deleteByPrefix(prefix)))).catch(() => {});
+  }
   loaded.set(key, p);
   p.catch(() => loaded.delete(key));
   // keep at most two models in memory (all presets of a pack count as one)

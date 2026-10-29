@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { convertRate, normalizeLoudness, speechLevel, TARGET_LEVEL_DB } from '../../extension/engines/tts/dsp.js';
 import { textSeed } from '../../extension/engines/tts/core.js';
 import { addClauseCommas, normalizeText } from '../../extension/engines/tts/normalize.js';
-import { VOICES, SUPERTONIC_PACK, packOf, presetsOf, voiceBytes, voiceById } from '../../extension/engines/tts/voices.js';
+import { VOICES, SUPERTONIC_INT8, SUPERTONIC_PACK, packOf, presetsOf, supertonicFiles, voiceBytes, voiceById } from '../../extension/engines/tts/voices.js';
 import { normalizeBlend, normalizeTone, resolveTone, SUPERTONIC_STEPS, toneFromSettings } from '../../extension/engines/tts/styles.js';
 import { blendStyles, chunk, preprocess } from '../../extension/engines/tts/supertonic.js';
 import { normalizeSettings, speakerVoice, voiceForSpeaker, voicesInUse } from '../../extension/common/settings.js';
@@ -73,9 +73,33 @@ test('katalog: Supertonic hazır sesleri bir paketi paylaşır', () => {
   assert.deepEqual([...new Set(presets.map((v) => v.gender))], ['female', 'male']);
   assert.equal(new Set(VOICES.map((v) => v.id)).size, VOICES.length);
   assert.equal(packOf(voiceById('antalia-mini')), 'antalia-mini');
-  const mb = voiceBytes(presets[0]) / 1e6;
-  assert.ok(mb > 395 && mb < 402, `${mb}`);
-  assert.ok(SUPERTONIC_PACK.files.every((f) => f.url.includes('/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/')));
+  if (!SUPERTONIC_INT8) {
+    const mb = voiceBytes(presets[0]) / 1e6;
+    assert.ok(mb > 395 && mb < 402, `${mb}`);
+    assert.ok(SUPERTONIC_PACK.files.every((f) => f.url.includes('/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/')));
+    assert.deepEqual(SUPERTONIC_PACK.legacyPrefixes, []);
+  } else {
+    assert.ok(SUPERTONIC_PACK.files.every((f) => f.url.includes(`/${SUPERTONIC_INT8.repo}/resolve/${SUPERTONIC_INT8.rev}/`)));
+    assert.match(SUPERTONIC_INT8.rev, /^[0-9a-f]{40}$/, 'commit kimliğine sabitli');
+    assert.equal(SUPERTONIC_PACK.legacyPrefixes.length, 1);
+  }
+});
+
+test('katalog: 8-bit Supertonic kopyası aynı düzende, ≈ 210 MB', () => {
+  const files = supertonicFiles({ repo: 'kim/supertonic-3-int8', rev: 'abc' });
+  const fp32 = supertonicFiles(null);
+  assert.deepEqual(files.map((f) => f.name), fp32.map((f) => f.name));
+  assert.ok(files.every((f) => f.url.startsWith('https://huggingface.co/kim/supertonic-3-int8/resolve/abc/')));
+  assert.equal(files.find((f) => f.name === 'vector').url.endsWith('onnx/vector_estimator.int8.onnx'), true);
+  // vector_estimator dışındaki dosyalar fp32 paketle aynı
+  const rel = (f) => f.url.split('/resolve/')[1].split('/').slice(1).join('/');
+  for (const f of files.filter((x) => x.name !== 'vector')) {
+    const g = fp32.find((x) => x.name === f.name);
+    assert.equal(rel(f), rel(g));
+    assert.equal(f.bytes, g.bytes);
+  }
+  const mb = files.reduce((n, f) => n + f.bytes, 0) / 1e6;
+  assert.ok(mb > 209 && mb < 211, `${mb}`);
 });
 
 test('supertonic: resmî ön işleme, parçalama, stil karıştırma', () => {
