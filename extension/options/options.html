@@ -64,6 +64,7 @@
         <div class="sysrow" id="presetRow" hidden>
           <label for="preset">Supertonic sesi</label>
           <select id="preset"></select>
+          <small class="note" id="presetNote"></small>
         </div>
         <div class="sysrow" id="systemVoiceRow" hidden>
           <label for="systemVoice">Sistem sesi</label>
@@ -126,18 +127,18 @@
 
       <details class="adv" id="speakerBlock">
         <summary>Konuşmacılara farklı ses</summary>
-        <label class="check">
-          <input type="checkbox" id="speakerVoices">
-          <span>Konuşmacı değişince (&gt;&gt;) başka sesle konuş <small>Sistem sesinde kullanılmaz.</small></span>
-        </label>
-        <div class="sysrow" id="speakerCountRow" hidden>
-          <label for="speakerCount">Ses sayısı</label>
-          <select id="speakerCount" title="Altyazı yalnızca konuşmacının değiştiğini söyler, kim olduğunu söylemez: sesler sırayla döner. İki kişilik konuşmada 2 ses doğru eşleşir.">
-            <option value="2">2 ses</option>
-            <option value="3">3 ses</option>
-            <option value="4">4 ses</option>
-          </select>
-          <small>Sesler sırayla döner; 3–4 ses grup videoları içindir.</small>
+        <div class="speakers-head">
+          <label class="check" title="Sistem sesinde kullanılmaz.">
+            <input type="checkbox" id="speakerVoices">
+            <span>Konuşmacı değişince (&gt;&gt;) başka sesle konuş</span>
+          </label>
+          <span class="count" id="speakerCountRow" hidden>
+            <select id="speakerCount" aria-label="Ses sayısı" title="Altyazı yalnızca konuşmacının değiştiğini söyler, kim olduğunu söylemez: sesler sırayla döner. İki kişilik konuşmada 2 ses doğru eşleşir; 3–4 ses grup videoları içindir.">
+              <option value="2">2 ses</option>
+              <option value="3">3 ses</option>
+              <option value="4">4 ses</option>
+            </select>
+          </span>
         </div>
         <div class="trio speakers">
           <div class="stack" id="voice2Row" hidden>

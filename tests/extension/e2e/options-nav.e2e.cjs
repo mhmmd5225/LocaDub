@@ -146,6 +146,20 @@ const overflow = (page) => page.evaluate(() => {
     await page.check('#mtChoice input[value=""]');
     await page.waitForFunction(() => chrome.storage.local.get('mtBackend').then((s) => s.mtBackend == null));
 
+    // Konuşmacılara 4 ses açıkken de (bölüm açık, modeller indirilmemiş) Seslendirme sığar
+    for (const voice of ['supertonic-3:F2', 'antalia-mini']) {
+      await opt.evaluate((v) => chrome.storage.local.set({ engineMode: 'real', voice: v, speakerVoices: true, speakerCount: 4 }), voice);
+      for (const [w, h] of SIZES) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.goto(url('', '#seslendirme'));
+        await page.waitForSelector('#voice4Row:not([hidden])');
+        await page.waitForTimeout(300);
+        const ov = await overflow(page);
+        assert.ok(ov.v <= 0 && ov.mainV <= 0, `4 konuşmacı sesiyle sığar (${voice} ${w}x${h}): ` + JSON.stringify(ov));
+      }
+    }
+    await opt.evaluate(() => chrome.storage.local.set({ speakerVoices: false, speakerCount: 2 }));
+
     // Dinle: test motorunda örnek sesi çalar (hata iletisi yok)
     await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'mock', modelsApproved: true, voice: null }));
     await page.goto(url('', '#seslendirme'));

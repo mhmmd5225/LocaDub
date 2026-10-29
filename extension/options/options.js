@@ -350,7 +350,7 @@ function renderVoiceChoice() {
       const current = members.find((m) => m.id === useVoice) || members.find((m) => m.id === lastPreset[v.pack]) || members[0];
       opts.push(choice({
         name: 'voice', value: v.pack, checked: members.some((m) => m.id === useVoice), title: PACK_NAMES[v.pack] || v.pack,
-        note: [`${members.length} ses, canlı`, v.experimental ? 'deneysel' : '', missing ? 'indirilmedi' : ''].filter(Boolean).join(' · '),
+        note: [`${members.length} ses`, v.experimental ? 'deneysel' : '', missing ? 'indirilmedi' : ''].filter(Boolean).join(' · '),
         onchange: () => setSettings({ voice: current.id, systemVoiceName: null }),
       }));
       // hazır ses seçici, paket seçiliyken radyoların altında (sistem sesi satırı gibi)
@@ -384,7 +384,10 @@ function renderVoiceChoice() {
   const v = lists.voices.find((x) => x.id === useVoice);
   if (v?.pack) lastPreset[v.pack] = v.id;
   $('preview').disabled = !v || (!v.system && !v.cached && !isMock());
-  $('voiceNote').replaceChildren(...(v && !v.system && !v.cached && !isMock() ? ['Bu ses henüz indirilmedi. ', ...downloadHint()] : []));
+  // Supertonic seçiliyken ileti hazır ses seçicinin yanında durur (panel kaydırmasız kalsın)
+  const missingNote = v && !v.system && !v.cached && !isMock() ? ['Bu ses henüz indirilmedi. ', ...downloadHint()] : [];
+  $('voiceNote').replaceChildren(...(v?.pack ? [] : missingNote));
+  $('presetNote').replaceChildren(...(v?.pack ? missingNote : []));
 }
 $('systemVoice').addEventListener('change', (e) => setSettings({ voice: 'system', systemVoiceName: e.target.value || null }));
 $('preset').addEventListener('change', (e) => setSettings({ voice: e.target.value, systemVoiceName: null }));
@@ -465,8 +468,10 @@ function renderSpeakerVoices() {
     })));
     sel.disabled = !voices.length || first === 'system';
     const v = voices.find((x) => x.id === want);
+    // birinci sesle aynı paketteki ses ayrıca indirilmez: ileti yalnızca birinci seste görünür
+    const samePack = v?.pack && v.pack === lists.voices.find((x) => x.id === first)?.pack;
     $(`${id}Note`).replaceChildren(...(first === 'system' ? ['Sistem sesi seçiliyken kullanılmaz.']
-      : v && !v.cached && !isMock() ? ['Bu ses henüz indirilmedi. ', ...downloadHint()] : []));
+      : v && !v.cached && !isMock() && !samePack ? downloadHint() : [])); // seçenek adı zaten "— indirilmedi" der
   }
   $('speakerCountRow').hidden = !settings.speakerVoices;
   $('speakerCount').value = String(settings.speakerCount);

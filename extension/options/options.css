@@ -163,6 +163,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visi
 .sysrow small { flex-basis: 100%; }
 #voiceNote:empty { display: none; }
 #voiceNote { margin: 8px 0 0; }
+#presetRow small { flex-basis: auto; }
 
 /* Üslup / kalite: üç ya da iki seçenekli bölümlü seçici */
 .style-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
@@ -194,7 +195,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .adv[open] summary { margin-bottom: 10px; }
 .adv .sysrow { margin-left: 26px; }
 .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
-.trio.speakers { margin: 10px 0 0 26px; gap: 12px; }
+.speakers-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.speakers-head .count[hidden] { display: none; }
+.trio.speakers { margin: 8px 0 0 26px; gap: 12px; }
+.trio.speakers .stack small:empty { display: none; }
 .trio.speakers .stack[hidden] { display: none; }
 
 /* Sözlük */
