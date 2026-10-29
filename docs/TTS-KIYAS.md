@@ -111,10 +111,11 @@ yalnızca ~3 kat. WebGPU bu test ortamında yoktu, ölçülmedi.
   - yalnızca Supertonic yüklenirken worker en çok 4 iş parçacığıyla açılır (çekirdek − 1); çok iş parçacıklı yükleme
     90 sn'de bitmezse tek iş parçacığına düşer (ort 1.22'de bazı Chromium sürümlerinde görülen asılı kalma);
   - Hızlı kalite 5 adım; Yüksek (8 adım) 4 çekirdekli makinede yetişmez, 8+ çekirdek önerilir;
-  - indirme ≈ 398 MB (resmî fp32 dosyalar, değiştirilmeden).
+  - indirme ≈ 210 MB (8-bit kopya, bölüm 4; resmî fp32 paket 398 MB).
 - **8-bit paket (bölüm 4):** vector_estimator'ın 8-bit hâli anlaşılırlığı ve ezgiyi koruyup paketi 398 → 210 MB'a
-  indiriyor ve tarayıcıda ≈ 1.4 kat hızlı (3 iş parçacığında RTF 0.48). Eklentiye HuggingFace'te barındırıldıktan
-  sonra bağlanacak; 8-bit vocoder sesi bozduğu için pakete girmedi.
+  indiriyor ve tarayıcıda ≈ 1.4 kat hızlı (3 iş parçacığında RTF 0.48). Eklenti artık bunu indiriyor:
+  [teknikkent/supertonic-3-int8](https://huggingface.co/teknikkent/supertonic-3-int8) (commit `605d35c2`); 8-bit vocoder
+  sesi bozduğu için pakete girmedi.
 - **Elenenler:** Chatterbox Multilingual (≥ 1.2 GB, otoregresif, gerçek zamanlı değil), Piper dfki ve MMS-TTS (ticari
   olmayan lisans), Okur (kartına göre EMA Lightning'den düşük UTMOS/WER, tek ses), Pocket TTS Türkçe ince ayarları
   (ONNX yok; ses klonlama için ileride bakılabilir), Kokoro/Kitten (Türkçe yok).
@@ -160,7 +161,9 @@ hf repo create OWNER/supertonic-3-int8 --repo-type model
 hf upload OWNER/supertonic-3-int8 tests/tts/.models/supertonic-3-int8 . --commit-message "Supertonic 3, dynamic 8-bit vector_estimator"
 ```
 
-Sonra `extension/engines/tts/voices.js` yeni depoya ve commit kimliğine sabitlenir.
+Yüklendi: https://huggingface.co/teknikkent/supertonic-3-int8, commit `605d35c25d57eca4749939b85f16a24aa83e4561`;
+`extension/engines/tts/voices.js` `SUPERTONIC_INT8` bu commit'e sabitli. Geri indirilen dosyaların SHA-256'sı `SHA256SUMS` ile
+aynı; tarayıcı test sayfası dosyaları gerçek adresten indirip M1'i 3 iş parçacığında RTF 0.46 ile seslendirdi.
 
 ## Yeniden üretmek
 

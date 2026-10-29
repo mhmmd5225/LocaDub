@@ -94,8 +94,12 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
 - **Supertonic 3** (deneysel, 10 hazır ses: F1–F5 kadın, M1–M5 erkek) — https://huggingface.co/Supertone/supertonic-3
   (commit `3cadd1ee6394adea1bd021217a0e650ede09a323`) — BigScience OpenRAIL-M, Supertone Inc. Lisans, modelin
   kullanımına sınırlamalar koyar (Ek A: yasa dışı kullanım, başkasını taklit ederek yanıltma, rıza dışı kişisel veri vb.
-  yasak); bu sınırlamalar eklentinin kullanıcıları için de geçerlidir. Model eklentiye paketlenmez ve değiştirilmez;
+  yasak); bu sınırlamalar eklentinin kullanıcıları için de geçerlidir. Model eklentiye paketlenmez;
   ses karıştırma yalnızca hazır stil vektörlerini çalışma anında harmanlar. Üretilen ses yapaydır.
+  Eklentinin indirdiği kopya: https://huggingface.co/teknikkent/supertonic-3-int8 (commit
+  `605d35c25d57eca4749939b85f16a24aa83e4561`) — aynı lisans; **değiştirildi:** `vector_estimator` dinamik 8-bit
+  nicemlendi (`tools/tts/quantize-supertonic.py`), diğer dosyalar resmî dosyaların aynısı. Depo lisansı, özgün model
+  kartını, değişiklik bildirimini ve kullanım kısıtlarını içerir.
 
 ## Referans proje
 

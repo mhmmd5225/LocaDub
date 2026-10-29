@@ -20,11 +20,16 @@ API: `docs/CONTRACT.md` → "Seslendirme motoru API". `index.js` offscreen'de ç
 Sesler: `antalia-mini` (erkek, varsayılan), `ahenk-cep` (kadın), `ema-lightning` (kadın), `supertonic-3:F1…F5` /
 `supertonic-3:M1…M5` (deneysel, 10 hazır ses) ve `system` (`{system:true}`). Karşılaştırma: `docs/TTS-KIYAS.md`.
 
-**Supertonic paketi:** on hazır ses aynı dosyaları (`pack: 'supertonic-3'`, ≈ 398 MB fp32) paylaşır; dosyalar bir kez
+**Supertonic paketi:** on hazır ses aynı dosyaları (`pack: 'supertonic-3'`) paylaşır; dosyalar bir kez
 iner, worker modeli bir kez yükler, ses yalnızca bir stil vektörüdür (her istekte değişir, karıştırılabilir). Tek iş
-parçacıklı WASM'de gerçek zamandan yavaş olduğu için (RTF ≈ 1.2) katalogda `threads: 4` taşır: `index.js` sayfa
+parçacıklı WASM'de gerçek zamana yakın olduğu için (8-bit: RTF ≈ 0.9) katalogda `threads: 4` taşır (3 iş parçacığında ≈ 0.48): `index.js` sayfa
 cross-origin isolated ise worker'ı en çok 4 (çekirdek − 1) iş parçacığıyla başlatır; çok iş parçacıklı yükleme 90 sn'de
 bitmezse tek iş parçacığına düşer.
+
+**8-bit kopya:** eklenti resmî fp32 paket (398 MB) yerine [teknikkent/supertonic-3-int8](https://huggingface.co/teknikkent/supertonic-3-int8)
+(210 MB, `voices.js SUPERTONIC_INT8`, commit'e sabitli) indirir: yalnızca `vector_estimator` dinamik 8-bit, kalan dosyalar
+resmî dosyaların aynısı. Üretim: `tools/tts/quantize-supertonic.py` (aynı sürümlerle birebir aynı bayt). Önceden indirilmiş
+fp32 dosyalar yeni paket yüklenince silinir (`legacyPrefixes`). `SUPERTONIC_INT8 = null` resmî dosyalara döner.
 
 **Her satırda (tüm sesler):** cümle başına metnin özetinden türeyen tohum (`core.js textSeed`; sabit tohumla her cümle aynı
 gürültüden başlıyordu), uzun yan cümlelerde "ama / fakat / çünkü / oysa / halbuki" öncesine virgül

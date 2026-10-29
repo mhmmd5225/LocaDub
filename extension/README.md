@@ -24,7 +24,7 @@ Derleme adımı yoktur: düz ES module JavaScript.
 **Açılır pencere:** üstte seslendirme seçici ve dublaj anahtarı (seçici anahtarın solunda), altında durum kartı ile dublaj ve orijinal ses seviyesi. Dublaj her tarayıcı açılışında kapalı başlar.
 
 **Ses seçimi:** Antalia Mini (erkek, varsayılan), Ahenk Cep ve EMA Lightning (kadın) birer küçük model (23–35 MB);
-**Supertonic 3** (deneysel) 10 hazır sesli tek pakettir (≈ 398 MB, 5 kadın + 5 erkek, en canlı tonlama; tarayıcıda
+**Supertonic 3** (deneysel) 10 hazır sesli tek pakettir (≈ 210 MB 8-bit kopya, 5 kadın + 5 erkek, en canlı tonlama; tarayıcıda
 4 iş parçacığı ister). Seslendirme menüsündeki **Dinle** düğmesi seçili ses ve üslupla kısa bir örnek çalar.
 Karşılaştırma: [docs/TTS-KIYAS.md](../docs/TTS-KIYAS.md).
 

@@ -74,9 +74,9 @@ const SUPERTONIC_FP32 = 'https://huggingface.co/Supertone/supertonic-3/resolve/3
 /**
  * The 8-bit copy (tools/tts/quantize-supertonic.py, docs/TTS-KIYAS.md section 4): 210 MB instead of 398 MB, same
  * intelligibility and melody, ≈ 1.4× faster in the browser. Set to { repo: 'OWNER/supertonic-3-int8', rev: '<commit>' }
- * once it is published on HuggingFace; until then the official fp32 files are used.
+ * (published: https://huggingface.co/teknikkent/supertonic-3-int8); null falls back to the official fp32 files.
  */
-export const SUPERTONIC_INT8 = null;
+export const SUPERTONIC_INT8 = { repo: 'teknikkent/supertonic-3-int8', rev: '605d35c25d57eca4749939b85f16a24aa83e4561' };
 const SUPERTONIC_STYLES = {
   F1: 292046, F2: 292423, F3: 290794, F4: 291808, F5: 291479,
   M1: 291748, M2: 292055, M3: 290198, M4: 291522, M5: 291469,
