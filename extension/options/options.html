@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LocaDub — Ayarlar</title>
+  <link rel="stylesheet" href="../common/theme.css">
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
@@ -172,6 +173,26 @@
         <h2>Çeviri motoru</h2>
         <div class="choices col" id="mtChoice" role="radiogroup" aria-label="Çeviri motoru"></div>
       </div>
+      <div class="group" id="mixGroup">
+        <h2>Ses ayırma</h2>
+        <div class="opt">
+          <div class="opt-text">
+            <label for="separation" class="opt-title">Gerçek dublaj (ses ayırma)</label>
+            <small id="separationHelp">Orijinal sesten konuşma yapay zekâ ile ayrılır; müzik ve efektler kalır, Türkçe ses üstüne gelir. GPU (WebGPU) ile çalışır; model ilk kullanımda indirilir.</small>
+          </div>
+          <span class="switch">
+            <input type="checkbox" id="separation" aria-describedby="separationHelp">
+            <span class="slider" aria-hidden="true"></span>
+          </span>
+        </div>
+        <div class="slider-row" id="prebufferRow">
+          <label for="prebufferSec">Başta önbellek süresi</label>
+          <input type="range" id="prebufferSec" min="5" max="60" step="5" aria-describedby="prebufferHelp">
+          <output id="prebufferSecOut" for="prebufferSec"></output>
+        </div>
+        <small class="hint" id="prebufferHelp">Ses ayırma için video başta en çok bu kadar bekletilebilir; ayırma yetişmezse video kısa süre bekler.</small>
+      </div>
+
       <div class="group">
         <h2>Otomatik altyazı</h2>
         <label class="check">

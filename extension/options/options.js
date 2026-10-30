@@ -100,6 +100,7 @@ const RANGES = {
   ttsVolume: (v) => `%${Math.round(v * 100)}`,
   originalVolume: (v) => `%${Math.round(v * 100)}`,
   lookaheadSec: (v) => `${v} sn`,
+  prebufferSec: (v) => `${v} sn`,
   pitch: (v) => `${v > 0 ? '+' : ''}${String(v).replace('.', ',')}`,
 };
 
@@ -203,6 +204,9 @@ function renderBasics() {
   $('showSubtitles').checked = settings.showSubtitles;
   $('checkUpdates').checked = settings.checkUpdates;
   $('holdStart').checked = settings.holdStart;
+  $('separation').checked = settings.separation !== 'off';
+  $('prebufferSec').disabled = settings.separation === 'off';
+  $('prebufferRow').classList.toggle('is-off', settings.separation === 'off');
   $('mock').checked = settings.engineMode === 'mock';
   for (const [id, fmt] of Object.entries(RANGES)) {
     if (document.activeElement !== $(id)) $(id).value = settings[id];
@@ -214,6 +218,7 @@ $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.c
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
 $('holdStart').addEventListener('change', (e) => setSettings({ holdStart: e.target.checked }));
+$('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
 $('mock').addEventListener('change', async (e) => {
   await setSettings({ engineMode: e.target.checked ? 'mock' : 'real', mtBackend: null, voice: null });
   await refreshModels();

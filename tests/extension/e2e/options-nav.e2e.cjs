@@ -187,6 +187,26 @@ const overflow = (page) => page.evaluate(() => {
     assert.ok(og.v <= 0 && og.mainV <= 0, 'cinsiyet moduyla sığar: ' + JSON.stringify(og));
     await opt.evaluate(() => chrome.storage.local.set({ speakerVoices: false, speakerCount: 2 }));
 
+    // Gerçek dublaj (ses ayırma) + başta önbellek süresi: yüklenir, ayarı yazar, ayırma kapalıyken süre devre dışıdır
+    await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'real', separation: 'auto', prebufferSec: 20 }));
+    await page.goto(url('', '#ai-model'));
+    await page.waitForSelector('#separation');
+    assert.equal(await page.isChecked('#separation'), true);
+    assert.equal(await page.isDisabled('#prebufferSec'), false);
+    assert.equal(await page.textContent('#prebufferSecOut'), '20 sn');
+    await page.click('#separation', { force: true });
+    await page.waitForFunction(() => chrome.storage.local.get('separation').then((s) => s.separation === 'off'));
+    await page.waitForFunction(() => document.getElementById('prebufferSec').disabled === true);
+    await page.click('#separation', { force: true });
+    await page.waitForFunction(() => chrome.storage.local.get('separation').then((s) => s.separation === 'auto'));
+    await page.fill('#prebufferSec', '35');
+    await page.dispatchEvent('#prebufferSec', 'change');
+    await page.waitForFunction(() => chrome.storage.local.get('prebufferSec').then((s) => s.prebufferSec === 35));
+    assert.equal(await page.textContent('#prebufferSecOut'), '35 sn');
+    await opt.evaluate(() => chrome.storage.local.set({ separation: 'off' }));
+    await page.waitForFunction(() => document.getElementById('separation').checked === false);
+    await opt.evaluate(() => chrome.storage.local.set({ separation: 'auto', prebufferSec: 20 }));
+
     // Dinle: test motorunda örnek sesi çalar (hata iletisi yok)
     await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'mock', modelsApproved: true, voice: null }));
     await page.goto(url('', '#seslendirme'));
