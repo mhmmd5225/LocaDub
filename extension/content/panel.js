@@ -124,7 +124,8 @@ export class Panel {
   // ---- dış API ----
 
   update(patch) {
-    const sep = ('session' in patch ? patch.session?.separation : this._sepTarget) || this._testSep || null;
+    // taklit edilen durum (yalnız test motorunda) gerçeğinin önüne geçer
+    const sep = this._testSep || ('session' in patch ? patch.session?.separation : this._sepTarget) || null;
     if (sep !== this._sepTarget) this._bindSeparation(sep);
     Object.assign(this.vm, patch);
     if (!this.vm.enabled) this.vm.session = null;
