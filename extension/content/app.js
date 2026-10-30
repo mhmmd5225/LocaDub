@@ -15,6 +15,7 @@ import {
 } from './timing.js';
 import { callMain, sendBg } from './bridge.js';
 import { Overlay, ensureToggleButton } from './overlay.js';
+import { Panel } from './panel.js';
 import { DubAudio, SystemVoice, Ducker, resumeAudio, videoAnalyser } from './player.js';
 
 const LOG = '[yt-tr-dub]';
@@ -27,6 +28,7 @@ const PITCH_MS = 50;
 
 let settings = null;
 let session = null;
+let panel = null; // oynatıcı paneli (content/panel.js); dublaj kapalıyken de durur
 const transcriptCache = new Map(); // videoId → { sentences:[{start,end,text,tr,speaker?}], trKey, kind }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -216,6 +218,7 @@ class Session {
     this._releaseHold();
     this.ducker?.destroy();
     this.overlay?.destroy();
+    if (session === this) panel?.update({ session: null });
     sendBg({ type: 'jobs.cancel', tag: this.tag });
     this._saveTranscript();
     this._dropAudio();
@@ -604,6 +607,7 @@ class Session {
         console.info(LOG, `konuşan: ${m.gender === 'female' ? 'kadın' : 'erkek'} (${m.hz} Hz, ${t.toFixed(1)} sn, erken)`);
         G.turns.set(turn, m.gender);
         G.last = m.gender;
+        G.hz = m.hz;
         continue;
       }
       if (s.measured || s.end > t || s.end < t - 5) continue;
@@ -620,6 +624,7 @@ class Session {
       }
       G.turns.set(turn, maj);
       G.last = maj;
+      G.hz = m.hz;
     }
     if (changed) this._regender(t);
   }
@@ -695,6 +700,10 @@ class Session {
   tick() {
     if (!this.alive) return;
     this._tickHold();
+    if (panel && session === this && performance.now() - (this._panelAt || 0) >= 200) {
+      this._panelAt = performance.now();
+      panel.update({ session: this._panelState() });
+    }
     if (!this.sentences.length) return;
     const v = this.video;
     const S = this.sentences;
@@ -759,6 +768,51 @@ class Session {
       ? `Türkçe dublaj 3/4: Türkçeye çevriliyor… (${p.done}/${p.total} cümle hazır)`
       : `Türkçe dublaj 4/4: Türkçe ses hazırlanıyor… (${p.done}/${p.total} cümle hazır)`) + wait;
     if (!ours || st.textContent !== text) this.overlay.setStatus(text, { kind: 'prep' });
+  }
+
+  // ---- oynatıcı paneli (content/panel.js) ----
+
+  // Panelin görünüm modeli: hazırlık adımları, çalan cümlenin sesi, ölçülen konuşan, bekletme, ses ayırma.
+  _panelState() {
+    const S = this.sentences;
+    const v = this.video;
+    const t = v?.currentTime || 0;
+    const sys = settings.voice === 'system';
+    const failed = this.timing.captions == null && (this.btnState === 'warn' || this.btnState === 'error') && !this.waitingApproval;
+    const nTr = S.reduce((k, s) => k + (s.tr != null ? 1 : 0), 0);
+    const nAu = S.reduce((k, s) => k + (s.audio ? 1 : 0), 0);
+    // önbellek: oynatma konumundan sonra sesi (ya da boş çevirisi) hazır, kesintisiz cümleler
+    let ahead = 0;
+    for (const s of S) {
+      if (s.end <= t) continue;
+      if (!(sys ? s.tr != null : s.audio || s.tr === '')) break;
+      ahead = s.end - t;
+    }
+    const p = this.playingIdx >= 0 ? S[this.playingIdx] : null;
+    const speaking = p && !v.paused && (sys || p.audio?.system ? this.sys.busy : this.audio.busy && !this.audio.paused)
+      ? { idx: this.playingIdx, voice: p.audio?.voice || (sys ? 'system' : null) } : null;
+    const st = this.overlay?.status;
+    const h = this._hold;
+    const sepAhead = this.separation?.state?.aheadSec;
+    return {
+      notice: st?.classList.contains('visible') ? { text: st.textContent, kind: st.dataset.kind || 'info' } : null,
+      steps: {
+        captions: S.length ? { status: 'done', text: `${S.length} cümle` }
+          : failed ? { status: this.btnState, text: this.btnDetail } : { status: 'active', text: 'alınıyor…' },
+        mt: this.mtReady ? { status: 'done', text: `${nTr}/${S.length} çevrildi` }
+          : this.waitingApproval ? { status: 'warn', text: 'modeller hazırlanmalı' } : { status: 'active', text: 'yükleniyor…' },
+        tts: sys ? { status: 'done', text: 'Sistem sesi' } : this.ttsBroken ? { status: 'error', text: 'başlatılamadı' }
+          : this.ttsReady ? { status: 'done', text: `${nAu} ses hazır` }
+          : this.waitingApproval ? { status: 'warn', text: 'modeller hazırlanmalı' } : { status: 'active', text: 'yükleniyor…' },
+        cache: !S.length ? { status: 'wait', text: '—' }
+          : { status: ahead >= 8 ? 'done' : ahead > 0 ? 'active' : 'wait', text: `${Math.floor(ahead)} sn ileri hazır`, pct: Math.min(1, ahead / settings.lookaheadSec) },
+      },
+      speaking,
+      level: this.audio?.gain || null,
+      speaker: this.genders.last ? { gender: this.genders.last, hz: this.genders.hz || null } : null,
+      hold: h.active ? { sec: (performance.now() - h.since) / 1000, maxSec: HOLD_MAX_MS / 1000, aheadSec: Number.isFinite(sepAhead) ? sepAhead : null } : null,
+      separation: this.separation || null,
+    };
   }
 
   // ---- ilk cümleye kadar bekletme (settings.holdStart) ----
@@ -855,6 +909,10 @@ function ensureButton() {
     resumeAudio();
     setSettings({ enabled: !settings.enabled });
   }, detail, player);
+  // oynatıcı paneli: oynatıcı değişince yeniden kurulur
+  if (panel && (panel.player !== player || !panel.root.isConnected)) { panel.destroy(); panel = null; }
+  if (!panel && player) panel = new Panel(player);
+  panel?.update({ enabled: !!settings?.enabled, state, detail });
 }
 
 function route() {
