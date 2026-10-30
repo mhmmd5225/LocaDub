@@ -1,4 +1,4 @@
-// LocaDub oynatıcı paneli: sol üstte canlı durum hapı (dublaj, konuşan ses, konuşanın cinsiyeti) ve tıklayınca açılan
+// LocaDub oynatıcı paneli: TR düğmesinin yanında canlı durum hapı (dublaj, konuşan ses, konuşanın cinsiyeti) ve tıklayınca açılan
 // cam panel (hazırlık adımları, kadın/erkek sesleri, karışım). Saf DOM; ayarları kendisi okur ve yazar.
 //
 // Görünüm modeli (content/app.js besler):
@@ -136,6 +136,8 @@ export class Panel {
   open() {
     if (this._open) return;
     this._open = true;
+    // panelin sol kenarı açılıştaki hapın sol kenarında kalır (hap genişliği değişince panel kaymasın)
+    this._anchorLeft = this.pill.offsetWidth ? this.pill.offsetLeft : null;
     this.root.classList.add('ld-open');
     this.panel.hidden = false;
     this.pill.setAttribute('aria-expanded', 'true');
@@ -151,6 +153,7 @@ export class Panel {
     this._open = false;
     this.root.classList.remove('ld-open');
     this.panel.hidden = true;
+    this._anchorLeft = null;
     this.pill.setAttribute('aria-expanded', 'false');
     if (focusPill) this.pill.focus({ preventScroll: true });
   }
@@ -166,7 +169,8 @@ export class Panel {
     window.removeEventListener('message', this._onTest);
     try { chrome.runtime.onMessage.removeListener(this._onMsg); } catch { /* yoksay */ }
     this._stopPreview();
-    this.player.classList.remove('ld-panel-on');
+    this.player.classList.remove('ld-panel-on', 'ld-pill-on', 'ld-pill-sticky');
+    this.player.style.removeProperty('--ld-sub-min');
     this.root.remove();
   }
 
@@ -500,6 +504,10 @@ export class Panel {
     const notice = S?.notice?.text ? S.notice : null;
     const urgent = st === 'preparing' || st === 'warn' || st === 'error' || !!hold;
     this.root.classList.toggle('ld-sticky', urgent);
+    // altyazı itmesi için oynatıcıda: hap var mı, kontroller gizliyken de görünür mü
+    this.player.classList.toggle('ld-pill-on', st !== 'off');
+    this.player.classList.toggle('ld-pill-sticky', st !== 'off' && (urgent || this._open));
+    this._layout();
 
     // konuşan ses
     const sp = S?.speaking?.voice ? S.speaking : null;
@@ -657,6 +665,9 @@ export class Panel {
 
   // ---- yerleşim ----
 
+  // Hap TR düğmesinin yanında, kontrol çubuğunun hemen üstünde (sağ kenarı düğmenin sağ kenarıyla hizalı); kontrol
+  // çubuğu olmayan Shorts'ta yüzen düğmenin altında. Panel hapa bağlı açılır (üstünde, sol kenarı hapın sol kenarında;
+  // oynatıcıya sığmazsa kaydırılır). Hap görünürken Türkçe altyazı hapın üstüne itilir (--ld-sub-min).
   _layout() {
     const p = this.player;
     const w = p.clientWidth || 640;
@@ -666,19 +677,27 @@ export class Panel {
     this.root.classList.toggle('ld-compact', compact);
     this.root.classList.toggle('ld-tiny', tiny);
     this.root.classList.toggle('ld-large', hgt >= 900);
-    // tam ekranda / gömülüde YouTube başlığı sol üstte: hap başlığın altına iner
-    let top = 12;
-    const ct = p.querySelector('.ytp-chrome-top');
-    const title = ct?.querySelector('.ytp-title');
-    if (ct && title && ct.offsetHeight > 0 && title.offsetHeight > 0 && getComputedStyle(title).visibility !== 'hidden') {
-      top = Math.max(top, ct.offsetTop + ct.offsetHeight + 6);
-    }
-    // küçük oynatıcıda panel kontrol çubuğunun üstüne de uzanır (açıkken)
-    const bottom = compact ? 0 : p.querySelector('.ytp-chrome-bottom')?.offsetHeight || 48;
-    const pillH = tiny ? 28 : 32;
-    this.root.style.setProperty('--ld-top', `${top}px`);
-    this.root.style.setProperty('--ld-panel-top', `${top + pillH + 8}px`);
-    this.root.style.setProperty('--ld-panel-max-h', `${Math.max(120, hgt - top - pillH - 8 - bottom - 12)}px`);
-    this.root.style.setProperty('--ld-panel-w', `${Math.min(hgt >= 900 ? 380 : 344, w - 24)}px`);
+    const pillH = tiny ? 28 : hgt >= 900 ? 36 : 32;
+    const pr = p.getBoundingClientRect();
+    const btn = p.querySelector('.yt-tr-dub-btn');
+    const br = btn?.getBoundingClientRect();
+    const bar = p.querySelector('.ytp-chrome-bottom');
+    let right = 12;
+    if (br?.width) right = Math.min(Math.max(0, pr.right - br.right), Math.max(0, w - 120));
+    const top = !(bar && bar.offsetHeight) && br?.height;
+    const anchor = top ? 'top' : 'bottom';
+    const edge = top ? Math.round(br.bottom - pr.top + 8) : Math.round((bar ? pr.bottom - bar.getBoundingClientRect().top : 48) + 8);
+    const panelW = Math.min(hgt >= 900 ? 380 : 344, w - 24);
+    const pillW = this.pill.offsetWidth || 120;
+    const left = this._anchorLeft ?? (w - right - pillW);
+    const set = (k, v) => this.root.style.setProperty(k, v);
+    this.root.dataset.anchor = anchor;
+    set('--ld-pill-right', `${right}px`);
+    set('--ld-pill-edge', `${edge}px`);
+    set('--ld-panel-edge', `${edge + pillH + 8}px`);
+    set('--ld-panel-left', `${Math.round(Math.min(Math.max(12, left), w - panelW - 12))}px`);
+    set('--ld-panel-max-h', `${Math.max(120, hgt - edge - pillH - 8 - 12)}px`);
+    set('--ld-panel-w', `${panelW}px`);
+    p.style.setProperty('--ld-sub-min', anchor === 'bottom' ? `${edge + pillH + 6}px` : '0px');
   }
 }
