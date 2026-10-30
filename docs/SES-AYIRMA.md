@@ -155,7 +155,8 @@ kötü (kim-vocal-2: 5.0); WASM'da uzun çağrılar tercih edilmeli.
 | RTX 5060 (~19 TFLOPS) | ~0.15–0.3 sn | ~0.05–0.1 | ~0.03–0.07 |
 | Mac mini M4, 10 çekirdek GPU (~4.3 TFLOPS) | ~0.6–1.2 sn | ~0.2–0.4 | ~0.13–0.27 |
 
-Bunlar tahmindir; gerçek değer `xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --webgpu` ile (GPU'lu bir
+WebGPU yolu bu konteynerde doğrulanamadı: GPU yok, SwiftShader'lı yazılım WebGPU'sunda 6 sn'lik bir çağrı 15 dakikada
+bitmedi (yavaşlık mı askı mı ayırt edilemedi). Bunlar tahmindir; gerçek değer `xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --webgpu` ile (GPU'lu bir
 makinede, `--use-webgpu-adapter=swiftshader` bayrağı kaldırılarak) ölçülmeli. JS tarafı (STFT/ISTFT, yeniden
 örnekleme) pencere başına ~0.15 sn ve WebGPU çalışırken paralel hazırlanır.
 
