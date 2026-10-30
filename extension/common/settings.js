@@ -29,6 +29,8 @@ export const DEFAULTS = Object.freeze({
   ttsSpeed: 1.0,           // temel TTS hızı (0.8..2.0)
   showSubtitles: true,     // Türkçe altyazı overlay'i
   lookaheadSec: 30,        // ileri-bakış penceresi
+  separation: 'auto',      // gerçek dublaj: orijinal sesten konuşma ayrılır, yalnız müzik + efekt kalır ('auto' | 'off'; engines/sep)
+  prebufferSec: 20,        // ayırma için başta en çok bu kadar beklenir (5–60 sn); ayırma yetişmezse video bekletilir
   holdStart: true,         // dublaj başlarken video, ilk cümlenin sesi hazır olana kadar bekletilir (en fazla 25 sn)
   fixAsrPunct: false,      // otomatik altyazıda çeviriden önce noktalama/büyük harf (isteğe bağlı model indirilince açılır)
   checkUpdates: true,      // günde iki kez sitedeki version.json'a bak (common/version.js)
@@ -57,6 +59,8 @@ export function normalizeSettings(raw = {}) {
   s.checkUpdates = !!s.checkUpdates;
   s.fixAsrPunct = !!s.fixAsrPunct;
   s.holdStart = !!s.holdStart;
+  s.separation = s.separation === 'off' ? 'off' : 'auto';
+  s.prebufferSec = Math.min(60, Math.max(5, Number(s.prebufferSec) || 20));
   s.glossaryMt = String(s.glossaryMt ?? '').slice(0, 20000);
   s.glossaryTts = String(s.glossaryTts ?? '').slice(0, 20000);
   s.engineMode = s.engineMode === 'mock' ? 'mock' : 'real';
