@@ -49,7 +49,7 @@
     {
       "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/embed/*"],
       "js": ["content/loader.js"],
-      "css": ["content/overlay.css"],
+      "css": ["common/theme.css", "content/overlay.css", "content/panel.css"],
       "run_at": "document_idle",
       "all_frames": true
     }

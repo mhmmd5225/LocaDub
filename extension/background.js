@@ -233,6 +233,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'update.check':
       checkUpdate().then((result) => sendResponse({ ok: true, result }));
       return true;
+    case 'options.open':
+      // oynatıcı paneli: içerik betiği ayarlar sayfasını kendisi açamaz
+      chrome.runtime.openOptionsPage().catch(() => {});
+      return false;
     case 'tts.system.voices':
       systemVoices().then((result) => sendResponse({ ok: true, result }), (e) => sendResponse({ ok: false, error: e.message }));
       return true;

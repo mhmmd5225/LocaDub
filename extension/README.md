@@ -21,6 +21,18 @@ Derleme adımı yoktur: düz ES module JavaScript.
 3. Bir YouTube videosu açın ve oynatıcı çubuğundaki **TR** düğmesine (ya da açılır penceredeki anahtara)
    basın. Düğme durumu gösterir: Dublaj kapalı / Hazırlanıyor / Dublaj aktif / Dikkat / Hata.
 
+**Oynatıcı paneli** (`content/panel.js`, `panel.css`; tasarım belirteçleri `common/theme.css`): oynatıcının sol üstündeki
+hap canlı durumu gösterir — dublaj açık/kapalı, hazırlık aşaması, video bekletilirken ince ilerleme çubuğu, bir dublaj
+cümlesi çalarken **şu an konuşan ses** (ad + kadın/erkek rengi + dublaj sesinden seviye dalgası) ve videodan ölçülen
+konuşan (♀/♂, araç ipucunda Hz). YouTube kontrolleriyle birlikte gizlenir (hazırlık, uyarı ve bekletmede görünür kalır).
+Tıklayınca açılan cam panel: **Durum** (altyazılar, çeviri motoru, ses motoru, ses ayırma, önbellek — model indirme
+yüzdesi ve ne kadar ilerisinin hazır olduğu), **Sesler** (otomatik kadın/erkek anahtarı; kadın ve erkek favori sesi,
+üslup Doğal/Canlı/Sakin, perde −3…+3, ▶ Dinle; anahtar kapalıyken tek ses satırı), **Karışım** (dublaj sesi, orijinal
+ses, gerçek dublaj = ses ayırma, Türkçe altyazı) ve **Tüm ayarlar** bağlantısı. Değişiklikler hemen uygulanır (hazır
+sesler yeni ses/tonla yeniden üretilir). Esc kapatır; panel içindeki tuşlar YouTube kısayollarına ulaşmaz. Küçük
+(mini/gömülü) oynatıcıda hap yalnızca simge, panel oynatıcıyı kaplar. Panel varken eski sol üst durum kutusu gizlenir
+(iletisi panelde görünür).
+
 **Açılır pencere:** üstte seslendirme seçici ve dublaj anahtarı (seçici anahtarın solunda), altında durum kartı ile dublaj ve orijinal ses seviyesi. Dublaj her tarayıcı açılışında kapalı başlar.
 
 **Ses seçimi:** Antalia Mini (erkek, varsayılan), Ahenk Cep ve EMA Lightning (kadın) birer küçük model (23–35 MB);
@@ -68,6 +80,7 @@ Ayarlar (`chrome.storage.local`):
 content/main-world.js (MAIN)  ytInitialPlayerResponse / player API, timedtext URL yakalama (pot)
         │ window.postMessage
 content/app.js (izole)        altyazı → cümleler → ileri-bakış (≈30 sn) → senkron çalma, overlay, TR düğmesi
+content/panel.js              oynatıcı paneli: durum hapı + cam panel (app.js `panel.update({ session: _panelState() })`)
         │ chrome.runtime.sendMessage
 background.js (SW)            offscreen oluşturma/yeniden kullanma, yönlendirme, ilerleme yayını, chrome.tts
         │ { target:'offscreen', …, settings }
@@ -128,6 +141,7 @@ xvfb-run -a node tests/extension/e2e/diagnostics.e2e.cjs
 xvfb-run -a node tests/extension/e2e/shorts-embed.e2e.cjs
 xvfb-run -a node tests/extension/e2e/hold-start.e2e.cjs
 xvfb-run -a node tests/extension/e2e/gender-voices.e2e.cjs
+xvfb-run -a node tests/extension/e2e/player-panel.e2e.cjs  # ekran görüntüleri: tests/extension/e2e/out/
 xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punct-en/ yoksa atlanır
 ```
 
