@@ -1,4 +1,4 @@
-/* LocaDub oynatıcı paneli: sol üstte durum hapı + cam panel (common/theme.css belirteçleri). */
+/* LocaDub oynatıcı paneli: TR düğmesinin yanında, kontrol çubuğunun üstünde durum hapı + cam panel (common/theme.css). */
 .ld-root {
   position: absolute;
   inset: 0;
@@ -18,12 +18,15 @@
 /* panel varken eski durum kutusu gizli: aynı bilgi hapta ve panelde */
 .ld-panel-on .yt-tr-dub-status { display: none !important; }
 .ad-showing .ld-root { display: none; }
+/* hap görünürken Türkçe altyazı hapın üstünde kalır (kontroller gizliyken hap da gizlenir, altyazı eski yerine iner) */
+.ld-pill-on:not(.ytp-autohide) .yt-tr-dub-sub,
+.ld-pill-on.ld-pill-sticky .yt-tr-dub-sub { bottom: max(14%, var(--ld-sub-min, 0px)); }
 
 /* ---- hap ---- */
 .ld-pill {
   position: absolute;
-  top: var(--ld-top, 12px);
-  left: 12px;
+  right: var(--ld-pill-right, 12px);
+  bottom: var(--ld-pill-edge, 56px);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -43,9 +46,13 @@
 .ytp-autohide .ld-root:not(.ld-open):not(.ld-sticky) .ld-pill,
 .ld-root.ld-quiet:not(.ld-open):not(.ld-sticky) .ld-pill {
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(6px);
   pointer-events: none;
 }
+/* dublaj kapalıyken hap yok (yalnızca TR düğmesi) */
+.ld-root[data-state="off"] .ld-pill { display: none; }
+/* Shorts: kontrol çubuğu yok, hap yüzen TR düğmesinin altında, panel hapın altında */
+.ld-root[data-anchor="top"] .ld-pill { bottom: auto; top: var(--ld-pill-edge, 92px); }
 .ld-logo {
   flex: none;
   display: inline-grid;
@@ -142,8 +149,8 @@
 /* ---- panel ---- */
 .ld-panel {
   position: absolute;
-  top: var(--ld-panel-top, 52px);
-  left: 12px;
+  bottom: var(--ld-panel-edge, 96px);
+  left: var(--ld-panel-left, 12px);
   width: var(--ld-panel-w, 344px);
   max-height: var(--ld-panel-max-h, 420px);
   display: flex;
@@ -152,10 +159,11 @@
   pointer-events: auto;
   overflow: hidden;
   cursor: default;
-  transform-origin: 20px 0;
+  transform-origin: 20px 100%;
   animation: ld-pop 200ms var(--ld-ease);
 }
-@keyframes ld-pop { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+.ld-root[data-anchor="top"] .ld-panel { bottom: auto; top: var(--ld-panel-edge, 132px); transform-origin: 20px 0; }
+@keyframes ld-pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
 .ld-head {
   flex: none;
   display: flex;
@@ -398,12 +406,11 @@
 .ld-compact .ld-pill-label { max-width: 160px; }
 .ld-compact .ld-now-name { max-width: 110px; }
 .ld-compact .ld-mix-l { width: 78px; }
-.ld-tiny .ld-pill { height: 28px; gap: 6px; padding: 0 8px 0 4px; left: 8px; }
+.ld-tiny .ld-pill { height: 28px; gap: 6px; padding: 0 8px 0 4px; }
 .ld-tiny .ld-logo { width: 20px; height: 20px; }
 .ld-tiny .ld-pill-label, .ld-tiny .ld-now-name { display: none; }
-.ld-tiny .ld-pill[data-state="off"] .ld-pill-label { display: none; }
 /* çok küçük oynatıcı: panel oynatıcıyı kaplar (hap altında kalır, kapatma panelde) */
-.ld-tiny .ld-panel { inset: 6px; width: auto; max-height: none; border-radius: var(--ld-radius-m); }
+.ld-tiny .ld-panel, .ld-root[data-anchor="top"].ld-tiny .ld-panel { inset: 6px; width: auto; max-height: none; border-radius: var(--ld-radius-m); }
 .ld-tiny .ld-head { padding: 8px 8px 8px 10px; }
 .ld-tiny .ld-logo-l, .ld-tiny .ld-nowcard { display: none; }
 .ld-tiny .ld-body { padding: 0 10px 4px; }

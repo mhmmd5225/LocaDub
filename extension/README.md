@@ -21,11 +21,12 @@ Derleme adımı yoktur: düz ES module JavaScript.
 3. Bir YouTube videosu açın ve oynatıcı çubuğundaki **TR** düğmesine (ya da açılır penceredeki anahtara)
    basın. Düğme durumu gösterir: Dublaj kapalı / Hazırlanıyor / Dublaj aktif / Dikkat / Hata.
 
-**Oynatıcı paneli** (`content/panel.js`, `panel.css`; tasarım belirteçleri `common/theme.css`): oynatıcının sol üstündeki
-hap canlı durumu gösterir — dublaj açık/kapalı, hazırlık aşaması, video bekletilirken ince ilerleme çubuğu, bir dublaj
+**Oynatıcı paneli** (`content/panel.js`, `panel.css`; tasarım belirteçleri `common/theme.css`): TR düğmesinin yanında,
+kontrol çubuğunun hemen üstündeki hap (Shorts'ta yüzen TR düğmesinin altında; dublaj kapalıyken yok) canlı durumu
+gösterir — hazırlık aşaması, video bekletilirken ince ilerleme çubuğu, bir dublaj
 cümlesi çalarken **şu an konuşan ses** (ad + kadın/erkek rengi + dublaj sesinden seviye dalgası) ve videodan ölçülen
-konuşan (♀/♂, araç ipucunda Hz). YouTube kontrolleriyle birlikte gizlenir (hazırlık, uyarı ve bekletmede görünür kalır).
-Tıklayınca açılan cam panel: **Durum** (altyazılar, çeviri motoru, ses motoru, ses ayırma, önbellek — model indirme
+konuşan (♀/♂, araç ipucunda Hz). YouTube kontrolleriyle birlikte gizlenir (hazırlık, uyarı ve bekletmede görünür kalır);
+hap görünürken Türkçe altyazı hapın üstüne itilir. Tıklayınca hapın üstünde açılan cam panel: **Durum** (altyazılar, çeviri motoru, ses motoru, ses ayırma, önbellek — model indirme
 yüzdesi ve ne kadar ilerisinin hazır olduğu), **Sesler** (otomatik kadın/erkek anahtarı; kadın ve erkek favori sesi,
 üslup Doğal/Canlı/Sakin, perde −3…+3, ▶ Dinle; anahtar kapalıyken tek ses satırı), **Karışım** (dublaj sesi, orijinal
 ses, gerçek dublaj = ses ayırma, Türkçe altyazı) ve **Tüm ayarlar** bağlantısı. Değişiklikler hemen uygulanır (hazır
