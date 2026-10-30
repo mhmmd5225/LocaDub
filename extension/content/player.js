@@ -127,9 +127,9 @@ export class SystemVoice {
 const videoGains = new WeakMap();
 const videoAnalysers = new WeakMap();
 
-// Videonun Web Audio grafiği: kaynak → kazanç (kısma) → hoparlör; kaynağa paralel bir analizör (konuşanın perdesi,
-// content/gender.js) kısmadan önce bağlanır. Yalnızca MSE (blob:) kaynakta ve bağlam çalışırken kurulur; bir video
-// öğesi için tek kaynak oluşturulabildiği için ikisi birlikte kurulur.
+// Videonun Web Audio grafiği: kaynak → kazanç (kısma) → hoparlör; kaynağa paralel, konuşma bandına süzülmüş bir
+// analizör (konuşanın perdesi, content/gender.js) kısmadan önce bağlanır. Yalnızca MSE (blob:) kaynakta ve bağlam
+// çalışırken kurulur; bir video öğesi için tek kaynak oluşturulabildiği için ikisi birlikte kurulur.
 function videoGraph(v) {
   if (videoGains.has(v)) return { gain: videoGains.get(v), analyser: videoAnalysers.get(v) };
   // Çapraz kaynaklı medya Web Audio'da sessizleşir; yalnızca MSE (blob:) ya da aynı kökenli kaynakta kullan.
@@ -143,9 +143,12 @@ function videoGraph(v) {
     const src = c.createMediaElementSource(v);
     const gain = c.createGain();
     src.connect(gain).connect(c.destination);
+    // konuşma bandı (70 Hz – 1 kHz): bas ve tiz enstrümanlar zayıflar, temel frekans ve ilk harmonikler kalır
+    const hp = new BiquadFilterNode(c, { type: 'highpass', frequency: 70 });
+    const lp = new BiquadFilterNode(c, { type: 'lowpass', frequency: 1000 });
     const analyser = c.createAnalyser();
     analyser.fftSize = 2048;
-    src.connect(analyser);
+    src.connect(hp).connect(lp).connect(analyser);
     videoGains.set(v, gain);
     videoAnalysers.set(v, analyser);
     return { gain, analyser };

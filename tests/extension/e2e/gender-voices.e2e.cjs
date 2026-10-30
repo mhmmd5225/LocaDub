@@ -1,6 +1,6 @@
 // Konuşanın cinsiyetine göre ses: videonun sesi önce erkek, sonra kadın konuşma (tests/extension/fixtures, eklentinin
 // kendi sesleriyle üretilmiş). Eklenti perdeyi videonun sesinden ölçer; kadın konuşmaya geçince sonraki cümleleri
-// favori kadın sesiyle hazırlar. Test motoru: favori erkek = mock-beep, favori kadın = mock-silent.
+// favori kadın sesiyle hazırlar; kadın konuşmanın ilk cümlesi bitmeden (erken karar). Test motoru: favori erkek = mock-beep, favori kadın = mock-silent.
 //   xvfb-run -a node tests/extension/e2e/gender-voices.e2e.cjs
 const assert = require('assert/strict');
 const fs = require('fs');
@@ -42,6 +42,9 @@ function genderVideo() {
     assert.ok(said.some((l) => /erkek/.test(l)), 'erkek duyulmadı: ' + logs.join('\n'));
     assert.ok(said.some((l) => /kadın/.test(l)), 'kadın duyulmadı: ' + logs.join('\n'));
     assert.ok(said.findIndex((l) => /erkek/.test(l)) < said.findIndex((l) => /kadın/.test(l)), said.join(' | '));
+    // erken karar: kadın konuşmanın ilk cümlesi (9.2–11.8 sn) bitmeden fark edilir
+    const fem = /kadın \(\d+ Hz, ([\d.]+) sn/.exec(said.find((l) => /kadın/.test(l)));
+    assert.ok(fem && Number(fem[1]) < 11.8, 'kadın konuşma cümle bitmeden fark edilmedi: ' + said.join(' | '));
     // erkek cümleler erkek sesiyle; kadın konuşmanın duyulduğu cümleden sonrakiler kadın sesiyle (son sentez)
     for (const i of [0, 1, 2]) assert.equal(voice[i], 'mock-beep', `cümle ${i}: ${voice[i]}`);
     for (const i of [4, 5, 6]) assert.equal(voice[i], 'mock-silent', `cümle ${i}: ${voice[i]}\n${logs.join('\n')}`);

@@ -3,7 +3,7 @@
 import { getSettings, setSettings, onSettingsChanged, chooseVoice, toneFor, voiceGender, genderVoice } from '../common/settings.js';
 import { styleSpeed } from '../engines/tts/styles.js';
 import { DEFAULT_VOICE } from '../engines/tts/voices.js';
-import { GenderTracker, estimateF0, predictGender, turnGender } from './gender.js';
+import { GenderTracker, estimateF0, predictGender, turnGender, EARLY_VOICED, CLEAR_MALE_HZ, CLEAR_FEMALE_HZ } from './gender.js';
 import { decodePcmBase64ToInt16, int16ToWav, trimSilenceInt16 } from '../common/pcm.js';
 import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
@@ -586,12 +586,26 @@ class Session {
     this.pitch.push(v.currentTime, estimateF0(buf, an.context.sampleRate));
   }
 
-  // Biten cümlelerin perdesini ölç; konuşmacı sırasının cinsiyetini güncelle (gender.js turnGender).
+  // Biten cümlelerin perdesini ölç; konuşmacı sırasının cinsiyetini güncelle (gender.js turnGender). Çalan cümlede
+  // ilk ≈ 0.5 sn'lik konuşma belirgin bir cinsiyet gösterir ve beklenenden farklıysa karar hemen verilir (erken
+  // karar): sonraki cümleler bu cümle bitmeden doğru sesle hazırlanır; bitişteki tam ölçüm yine yapılır.
   _measureGender(t) {
     if (!settings.genderVoices || settings.voice === 'system') return;
     const G = this.genders;
     let changed = false;
     for (const s of this.sentences) {
+      if (!s.early && !s.measured && s.start <= t && s.end > t) {
+        const m = this.pitch.measure(s.start, t, { min: EARLY_VOICED });
+        if (!m?.gender || (m.hz >= CLEAR_MALE_HZ && m.hz <= CLEAR_FEMALE_HZ)) continue;
+        s.early = true;
+        const turn = s.speaker || 0;
+        if (G.turns.get(turn) === m.gender && G.last === m.gender) continue;
+        changed = true;
+        console.info(LOG, `konuşan: ${m.gender === 'female' ? 'kadın' : 'erkek'} (${m.hz} Hz, ${t.toFixed(1)} sn, erken)`);
+        G.turns.set(turn, m.gender);
+        G.last = m.gender;
+        continue;
+      }
       if (s.measured || s.end > t || s.end < t - 5) continue;
       s.measured = true;
       const m = this.pitch.measure(s.start, s.end);
