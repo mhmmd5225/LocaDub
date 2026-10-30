@@ -22,3 +22,10 @@ Thumbs.db
 site/LocaDub.zip
 site/version.json
 build/
+
+# Ses laboratuvarı (ölçüm çıktıları, indirilen modeller ve klonlar)
+tools/tts/lab/out/
+tools/tts/lab/.models/
+tools/tts/lab/.vendor/
+tools/tts/lab/node_modules/
+tools/tts/lab/.venv-pocket/

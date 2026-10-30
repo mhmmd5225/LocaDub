@@ -1,0 +1,17 @@
+{
+  "_not": "Kör dinleme sayfasına giren adaylar. 'etiket' yalnızca sonuç ekranında ve raporda görünür.",
+  "candidates": [
+    { "id": "antalia-mini", "etiket": "Antalia Mini (mevcut, erkek)" },
+    { "id": "ahenk-cep-neutral", "etiket": "Ahenk Cep, stil neutral (mevcut, kadın)" },
+    { "id": "ahenk-cep-calm", "etiket": "Ahenk Cep, stil calm" },
+    { "id": "ema-lightning", "etiket": "EMA Lightning" },
+    { "id": "okur", "etiket": "Okur v1.0" },
+    { "id": "supertonic3-F1", "etiket": "Supertonic 3, F1 (kadın)" },
+    { "id": "supertonic3-F3", "etiket": "Supertonic 3, F3 (kadın)" },
+    { "id": "supertonic3-M1", "etiket": "Supertonic 3, M1 (erkek)" },
+    { "id": "supertonic3-M4", "etiket": "Supertonic 3, M4 (erkek)" },
+    { "id": "pocket-female_1", "etiket": "Pocket TTS Turkish, female_1" },
+    { "id": "pocket-female_2", "etiket": "Pocket TTS Turkish, female_2" },
+    { "id": "pocket-male_2", "etiket": "Pocket TTS Turkish, male_2" }
+  ]
+}

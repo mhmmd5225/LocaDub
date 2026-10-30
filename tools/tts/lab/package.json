@@ -1,0 +1,9 @@
+{
+  "name": "locadub-ses-laboratuvari",
+  "private": true,
+  "type": "module",
+  "description": "Türkçe TTS aday ölçüm ve kör dinleme laboratuvarı (eklentiden bağımsız)",
+  "dependencies": {
+    "onnxruntime-node": "1.22.0"
+  }
+}

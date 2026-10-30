@@ -1,0 +1,245 @@
+<title>Kör Ses Dinlemesi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
+<style>
+/* Düzen: tek sütun, cümle başına bir kart; yapışkan üst çubukta ilerleme ve sonuç düğmesi. */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --fg: #1d2421;
+  --muted: #5d6762;
+  --line: #d9ddd7;
+  --accent: #0f6b5c;
+  --accent-fg: #ffffff;
+  --accent-soft: #dcefe9;
+  --warn: #a8481b;
+  --warn-soft: #f8e4d8;
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121715; --surface: #1b2220; --fg: #e8ece9; --muted: #9aa5a0; --line: #2e3834;
+    --accent: #55c2ac; --accent-fg: #0b1512; --accent-soft: #1d3a33; --warn: #f0a077; --warn-soft: #3c2619;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121715; --surface: #1b2220; --fg: #e8ece9; --muted: #9aa5a0; --line: #2e3834;
+  --accent: #55c2ac; --accent-fg: #0b1512; --accent-soft: #1d3a33; --warn: #f0a077; --warn-soft: #3c2619;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 760px; margin: 0 auto; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+header.top { padding-block: 32px 8px; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 6vw, 2.75rem); line-height: 1.1; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { color: var(--muted); max-width: 62ch; margin: 0 0 8px; }
+.scale { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 0; padding: 0; list-style: none; font-size: 0.875rem; color: var(--muted); }
+.scale b { font-family: var(--font-mono); color: var(--fg); font-weight: 500; }
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  border-bottom: 1px solid var(--line); margin-top: 16px; padding-block: 10px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.prog { flex: 1 1 160px; min-width: 0; }
+.prog small { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.track i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); border-radius: 6px; padding: 8px 14px; font-weight: 500; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: default; }
+section.s { margin-top: 28px; }
+.s h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.35rem; line-height: 1.35; margin: 0 0 6px; text-wrap: pretty; }
+.meta { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.voices { display: grid; gap: 8px; margin-top: 12px; }
+.v { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; }
+.v.done { border-color: var(--accent); }
+.play { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); font-size: 1rem; display: grid; place-items: center; padding: 0; }
+.play[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.vname { font-weight: 600; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.vname span { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 400; color: var(--muted); }
+.ctl { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.rate { display: inline-flex; gap: 4px; border: 0; margin: 0; padding: 0; }
+.rate legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.rate label { position: relative; }
+.rate input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.rate span { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--font-mono); background: var(--bg); }
+.rate input:checked + span { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.rate input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.robo { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; font-size: 0.9rem; cursor: pointer; }
+.robo input { width: 20px; height: 20px; accent-color: var(--warn); }
+.pb { grid-column: 2; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.pb i { display: block; height: 100%; width: 0; background: var(--accent); }
+#sonuc { margin-top: 40px; padding-top: 24px; border-top: 2px solid var(--fg); }
+#sonuc h2 { font-family: var(--font-display); font-size: 1.75rem; margin: 0 0 8px; }
+.tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin-block: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 500; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+textarea { width: 100%; min-height: 160px; font-family: var(--font-mono); font-size: 0.75rem; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.note { color: var(--muted); font-size: 0.875rem; max-width: 70ch; }
+.warn { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 8px 12px; font-size: 0.875rem; }
+details { margin-block: 12px; }
+summary { cursor: pointer; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .track i { transition: none; } }
+@media (max-width: 520px) { .rate span { width: 44px; height: 44px; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Kör Ses Dinlemesi</h1>
+    <p class="lede">Aynı Türkçe cümle, farklı sesler. Hangisinin hangi model olduğu gizli ve sıra her cümlede farklı. Her sesi dinleyip ne kadar insansı geldiğine puan verin. Robot gibi duyulanları ayrıca işaretleyin.</p>
+    <ul class="scale" aria-label="Puan ölçeği">
+      <li><b>1</b> çok yapay</li><li><b>3</b> idare eder</li><li><b>5</b> insan gibi</li>
+    </ul>
+  </header>
+  <div class="bar">
+    <div class="prog"><small id="progTxt">0 / 0 ses puanlandı</small><div class="track"><i id="progBar"></i></div></div>
+    <button class="btn" id="showBtn" type="button">Sonuçları göster</button>
+  </div>
+  <main id="main"></main>
+  <section id="sonuc" hidden>
+    <h2>Sonuçlar</h2>
+    <p class="note" id="sonucNot"></p>
+    <div class="tw"><table id="tbl"></table></div>
+    <p>Aşağıdaki JSON'u kopyalayıp gönderebilirsiniz.</p>
+    <textarea id="json" readonly aria-label="Sonuç JSON"></textarea>
+    <p><button class="btn ghost" id="copyBtn" type="button">JSON'u kopyala</button> <span id="copyMsg" class="note" role="status"></span></p>
+    <details><summary>Cümle başına ses sırası (anahtar)</summary><div class="tw"><table id="key"></table></div></details>
+    <p class="note">UTMOS22 İngilizce konuşmayla eğitilmiş otomatik bir kalite tahminidir ve Türkçede kaba bir ölçüttür. Hız (RTF) bu sunucuda, tek bir CPU çekirdek grubunda ölçüldü. Tarayıcıdaki WASM bunlardan yavaş olur.</p>
+  </section>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+const KEY = 'kor-dinleme-v1';
+const $ = (s, r = document) => r.querySelector(s);
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { state = {}; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+const cell = (sid, cid) => (state[sid + '|' + cid] ||= {});
+const total = DATA.sentences.length * DATA.candidates.length;
+
+const main = $('#main');
+let current = null; // {audio, btn, bar}
+const urls = {};
+function urlFor(cid, sid) {
+  const k = cid + '|' + sid;
+  if (!urls[k]) {
+    const bin = atob(DATA.audio[cid][sid]);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    urls[k] = URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' }));
+  }
+  return urls[k];
+}
+function stopCurrent() {
+  if (!current) return;
+  current.audio.pause();
+  current.btn.setAttribute('aria-pressed', 'false');
+  current.btn.textContent = '▶';
+  current = null;
+}
+function play(btn, bar, cid, sid) {
+  if (current && current.btn === btn) { stopCurrent(); return; }
+  stopCurrent();
+  const a = new Audio(urlFor(cid, sid));
+  a.addEventListener('timeupdate', () => { bar.style.width = (a.duration ? (a.currentTime / a.duration) * 100 : 0) + '%'; });
+  a.addEventListener('ended', () => { if (current && current.audio === a) stopCurrent(); bar.style.width = '0'; });
+  current = { audio: a, btn, bar };
+  btn.setAttribute('aria-pressed', 'true');
+  btn.textContent = '❚❚';
+  a.play().catch(() => stopCurrent());
+}
+function updateProgress() {
+  let n = 0;
+  for (const s of DATA.sentences) for (const c of DATA.candidates) if (cell(s.id, c.id).puan) n++;
+  $('#progTxt').textContent = n + ' / ' + total + ' ses puanlandı';
+  $('#progBar').style.width = (100 * n / total) + '%';
+  return n;
+}
+function build() {
+  for (const s of DATA.sentences) {
+    const sec = document.createElement('section');
+    sec.className = 's';
+    sec.innerHTML = '<div class="meta"></div><h2></h2><div class="voices"></div>';
+    $('.meta', sec).textContent = 'Cümle ' + (DATA.sentences.indexOf(s) + 1) + ' / ' + DATA.sentences.length + ' · ' + s.tur;
+    $('h2', sec).textContent = s.text;
+    const list = $('.voices', sec);
+    DATA.order[s.id].forEach((cid, i) => {
+      const label = 'Ses ' + String.fromCharCode(65 + i);
+      const st = cell(s.id, cid);
+      const row = document.createElement('div');
+      row.className = 'v' + (st.puan ? ' done' : '');
+      const name = 'p-' + s.id + '-' + i;
+      row.innerHTML =
+        '<button type="button" class="play" aria-pressed="false" aria-label="' + label + ' oynat">▶</button>' +
+        '<div class="vname">' + label + '</div>' +
+        '<div class="pb"><i></i></div>' +
+        '<div class="ctl"><fieldset class="rate"><legend>' + label + ' için insansılık puanı</legend>' +
+        [1, 2, 3, 4, 5].map((n) => '<label><input type="radio" name="' + name + '" value="' + n + '"' + (st.puan === n ? ' checked' : '') + '><span>' + n + '</span></label>').join('') +
+        '</fieldset><label class="robo"><input type="checkbox"' + (st.robotik ? ' checked' : '') + '> Robotik</label></div>';
+      const btn = $('.play', row), bar = $('.pb i', row);
+      btn.addEventListener('click', () => play(btn, bar, cid, s.id));
+      row.querySelectorAll('.rate input').forEach((r) => r.addEventListener('change', () => {
+        cell(s.id, cid).puan = Number(r.value); row.classList.add('done'); save(); updateProgress();
+      }));
+      $('.robo input', row).addEventListener('change', (e) => { cell(s.id, cid).robotik = e.target.checked; save(); });
+      list.appendChild(row);
+    });
+    main.appendChild(sec);
+  }
+  updateProgress();
+}
+
+const f = (x, d = 2) => (x == null ? '–' : Number(x).toFixed(d));
+function results() {
+  const rows = [], per = {};
+  for (const s of DATA.sentences) DATA.order[s.id].forEach((cid, i) => {
+    const st = cell(s.id, cid);
+    rows.push({ cumle: s.id, ses: 'Ses ' + String.fromCharCode(65 + i), aday: cid, puan: st.puan || null, robotik: !!st.robotik });
+    const p = (per[cid] ||= { n: 0, sum: 0, robo: 0, sayilan: 0 });
+    if (st.puan) { p.n++; p.sum += st.puan; }
+    if (st.robotik) p.robo++;
+  });
+  const ozet = DATA.candidates.map((c) => {
+    const p = per[c.id];
+    return { aday: c.id, etiket: c.etiket, ortPuan: p.n ? +(p.sum / p.n).toFixed(2) : null, puanlanan: p.n, robotikIsareti: p.robo,
+      utmos: c.utmos, rtf4: c.rtf4, rtf1: c.rtf1, mb: c.mb };
+  }).sort((a, b) => (b.ortPuan ?? -1) - (a.ortPuan ?? -1));
+  return { surum: 1, kaynak: 'kor-dinleme', ozet, puanlar: rows };
+}
+function showResults() {
+  const n = updateProgress();
+  const r = results();
+  $('#sonucNot').innerHTML = n < total ? '<span class="warn">' + (total - n) + ' ses henüz puanlanmadı; ortalamalar yalnızca puanlananlarla hesaplandı.</span>' : 'Tüm sesler puanlandı.';
+  $('#tbl').innerHTML = '<tr><th>Aday</th><th class="n">Ort. puan</th><th class="n">Robotik</th><th class="n">UTMOS22</th><th class="n">RTF (4 iş p.)</th><th class="n">RTF (1 iş p.)</th><th class="n">Boyut MB</th></tr>' +
+    r.ozet.map((o) => '<tr><td>' + o.etiket + '</td><td class="n">' + f(o.ortPuan) + '</td><td class="n">' + o.robotikIsareti + '/' + DATA.sentences.length + '</td><td class="n">' + f(o.utmos) + '</td><td class="n">' + f(o.rtf4, 3) + '</td><td class="n">' + f(o.rtf1, 3) + '</td><td class="n">' + f(o.mb, 0) + '</td></tr>').join('');
+  const labels = DATA.candidates.reduce((m, c) => (m[c.id] = c.etiket, m), {});
+  $('#key').innerHTML = '<tr><th>Cümle</th>' + DATA.order[DATA.sentences[0].id].map((_, i) => '<th>Ses ' + String.fromCharCode(65 + i) + '</th>').join('') + '</tr>' +
+    DATA.sentences.map((s) => '<tr><td>' + s.id + '</td>' + DATA.order[s.id].map((cid) => '<td>' + labels[cid] + '</td>').join('') + '</tr>').join('');
+  $('#json').value = JSON.stringify(r, null, 1);
+  $('#sonuc').hidden = false;
+  $('#sonuc').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#showBtn').addEventListener('click', showResults);
+$('#copyBtn').addEventListener('click', async () => {
+  const ta = $('#json');
+  try { await navigator.clipboard.writeText(ta.value); $('#copyMsg').textContent = 'Kopyalandı.'; }
+  catch (e) { ta.select(); $('#copyMsg').textContent = 'Metin seçildi; elle kopyalayın.'; }
+});
+build();
+</script>
