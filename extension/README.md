@@ -73,7 +73,9 @@ Ayarlar (`chrome.storage.local`):
 | İlk cümle hazır olana kadar videoyu beklet | Varsayılan açık (`holdStart`). Dublaj açılınca video, yakındaki (8 sn) ilk cümlenin sesi hazır olana kadar duraklatılır, sonra kendiliğinden sürer (en fazla 25 sn; Oynat'a basınca beklemeden devam eder, reklamda bekletilmez). Böylece motorlar yüklenirken baştaki cümleler atlanmaz |
 | Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
 | Otomatik altyazıda noktalama | İsteğe bağlı model (Ayarlar → İndirme, 210 MB, HuggingFace): YouTube'un otomatik (küçük harfli, noktasız) altyazısına çeviriden önce noktalama ve büyük harf ekler; kıyasta chrF 51.1 → 53.1 (`engines/mt/punct.js`, `restore-engine.js`; `docs/MT-KIYAS.md`). Elle yazılmış altyazıya dokunmaz; indirme bitince kendiliğinden açılır |
-| Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, indirme yok |
+| Gerçek dublaj (ses ayırma) | Varsayılan Otomatik (`separation: 'auto' \| 'off'`). Orijinal sesten konuşma bir ayırma modeliyle çıkarılır; video boyunca yalnızca müzik + efekt çalar, Türkçe dublaj üstüne. Ayrıntı: aşağıda "Gerçek dublaj". Açıkken "Orijinal ses" (ducking) ayarı etkisizdir: konuşma zaten yoktur, müzik kısılmaz |
+| Ön tampon | `prebufferSec` (5–60, varsayılan 20): dublaj başlarken video en çok bu kadar saniye bekletilir ve bu kadar saniyelik ses önceden ayrılır |
+| Test motoru | `engines/_mock/` ile uçtan uca test: "[TR] …" metni + bip sesi, sahte ayırma (girdi × 0.5), indirme yok |
 
 ## Mimari
 
@@ -121,13 +123,68 @@ offscreen.js                  engines/mt/index.js + engines/tts/index.js (dinami
   WASM çoklu iş parçacığı açık. Model indirmeleri `mode:'cors'`, `credentials:'omit'`.
 - Model indirmesi yalnızca kullanıcı popup'ta onay verdikten sonra yapılır (`modelsApproved`).
 
+### Gerçek dublaj (ses ayırma)
+
+```
+main-world.js (MAIN)     MediaSource.addSourceBuffer / SourceBuffer.appendBuffer kancası: ses SourceBuffer'ına
+                         (audio/webm opus, audio/mp4 AAC) başarıyla eklenen baytların kopyası + timestampOffset
+        │ window.postMessage (aktarılabilir ArrayBuffer; abone olunca baştan, sonra anında)
+content/separation.js    SeparatedAudio: video.src'deki MediaSource'un eklemeleri → sep-demux.js (WebM/EBML ya da
+                         parçalı MP4 akış ayrıştırıcısı) → kodlanmış paketler (PacketStore, medya zamanıyla)
+        │ iş başına WebCodecs AudioDecoder → PCM [a − 1 sn, b + 1 sn]
+        │ MessageChannel (aktarılabilir Float32Array)
+sep/host.html + host.js  YouTube sayfasına eklenen gizli eklenti çerçevesi → Worker (eklenti kökeni, WebGPU)
+        │                engines/sep/worker.js (test: engines/_mock/sep.js)
+        ▼ sonuç: bağlam kırpılır, ekler 50 ms çapraz geçişle önbelleğe (PcmTimeline)
+AudioBufferSourceNode'lar video.currentTime'a eşit kurulur; videonun kendi sesi grafikte susturulur
+```
+
+- **Ses nereden?** YouTube MSE ile oynatır; içerik betiği sayfadan sonra yüklendiği için MAIN dünyası kancası
+  (`document_start`) eklemelerin kopyasını baştan tutar (kaynak başına ≤ 32 MB ≈ yarım saat opus) ve abonelikte
+  yeniden gönderir. YouTube'un eklediği veriye dokunulmaz. Ses paket olarak (≈ 16 KB/sn) saklanır, yalnızca işlenecek
+  parça çözülür: geri sarınca (YouTube aynı bölümü yeniden eklemez) 5 dakikaya kadar geriye yeniden ayrılabilir.
+- **Çözme**: `decodeAudioData` her parçayı ayrı ve sıfırdan çözer (opus ön-atlama, ek yerinde tıkırtı, zaman damgası yok);
+  bunun yerine en küçük akış ayrıştırıcıları (`content/sep-demux.js`: EBML Cluster/SimpleBlock, MP4 moof/tfdt/trun)
+  + WebCodecs `AudioDecoder` kullanılır; her çıkış bloğu kendi zaman damgasıyla örnek düzeyinde yerleşir. Kalite
+  değişimi (yeni ilklendirme), `abort()`, aynı zamana yeniden ekleme (yenisi kazanır), boşluk ve sıra dışı ekleme
+  (ileri/geri sarma) desteklenir.
+- **Neden çerçeve?** İşçi, WebGPU'ya erişen bir eklenti kökeninden açılmalı. Offscreen belgesi
+  `chrome.runtime` iletileriyle (JSON/base64) büyük PCM için yavaş; gizli web-accessible çerçeve
+  (`sep/host.html`) ile içerik betiği arasında `MessageChannel` + aktarılabilir diziler kopyasız. Model, oturumlar
+  (video değişimi, reklam) arasında çerçevede yüklü kalır; ayar kapatılınca ya da dublaj kapanınca boşaltılır.
+- **İşçi protokolü**: `load { id, model?, backend? }` → `progress { loaded, total }`* → `loaded { backend, model,
+  contextSec? }` | `error`; `process { id, left, right, sampleRate }` → `result { id, left, right, ms, backend }` |
+  `error`; `dispose`. Sonuç girdiyle aynı uzunluktadır; `contextSec` bildirilirse bağlam o olur (varsayılan 1 sn).
+- **Planlama** (`content/sep-core.js`, saf): yalnızca oynatma konumunun ilerisi, en yakın önce; parça 12 sn, her iki
+  yanda 1 sn bağlam (sonuçtan kırpılır), sondaki bağlamın ilk 50 ms'si bir sonraki parçayla doğrusal geçer. İleri
+  pencere = max(ön tampon, 8) + 12 sn. Girdi tam parçaya yetmiyorsa acil değilken beklenir, acilken (≤ 8 sn hazır)
+  en az 2 sn'lik parça işlenir. Önbellek: 15 sn geri, pencere + 17 sn ileri.
+- **Bekletme** (`HoldGate`): başta en çok `prebufferSec` saniye, `prebufferSec` kadar ses ayrılana dek (model
+  yüklenirken de). Sonra: ayırma darboğazsa hazır ses < 2 sn → video duraklatılır (`waiting`), ≥ 8 sn olunca sürer.
+  YouTube henüz indirmediyse (işlenecek bir şey yok) bekletilmez. Bekletme sırasında Oynat'a basılırsa ayırma yeniden
+  8 sn öne geçene dek bekletilmez; o arada ayrılmamış bölümde orijinal ses çalar. Dublajın ilk cümle bekletmesiyle
+  (`holdStart`) aynı videoyu paylaşır: hangisi önce bırakırsa öbürünü bekler, videoyu son bırakan sürdürür.
+- **Çalma**: 0.5 sn'lik `AudioBufferSourceNode`'lar 2 sn ileriye kurulur (medya zamanı → `AudioContext` zamanı);
+  oynat/duraklat/atlama/hız izlenir; çalan parçanın medya zamanı − `video.currentTime` ortancası 40 ms'yi aşarsa yeniden
+  eşitlenir. Orijinal ses `videoGraph().mute` ile tam o anda susturulur, ayrılmış ses bittiği anda geri açılır. Perde
+  analizörü (cinsiyet) susturmadan önce bağlıdır, orijinal sesi dinlemeye devam eder. Ayrılmış ses YouTube'un ses
+  düzeyini izler, dublaj sırasında kısılmaz.
+- **Durum** (oynatıcı paneli için): `session.separation` (`SeparatedAudio`, `EventTarget`), `'state'` olayı
+  `detail = { status, backend, model, aheadSec, cachedRanges, progress, rtf, message }`;
+  `status`: `off` | `loading-model` | `buffering` | `playing` | `waiting` | `error`. Konsola durum değişimleri
+  (`[yt-tr-dub] ayırma: …`) yazılır; video bekletilirken nedeni oynatıcıdaki durum satırında görünür.
+- **Sınırlar**: reklamda kapalıdır (reklam bitince yeniden kurulur). Oynatma hızı 1x değilken orijinal ses çalar
+  (Web Audio'da perde korumalı hız yok). Şifreli (DRM) ses, MSE'siz kaynak, canlı yayın ve MSE'yi Worker'da çalıştıran
+  oynatıcılar desteklenmez (durum `off`/`error`, orijinal ses çalar). Örnekleme hızı değişirse ayrılmış önbellek
+  boşaltılır. Opus kod gecikmesi (≈ 6.5 ms) düzeltilmez. Ayırma işçisi WebGPU'suz da açılır; yavaşsa video bekler.
+
 ## Testler
 
 ```
 node --test tests/extension/
 ```
 
-Saf modüller (`content/captions.js`, `content/timing.js`, `common/pcm.js`, `common/settings.js`,
+Saf modüller (`content/captions.js`, `content/timing.js`, `content/sep-core.js`, `content/sep-demux.js`, `common/pcm.js`, `common/settings.js`,
 `common/transcript-store.js`, `common/glossary.js`),
 `engines/common/model-cache.js` (sahte Cache Storage/fetch ile) ve sahte motorlar sınanır.
 
@@ -143,6 +200,7 @@ xvfb-run -a node tests/extension/e2e/shorts-embed.e2e.cjs
 xvfb-run -a node tests/extension/e2e/hold-start.e2e.cjs
 xvfb-run -a node tests/extension/e2e/gender-voices.e2e.cjs
 xvfb-run -a node tests/extension/e2e/player-panel.e2e.cjs  # ekran görüntüleri: tests/extension/e2e/out/
+xvfb-run -a node tests/extension/e2e/separation.e2e.cjs  # sahte YouTube MSE ile (launch({ mse: true }))
 xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punct-en/ yoksa atlanır
 ```
 

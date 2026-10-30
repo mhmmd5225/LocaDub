@@ -124,14 +124,14 @@ export class SystemVoice {
 
 // Orijinal sesi kısar. Tercihen Web Audio Gain (YouTube'un ses ayarına dokunmaz),
 // bağlam çalışmıyorsa video.volume ile.
-const videoGains = new WeakMap();
-const videoAnalysers = new WeakMap();
+const videoGraphs = new WeakMap();
 
-// Videonun Web Audio grafiği: kaynak → kazanç (kısma) → hoparlör; kaynağa paralel, konuşma bandına süzülmüş bir
-// analizör (konuşanın perdesi, content/gender.js) kısmadan önce bağlanır. Yalnızca MSE (blob:) kaynakta ve bağlam
-// çalışırken kurulur; bir video öğesi için tek kaynak oluşturulabildiği için ikisi birlikte kurulur.
-function videoGraph(v) {
-  if (videoGains.has(v)) return { gain: videoGains.get(v), analyser: videoAnalysers.get(v) };
+// Videonun Web Audio grafiği: kaynak → kazanç (kısma, Ducker) → susturma (gerçek dublajda orijinal ses yerine ayrılmış
+// müzik + efekt çalar, content/separation.js) → hoparlör; kaynağa paralel, konuşma bandına süzülmüş bir analizör
+// (konuşanın perdesi, content/gender.js) kısmadan önce bağlanır, susturmadan etkilenmez. Yalnızca MSE (blob:) ya da
+// aynı kökenli kaynakta ve bağlam çalışırken kurulur; bir video öğesi için tek kaynak olabildiği için hepsi birlikte.
+export function videoGraph(v) {
+  if (videoGraphs.has(v)) return videoGraphs.get(v);
   // Çapraz kaynaklı medya Web Audio'da sessizleşir; yalnızca MSE (blob:) ya da aynı kökenli kaynakta kullan.
   const src0 = String(v.currentSrc || v.src);
   let sameOrigin = false;
@@ -140,18 +140,19 @@ function videoGraph(v) {
   const c = audioContext();
   if (!c || c.state !== 'running') return null;
   try {
-    const src = c.createMediaElementSource(v);
+    const source = c.createMediaElementSource(v);
     const gain = c.createGain();
-    src.connect(gain).connect(c.destination);
+    const mute = c.createGain();
+    source.connect(gain).connect(mute).connect(c.destination);
     // konuşma bandı (70 Hz – 1 kHz): bas ve tiz enstrümanlar zayıflar, temel frekans ve ilk harmonikler kalır
     const hp = new BiquadFilterNode(c, { type: 'highpass', frequency: 70 });
     const lp = new BiquadFilterNode(c, { type: 'lowpass', frequency: 1000 });
     const analyser = c.createAnalyser();
     analyser.fftSize = 2048;
-    src.connect(hp).connect(lp).connect(analyser);
-    videoGains.set(v, gain);
-    videoAnalysers.set(v, analyser);
-    return { gain, analyser };
+    source.connect(hp).connect(lp).connect(analyser);
+    const g = { source, gain, mute, analyser };
+    videoGraphs.set(v, g);
+    return g;
   } catch {
     return null;
   }
@@ -217,7 +218,7 @@ export class Ducker {
     clearTimeout(this.releaseTimer);
     if (!this.ducked) return;
     if (this.mode === 'gain') {
-      const g = videoGains.get(this.v);
+      const g = videoGraphs.get(this.v)?.gain;
       const c = audioContext();
       if (g && c) {
         g.gain.cancelScheduledValues(c.currentTime);

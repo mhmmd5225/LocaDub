@@ -17,6 +17,7 @@ import { callMain, sendBg } from './bridge.js';
 import { Overlay, ensureToggleButton } from './overlay.js';
 import { Panel } from './panel.js';
 import { DubAudio, SystemVoice, Ducker, resumeAudio, videoAnalyser } from './player.js';
+import { SeparatedAudio, disposeSeparation } from './separation.js';
 
 const LOG = '[yt-tr-dub]';
 const TICK_MS = 100;
@@ -146,6 +147,7 @@ class Session {
     this.sys = new SystemVoice(sendBg);
     this.ducker = new Ducker(this.video);
     this._bindVideo();
+    this.syncSeparation();
 
     this.overlay.setStatus('Türkçe dublaj 1/4: İngilizce altyazılar alınıyor…');
     this._setBtn('preparing', 'altyazılar alınıyor');
@@ -216,6 +218,8 @@ class Session {
     this._listeners = [];
     this.stopSpeech();
     this._releaseHold();
+    this.separation?.destroy();
+    this.separation = null;
     this.ducker?.destroy();
     this.overlay?.destroy();
     if (session === this) panel?.update({ session: null });
@@ -261,6 +265,38 @@ class Session {
     // Otomatik oynatma politikası: ilk etkileşimde ses bağlamını aç.
     on(document, 'click', () => resumeAudio(), true);
     on(document, 'keydown', () => resumeAudio(), true);
+  }
+
+  // ---- gerçek dublaj: konuşmasız orijinal ses (content/separation.js) ----
+  // this.separation: SeparatedAudio | null; 'state' olayı { status, backend, model, aheadSec, cachedRanges, progress,
+  // rtf, message } (oynatıcı paneli de dinleyebilir). Reklamda kapatılır, reklam bitince yeniden kurulur.
+
+  syncSeparation() {
+    const ad = !!this.player?.classList.contains('ad-showing');
+    const want = this.alive && this.video && settings.enabled && settings.separation === 'auto' && !ad &&
+      (settings.engineMode === 'mock' || settings.modelsApproved);
+    const mode = settings.engineMode === 'mock' ? 'mock' : 'real';
+    if (this.separation && (!want || this.separation.mode !== mode)) {
+      this.separation.destroy();
+      this.separation = null;
+    }
+    if (this.separation) this.separation.setPrebuffer(settings.prebufferSec);
+    if (!want || this.separation) return;
+    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, otherHold: () => this._hold.active });
+    sep.addEventListener('state', (ev) => this._onSepState(ev.detail));
+    this.separation = sep.start();
+  }
+
+  _onSepState(st) {
+    if (st.status !== this._sepStatus) {
+      this._sepStatus = st.status;
+      console.info(LOG, `ayırma: ${st.status}${st.backend ? ` (${st.backend})` : ''} — ${st.message}`);
+    }
+    // video ayırma için bekletiliyorsa nedeni oynatıcıda görünsün
+    const st0 = this.overlay?.status;
+    if (!st0) return;
+    if (this.separation?.holding) this.overlay.setStatus(st.message, { kind: 'sep' });
+    else if (st0.dataset.kind === 'sep') this.overlay.clearStatus();
   }
 
   // Dublaj sesi = eklentideki dublaj seviyesi × oynatıcının ses seviyesi.
@@ -699,6 +735,7 @@ class Session {
 
   tick() {
     if (!this.alive) return;
+    this.syncSeparation(); // ayar, motor ve reklam durumuna göre kur / kaldır
     this._tickHold();
     if (panel && session === this && performance.now() - (this._panelAt || 0) >= 200) {
       this._panelAt = performance.now();
@@ -826,11 +863,12 @@ class Session {
     const hold = shouldHold(this.sentences, v.currentTime, { loaded: this.sentences.length > 0, needAudio });
     if (!h.active) {
       if (!hold) { if (this.sentences.length && (this.mtReady || this.ttsReady)) h.done = true; return; }
-      if (v.paused) return; // kullanıcı durdurmuşsa beklemeye gerek yok; oynatınca yeniden bakılır
+      // kullanıcı durdurmuşsa beklemeye gerek yok; oynatınca yeniden bakılır (ayırma bekletiyorsa bekletmeyi paylaş)
+      if (v.paused && !this.separation?.holding) return;
       h.active = true;
       h.ours = true;
       h.since = performance.now();
-      v.pause();
+      if (!v.paused) v.pause();
       if (this.sentences.length && !this.enginesReady && !this.waitingApproval) this._engineStatus();
       return;
     }
@@ -843,7 +881,8 @@ class Session {
     if (!h.active) { h.done = true; return; }
     const ours = h.ours;
     this._endHold();
-    if (ours && this.video?.paused && this.alive) {
+    // ayırma da bekletiyorsa videoyu o sürdürür
+    if (ours && this.video?.paused && this.alive && !this.separation?.holding) {
       h.resuming = true;
       this.video.play().catch(() => {}).finally(() => { h.resuming = false; });
     }
@@ -927,6 +966,11 @@ function route() {
 
 function onSettings(prev, keys) {
   const has = (k) => keys.includes(k);
+  // ayırma kapatılınca (ya da dublaj kapanınca) işçi ve modeli bellekten at
+  if ((has('separation') && settings.separation === 'off') || (has('enabled') && !settings.enabled)) {
+    session?.syncSeparation();
+    disposeSeparation();
+  }
   if (has('enabled')) { route(); return; }
   ensureButton();
   if (!session) return;
