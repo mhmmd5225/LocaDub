@@ -117,6 +117,11 @@ export class GenderTracker {
   }
 }
 
+/** [t, f0] çerçevelerinden ötümlü olanların perdeleri, tutulan notalar (müzik) atılmış: küme kanıtı için. */
+export function voicedF0(frames) {
+  return dropHeld(frames.filter(([, f]) => f > 0).sort((a, b) => a[0] - b[0]));
+}
+
 // Zamana göre sıralı [t, f0] örneklerinden tutulan nota dizilerini at → kalan perdeler.
 function dropHeld(s) {
   const out = [];
@@ -155,4 +160,203 @@ export function predictGender(sentence, st) {
   if (st.turns.has(turn)) return st.turns.get(turn);
   if (turn >= 2 && st.turns.has(turn - 2)) return st.turns.get(turn - 2);
   return st.last || st.fallback || null;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Konuşmacı kümeleri: cümle başına konuşmacı vektörü (engines/spk, birim uzunluk) → çevrimiçi kümeleme → küme başına
+// tek cinsiyet. Perde tek cümlede müzik/bağırma/fısıltıyla kayar; aynı kişinin bütün cümlelerinin kanıtı birlikte
+// tartılınca karar kararlı olur ve aynı küme hep aynı sesle konuşur. Eşikler tools/spk-eval.mjs ölçümünden.
+
+/** En yakın kümeye benzerlik bundan büyükse katılır (kosinüs). */
+export const SPK_JOIN = 0.5;
+/** Bundan küçükse yeni küme; arası belirsiz: en yakına yarım ağırlıkla katılır (yeni kişi açmakta tutucu). */
+export const SPK_NEW = 0.3;
+/** İki kümenin merkezleri bu kadar benzerse birleşir. */
+export const SPK_MERGE = 0.55;
+/** Küme cinsiyeti için gereken toplam kanıt (ötümlü perde çerçevesi; 50 ms'de bir). */
+export const SPK_MIN_F0 = 10;
+
+export function cosine(a, b) {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s;
+}
+
+function unit(v) {
+  let n = 0;
+  for (let i = 0; i < v.length; i++) n += v[i] * v[i];
+  n = Math.sqrt(n) || 1;
+  return Float32Array.from(v, (x) => x / n);
+}
+
+// Log-perde kutuları (70–400 Hz, yarım ton): kümenin bütün çerçevelerinin ortancası bellek sınırlı tutulur.
+const F0_LO = 70;
+const F0_BINS = 31;
+const f0Bin = (hz) => Math.min(F0_BINS - 1, Math.max(0, Math.round(12 * Math.log2(hz / F0_LO))));
+const binHz = (b) => F0_LO * 2 ** (b / 12);
+
+/**
+ * Kümesi olmayan tek cümlenin cinsiyeti ({ f0: perde çerçeveleri, score: sınıflandırıcı logiti }): küme kararıyla
+ * aynı puan, aynı eşik; kanıt az ya da belirsizse null.
+ */
+export function sentenceGender({ f0 = [], score = null } = {}) {
+  const c = new SpeakerClusters();
+  const z = c.evidence(c._empty(f0, score));
+  return z == null || Math.abs(z) < 1 ? null : z > 0 ? 'female' : 'male';
+}
+
+/**
+ * Çevrimiçi konuşmacı kümeleme ve küme cinsiyeti. Kimlikler kalıcıdır: birleşen kümenin kimliği takma ad olur
+ * (resolve). Cinsiyet kanıtı: cümlelerin ötümlü perde çerçeveleri (tutulan notalar atılmış) ve varsa sınıflandırıcı
+ * puanı (> 0 kadın, logit). Karar yeterli kanıtla bir kez verilir; yalnız birikmiş kanıt açıkça tersini gösterirse döner.
+ */
+export class SpeakerClusters {
+  constructor({ join = SPK_JOIN, fresh = SPK_NEW, merge = SPK_MERGE, minF0 = SPK_MIN_F0 } = {}) {
+    Object.assign(this, { joinThr: join, newThr: fresh, mergeThr: merge, minF0 });
+    this.clusters = new Map(); // id → { id, sum, centroid, n, hist, nf0, score, nscore, gender, order }
+    this.alias = new Map();
+    this.next = 1;
+  }
+
+  // Boş küme kaydı (isteğe bağlı kanıtla; sentenceGender kimliksiz kullanır).
+  _empty(f0 = null, score = null) {
+    const c = { id: null, sum: null, centroid: null, n: 0, w: 0, hist: new Float32Array(F0_BINS), nf0: 0, score: 0, nscore: 0, gender: null };
+    if (f0) for (const hz of f0) if (hz > 0) { c.hist[f0Bin(hz)]++; c.nf0++; }
+    if (Number.isFinite(score)) { c.score = score; c.nscore = 1; }
+    return c;
+  }
+
+  resolve(id) {
+    while (this.alias.has(id)) id = this.alias.get(id);
+    return id;
+  }
+
+  get(id) { return this.clusters.get(this.resolve(id)) || null; }
+
+  /** En yakın küme ve benzerliği. */
+  nearest(v) {
+    let best = null;
+    let sim = -1;
+    for (const c of this.clusters.values()) {
+      const s = cosine(v, c.centroid);
+      if (s > sim) { sim = s; best = c; }
+    }
+    return { cluster: best, sim };
+  }
+
+  /**
+   * Bir cümlenin vektörünü küme ata → küme kimliği. w: güven ağırlığı (ör. konuşma süresi, sn).
+   * ev: { f0?: number[], score?: number } cinsiyet kanıtı (addEvidence).
+   */
+  assign(v, { w = 1, ev = null } = {}) {
+    const { cluster, sim } = this.nearest(v);
+    let c = cluster;
+    if (!c || sim < this.newThr) {
+      c = this._empty();
+      c.id = this.next++;
+      c.sum = new Float32Array(v.length);
+      this.clusters.set(c.id, c);
+    } else if (sim < this.joinThr) w *= 0.5;
+    for (let i = 0; i < v.length; i++) c.sum[i] += w * v[i];
+    c.centroid = unit(c.sum);
+    c.n++;
+    c.w += w;
+    if (ev) this.addEvidence(c.id, ev);
+    this._merge();
+    return this.resolve(c.id);
+  }
+
+  // Merkezleri yakınlaşan kümeleri birleştir (küçük olan büyüğe).
+  _merge() {
+    for (;;) {
+      const cs = [...this.clusters.values()];
+      let pair = null;
+      let best = this.mergeThr;
+      for (let i = 0; i < cs.length; i++) {
+        for (let j = i + 1; j < cs.length; j++) {
+          const s = cosine(cs[i].centroid, cs[j].centroid);
+          if (s > best) { best = s; pair = cs[i].w >= cs[j].w ? [cs[i], cs[j]] : [cs[j], cs[i]]; }
+        }
+      }
+      if (!pair) return;
+      const [a, b] = pair;
+      for (let i = 0; i < a.sum.length; i++) a.sum[i] += b.sum[i];
+      a.centroid = unit(a.sum);
+      a.n += b.n;
+      a.w += b.w;
+      for (let i = 0; i < F0_BINS; i++) a.hist[i] += b.hist[i];
+      a.nf0 += b.nf0;
+      a.score += b.score;
+      a.nscore += b.nscore;
+      a.gender = a.gender || b.gender;
+      this.clusters.delete(b.id);
+      this.alias.set(b.id, a.id);
+      this._decide(a, true);
+    }
+  }
+
+  /** Kümeye cinsiyet kanıtı ekle (perde çerçeveleri, Hz; sınıflandırıcı logiti). Karar değiştiyse true. */
+  addEvidence(id, { f0 = null, score = null } = {}) {
+    const c = this.get(id);
+    if (!c) return false;
+    if (f0) for (const hz of f0) if (hz > 0) { c.hist[f0Bin(hz)]++; c.nf0++; }
+    if (Number.isFinite(score)) { c.score += score; c.nscore++; }
+    return this._decide(c, false);
+  }
+
+  /** Kümenin ortanca perdesi (Hz) ya da yeterli kanıt yoksa 0. Oktav hataları (ortancanın ±10 yarım ton dışı) atılır. */
+  medianHz(id) {
+    const c = typeof id === 'object' ? id : this.get(id);
+    if (!c || c.nf0 < this.minF0) return 0;
+    const med = (lo, hi) => {
+      let n = 0;
+      for (let b = lo; b <= hi; b++) n += c.hist[b];
+      let acc = 0;
+      for (let b = lo; b <= hi; b++) {
+        acc += c.hist[b];
+        if (acc >= n / 2) return b;
+      }
+      return lo;
+    };
+    const m0 = med(0, F0_BINS - 1);
+    return binHz(med(Math.max(0, m0 - 10), Math.min(F0_BINS - 1, m0 + 10)));
+  }
+
+  /**
+   * Kanıtın cinsiyet puanı (> 0 kadın): sınıflandırıcı varsa ortalama logiti, perde ortancasının eşik ortasına
+   * (162 Hz) uzaklığıyla (yarım ton başına 0.5) toplanır. Kanıt yoksa null.
+   */
+  evidence(c) {
+    const hz = c.nf0 >= this.minF0 ? this.medianHz(c) : 0;
+    if (!hz && !c.nscore) return null;
+    let z = 0;
+    if (hz) z += 0.5 * 12 * Math.log2(hz / 162);
+    if (c.nscore) z += c.score / c.nscore;
+    return z;
+  }
+
+  // Yapışkan karar: ilk karar |z| ≥ 1 ile; sonra yön ancak |z| ≥ 3 ile döner.
+  _decide(c, force) {
+    const z = this.evidence(c);
+    if (z == null) return false;
+    const g = z > 0 ? 'female' : 'male';
+    if (g === c.gender) return false;
+    if (!c.gender ? Math.abs(z) < 1 : Math.abs(z) < 3 && !force) return false;
+    c.gender = g;
+    return true;
+  }
+
+  genderOf(id) { return this.get(id)?.gender || null; }
+
+  /** Aynı cinsiyetin kaçıncı kümesi (görülme sırasıyla, 0'dan): aynı cinsiyetten iki konuşmacıya iki ses. */
+  altOf(id) {
+    const c = this.get(id);
+    if (!c?.gender) return 0;
+    let k = 0;
+    for (const o of this.clusters.values()) {
+      if (o === c) return k;
+      if (o.gender === c.gender && o.n >= 2) k++;
+    }
+    return 0;
+  }
 }

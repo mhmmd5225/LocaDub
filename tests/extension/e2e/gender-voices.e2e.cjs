@@ -46,7 +46,7 @@ function genderVideo() {
     const fem = /kadın \(\d+ Hz, ([\d.]+) sn/.exec(said.find((l) => /kadın/.test(l)));
     assert.ok(fem && Number(fem[1]) < 11.8, 'kadın konuşma cümle bitmeden fark edilmedi: ' + said.join(' | '));
     // erkek cümleler erkek sesiyle; kadın konuşmanın duyulduğu cümleden sonrakiler kadın sesiyle (son sentez)
-    for (const i of [0, 1, 2]) assert.equal(voice[i], 'mock-beep', `cümle ${i}: ${voice[i]}`);
+    for (const i of [0, 1, 2]) assert.equal(voice[i], 'mock-beep', `cümle ${i}: ${voice[i]}\n${logs.join('\n')}`);
     for (const i of [4, 5, 6]) assert.equal(voice[i], 'mock-silent', `cümle ${i}: ${voice[i]}\n${logs.join('\n')}`);
     console.log('ok — gender-voices', said.join(' | '));
   } finally {
