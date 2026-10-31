@@ -249,6 +249,22 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
     assert.deepEqual(await sep({ status: 'loading-model', backend: 'webgpu', progress: 0.42 }), { status: 'active', text: 'Model yükleniyor %42 · WebGPU', bar: '42%' });
     assert.deepEqual(await sep({ status: 'buffering', backend: 'wasm', aheadSec: 8.6 }), { status: 'active', text: 'Arabellek · WASM · 8 sn ileri', bar: '43%' });
     await page.screenshot({ path: path.join(OUT, 'panel-separation.png') });
+    // yetişiyor: pillde ve adımda "Hazırlanıyor" yok; ETA + hazır/gereken ve çubuk
+    assert.deepEqual(await sep({ status: 'waiting', backend: 'webgpu', aheadSec: 12, needSec: 30, etaSec: 7.2 }), { status: 'warn', text: '12 / 30 sn hazır · ~8 sn', bar: '40%' });
+    const pill = () => page.evaluate(() => {
+      const p = document.querySelector('.ld-pill');
+      return { label: p.querySelector('.ld-pill-label').textContent, phase: p.dataset.phase, spin: !p.querySelector('.ld-spin').hidden, bar: !p.querySelector('.ld-pill-bar').hidden };
+    });
+    assert.deepEqual(await pill(), { label: 'Ses ayırma yetişiyor · ~8 sn', phase: 'sep', spin: false, bar: true });
+    await page.screenshot({ path: path.join(OUT, 'panel-separation-waiting.png') });
+    // etaSec yoksa süre yazılmaz
+    assert.deepEqual(await sep({ status: 'waiting', backend: 'wasm', aheadSec: 3.4, needSec: 30 }), { status: 'warn', text: '3 / 30 sn hazır', bar: '11%' });
+    assert.equal((await pill()).label, 'Ses ayırma yetişiyor');
+    assert.deepEqual(await sep({ status: 'playing', backend: 'webgpu', aheadSec: 31, rtf: 0.62 }), { status: 'done', text: 'WebGPU · 1.6× gerçek zaman · 31 sn ileri', bar: null });
+    assert.notEqual((await pill()).phase, 'sep');
+    assert.doesNotMatch((await pill()).label, /yetişiyor/);
+    await page.screenshot({ path: path.join(OUT, 'panel-separation-playing.png') });
+    assert.deepEqual(await sep({ status: 'playing', backend: 'wasm', aheadSec: 20, rtf: 1.25 }), { status: 'done', text: 'WASM · 0.8× gerçek zaman · 20 sn ileri', bar: null });
     assert.deepEqual(await sep({ status: 'playing', backend: 'webgpu', aheadSec: 31 }), { status: 'done', text: 'Çalışıyor · WebGPU · 31 sn ileri', bar: null });
     assert.deepEqual(await sep({ status: 'error', message: 'Model yüklenemedi' }), { status: 'error', text: 'Model yüklenemedi', bar: null });
     await opt.evaluate(() => chrome.storage.local.set({ separation: 'off' }));

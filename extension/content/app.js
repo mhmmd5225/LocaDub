@@ -288,6 +288,7 @@ class Session {
   }
 
   _onSepState(st) {
+    if (st.status === 'error' && st.message) this._sepLastError = st.message; // [tanılama]
     if (st.status !== this._sepStatus) {
       this._sepStatus = st.status;
       console.info(LOG, `ayırma: ${st.status}${st.backend ? ` (${st.backend})` : ''} — ${st.message}`);
@@ -992,8 +993,14 @@ export async function start() {
     settings = s;
     onSettings(prev, keys);
   });
-  chrome.runtime.onMessage.addListener((msg) => {
+  chrome.runtime.onMessage.addListener((msg, _from, respond) => {
     if (msg?.type === 'engine.progress') session?.onProgress(msg);
+    // [tanılama] ses ayırma özeti: ayarlar sayfasındaki rapor için (background diag.separation → üst çerçeve)
+    if (msg?.type === 'diag.separation') {
+      const sp = session?.separation;
+      const { cachedRanges, message, ...st } = sp?.state || {};
+      respond(sp ? { ...st, lastError: sp.error?.message || (st.status === 'error' ? message : session._sepLastError) || '' } : { off: true });
+    }
   });
   document.addEventListener('yt-navigate-finish', () => route());
   window.addEventListener('popstate', () => setTimeout(route, 300));
