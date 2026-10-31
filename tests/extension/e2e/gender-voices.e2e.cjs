@@ -11,7 +11,7 @@ const { launch } = require('./common.cjs');
 
 const VID = 'gendertest1';
 const FIX = path.resolve(__dirname, '../fixtures');
-const CLIPS = ['male-antalia', 'male-supertonic', 'male-antalia', 'female-ahenk', 'female-ema', 'female-supertonic', 'female-ahenk'];
+const CLIPS = ['male-antalia', 'male-antalia', 'male-antalia', 'female-ahenk', 'female-ema', 'female-supertonic', 'female-ahenk'];
 const videos = { [VID]: CLIPS.map((c, i) => ({ t: i * 3000 + 200, d: 2600, text: `This is sentence number ${i + 1}.` })) };
 
 function genderVideo() {
