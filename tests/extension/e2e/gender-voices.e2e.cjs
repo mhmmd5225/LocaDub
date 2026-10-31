@@ -28,7 +28,7 @@ function genderVideo() {
 (async () => {
   const { ctx } = await launch({
     videos, videoFile: genderVideo(),
-    settings: { voice: 'mock-beep', holdStart: false, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-silent' } },
+    settings: { voice: 'mock-beep', holdStart: false, genderVoices: true, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-silent' } },
   });
   try {
     const page = await ctx.newPage();

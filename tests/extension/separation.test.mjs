@@ -9,8 +9,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   SEP, PacketStore, PcmTimeline, HoldGate, DriftMeter, planNext, runJob, writeResult, aheadOf, windowFor, bestLag,
+  planStream, writeStreamResult, mergeRanges, streamChunkSec,
 } from '../../extension/content/sep-core.js';
 import { WebmDemuxer, Mp4Demuxer, createDemuxer, opusDuration } from '../../extension/content/sep-demux.js';
+import { handleMessage as handleMock } from '../../extension/engines/_mock/sep.js';
 
 const SR = 1000; // testte küçük örnekleme hızı: dizinler okunaklı
 const ramp = (n, from = 0) => Float32Array.from({ length: n }, (_, i) => from + i);
@@ -392,4 +394,199 @@ test('MP4/AAC (parçalı): yapılandırma, zaman damgaları, bölünmüş ekleme
 
 test('SEP sabitleri makul', () => {
   assert.ok(SEP.low < SEP.high && SEP.ctxSec >= SEP.xfSec && SEP.chunkSec >= 10 && SEP.chunkSec <= 15);
+});
+
+// ---- akış kipi: planlayıcı, yazma, boru hattı ----
+
+const GEO = { win: 5.92, step: 2.96, lat: 0.005 };
+
+test('Akış planı: yeni akış (bağlam, kısa ilk parça), devam (tam pencereler), final (sınır / video sonu)', () => {
+  const base = { raw: [[0, 200]], duration: 200, windowSec: 40, geo: GEO, chunkSec: 4 * GEO.step, ctxSec: 1, xfSec: 0.05 };
+  const a = planStream({ ...base, t: 10, sep: [], stream: null });
+  assert.equal(a.reset, true);
+  assert.equal(a.cont, false);
+  assert.ok(near(a.a, 10) && near(a.ra, 9) && near(a.ctxL, 1));
+  assert.ok(a.b >= 10 + SEP.firstSec - 1e-6 && a.b < 10 + SEP.firstSec + GEO.step, `ilk parça ${a.b}`);
+  assert.ok(near((a.rb - GEO.win - GEO.lat) / GEO.step % 1, 0, 1e-6), 'girdi sonu pencere sonunda');
+  // devam: gönderilmiş işin beklenen aralığı sep'te (mergeRanges), girdi akışın sonundan
+  const stream = { inEnd: a.rb, out: a.b };
+  const b = planStream({ ...base, t: 10, sep: mergeRanges([], [[a.a, a.b]]), stream, aheadSec: 0 });
+  assert.equal(b.cont, true);
+  assert.equal(b.reset, false);
+  assert.ok(near(b.ra, a.rb) && near(b.a, a.b));
+  assert.ok(near(b.b - a.b, 4 * GEO.step, 1e-6), 'tam 4 pencere');
+  // pencere doluysa yok
+  assert.equal(planStream({ ...base, t: 10, sep: [[10, 60]], stream: { inEnd: 63, out: 60 } }), null);
+  // sonraki ayrılmış parça yakın: final, sınıra kadar + sağ bağlam
+  const c = planStream({ ...base, t: 10, sep: [[10, a.b], [a.b + 3, 90]], stream });
+  assert.equal(c.final, true);
+  assert.ok(near(c.b, a.b + 3) && near(c.rb, a.b + 4));
+  // video sonu
+  const d = planStream({ ...base, t: 195, sep: [], stream: null });
+  assert.equal(d.final, true);
+  assert.ok(near(d.b, 200) && near(d.rb, 200));
+  // atlama: akış başka yerde → yeni akış
+  const e = planStream({ ...base, t: 120, sep: [[10, a.b]], stream });
+  assert.equal(e.reset, true);
+  assert.ok(near(e.a, 120));
+});
+
+test('Akış planı: girdi yetmezse acil değilken bekle, acilken eldeki pencereler ya da kısa final', () => {
+  const base = { duration: 200, windowSec: 40, geo: GEO, chunkSec: 4 * GEO.step, ctxSec: 1, xfSec: 0.05, sep: [[0, 20]] };
+  const stream = { inEnd: 20 + GEO.win - GEO.step + GEO.lat, out: 20 };
+  assert.equal(planStream({ ...base, t: 0, raw: [[0, 30]], stream, aheadSec: 20 }), null, 'acil değil: tam parçayı bekle');
+  const u = planStream({ ...base, t: 17, raw: [[0, 30]], stream, aheadSec: 3 });
+  assert.equal(u.cont, true);
+  assert.ok(u.rb <= 30 && u.b > 20, JSON.stringify(u));
+  const f = planStream({ ...base, t: 19, raw: [[0, 23.5]], stream, aheadSec: 1 });
+  assert.equal(f.final, true);
+  assert.ok(near(f.b, 22.5) && near(f.rb, 23.5), JSON.stringify(f));
+  assert.equal(planStream({ ...base, t: 19, raw: [[0, 22]], stream, aheadSec: 1 }), null, 'girdi yok');
+});
+
+test('Akış yazma: yeni akışın bağlamı atılır (xf ile geçiş), orta dikişsiz, final b + xf', () => {
+  const tl = new PcmTimeline(SR);
+  tl.write(0, new Float32Array(5000).fill(1)); // var olan [0, 5)
+  const r1 = { left: new Float32Array(6000).fill(2), right: new Float32Array(6000).fill(2), startSample: 4000, reset: true };
+  assert.deepEqual(writeStreamResult(tl, { a: 5, b: 9, ctxL: 1, reset: true }, r1, { xfSec: 0.05 }), [4950, 10000]);
+  const { L } = tl.read(4900, 5100);
+  assert.equal(L[0], 1);
+  assert.ok(L[60] > 1 && L[60] < 2, 'çapraz geçiş');
+  assert.equal(L[150], 2);
+  const r2 = { left: ramp(3000), right: ramp(3000), startSample: 10000, reset: false };
+  assert.deepEqual(writeStreamResult(tl, { a: 10, b: 13, reset: false }, r2), [10000, 13000]);
+  assert.deepEqual(tl.ranges(), [[0, 13000]]);
+  assert.equal(tl.read(12999, 13000).L[0], 2999);
+  // final: sınır 14 + 50 ms
+  const r3 = { left: new Float32Array(2000).fill(3), right: new Float32Array(2000).fill(3), startSample: 13000 };
+  assert.deepEqual(writeStreamResult(tl, { a: 13, b: 14, final: true, reset: false }, r3, { duration: 100 }), [13000, 14050]);
+  // beklenmedik sıfırlama: ilk ctxSec atılır
+  const r4 = { left: new Float32Array(3000).fill(4), right: new Float32Array(3000).fill(4), startSample: 20000, reset: true };
+  assert.deepEqual(writeStreamResult(tl, { a: 20, b: 23, reset: false }, r4, { ctxSec: 1 }), [21000, 23000]);
+});
+
+test('Boru hattı: iki iş uçuşta, sırayla sahte akış işçisinde → önbellek kesintisiz ve girdi × 0.5', async () => {
+  const sr = 8000, dur = 60;
+  let s = 3;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647) - 0.5;
+  const rawL = Float32Array.from({ length: sr * dur }, rnd), rawR = Float32Array.from({ length: sr * dur }, rnd);
+  const out = [];
+  handleMock({ type: 'load', id: 0 }, (m) => out.push(m));
+  const info = out.pop();
+  const geo = { win: info.chunkSec, step: info.stepSec };
+  const tl = new PcmTimeline(sr);
+  let stream = null;
+  const inflight = [];
+  let id = 0, t = 0;
+  const flushOne = () => { // en eski işin sonucu (işçi sırayla yanıtlar)
+    const job = inflight.shift();
+    writeStreamResult(tl, job, job.res, { duration: dur });
+    if (stream && stream.last === job && job.res.left.length) stream.out = (job.res.startSample + job.res.left.length) / sr;
+  };
+  for (let guard = 0; guard < 200 && t < dur; guard++) {
+    while (inflight.length < SEP.inflight) {
+      const plan = planStream({
+        t, raw: [[0, dur]], sep: mergeRanges(tl.rangesSec(), inflight.map((j) => [j.a, j.b])), stream, geo, duration: dur,
+        windowSec: 30, aheadSec: aheadOf(tl.rangesSec(), t, { duration: dur }), chunkSec: streamChunkSec('wasm', geo.step),
+      });
+      if (!plan) break;
+      const raS = plan.cont ? stream.inEndS : Math.round(plan.ra * sr), rbS = Math.round(plan.rb * sr);
+      if (plan.final) stream = null;
+      else { if (!plan.cont) stream = {}; Object.assign(stream, { inEndS: rbS, inEnd: rbS / sr, out: plan.b, last: plan }); }
+      handleMock({ type: 'process', id: ++id, left: rawL.slice(raS, rbS), right: rawR.slice(raS, rbS), sampleRate: sr,
+        startSample: raS, final: plan.final, reset: plan.reset }, (m) => { plan.res = m; });
+      inflight.push(plan);
+    }
+    if (inflight.length) flushOne();
+    else t += 1; // oynatma ilerler
+    if (guard % 3 === 2) t += 4;
+  }
+  while (inflight.length) flushOne();
+  const [[s0, s1]] = tl.ranges();
+  assert.equal(tl.ranges().length, 1, 'kesintisiz: ' + JSON.stringify(tl.rangesSec()));
+  assert.equal(s0, 0);
+  assert.equal(s1, dur * sr);
+  const o = tl.read(s0, s1);
+  let maxErr = 0;
+  for (let i = 0; i < o.L.length; i++) maxErr = Math.max(maxErr, Math.abs(o.L[i] - 0.5 * rawL[i]), Math.abs(o.R[i] - 0.5 * rawR[i]));
+  assert.ok(maxErr < 1e-6, 'dikiş ' + maxErr);
+});
+
+// ---- bekletme: ölçülen hıza uyan eşikler ----
+
+test('Bekletme (rtf 0.6): gereken ön tampon parça·rtf ile; dolunca süre beklenmeden sürer, oynarken eşik dibi kapsar', () => {
+  const g = new HoldGate();
+  const chunkSec = 11.84;
+  const u = (o) => g.update({ prebufferSec: 20, pending: true, ready: true, elapsedMs: 3000, aheadSec: 0, rtf: 0.6, chunkSec, ...o });
+  assert.equal(u({ aheadSec: 5 }), true);
+  const need = 2 + chunkSec * 0.6 + 1;
+  assert.ok(near(g.needSec, need), String(g.needSec));
+  assert.ok(near(g.etaSec, Math.round((need - 5) * 0.6 * 10) / 10), 'eta = (need − ahead)·rtf');
+  assert.equal(u({ aheadSec: need }), false, 'gereken doldu');
+  assert.equal(g.initial, false);
+  assert.equal(g.etaSec, null);
+  assert.equal(u({ aheadSec: 1.5 }), true);
+  assert.ok(near(g.needSec, need), 'oynarken sürme eşiği = low + dip + 1');
+  assert.equal(u({ aheadSec: 8.5 }), true, 'eski 8 sn eşiği parça dibini kapsamaz');
+  assert.equal(u({ aheadSec: need }), false);
+  // süre dolsa da rtf < 1 iken gereken dolana dek (en çok holdMaxSec) beklenir
+  const s = new HoldGate();
+  assert.equal(s.update({ prebufferSec: 5, pending: true, ready: true, elapsedMs: 30000, aheadSec: 2, rtf: 0.6, chunkSec }), true);
+  assert.equal(s.initial, true);
+  assert.ok(near(s.needSec, 5), 'ön tamponla sınırlı');
+  assert.equal(s.update({ prebufferSec: 5, pending: true, ready: true, elapsedMs: 31000, aheadSec: 5, rtf: 0.6, chunkSec }), false);
+});
+
+test('Bekletme (rtf 0.95 ve 1.3): seyrek, uzun bekleme (30 sn hedef, kalan süreyle sınırlı), eta bildirilir', () => {
+  for (const rtf of [0.95, 1.3]) {
+    const g = new HoldGate();
+    const u = (o) => g.update({ prebufferSec: 10, pending: true, ready: true, elapsedMs: 0, aheadSec: 0, rtf, chunkSec: 23.68, ...o });
+    assert.equal(u({ aheadSec: 4, elapsedMs: 5000 }), true);
+    assert.equal(g.needSec, 10, 'rtf ≥ 1 ya da yakın: başta ön tampon kadar');
+    assert.equal(u({ aheadSec: 10, elapsedMs: 9000 }), false);
+    assert.equal(u({ aheadSec: 3 }), false);
+    assert.equal(u({ aheadSec: 1.9 }), true);
+    assert.equal(g.needSec, SEP.highSlow);
+    assert.ok(near(g.etaSec, Math.round((30 - 1.9) * rtf * 10) / 10), `eta ${g.etaSec}`);
+    assert.equal(u({ aheadSec: 20 }), true, 'sık kısa bekleme yerine 30 sn\'ye dek');
+    assert.equal(u({ aheadSec: 30 }), false);
+    // video sonuna yakın: kalan süre kadar
+    assert.equal(u({ aheadSec: 1, remainingSec: 12 }), true);
+    assert.ok(near(g.needSec, 11.9));
+    assert.equal(u({ aheadSec: 11.9, remainingSec: 12 }), false);
+  }
+  // rtf bilinmiyorken süre dolarsa olağan kurala geçilir (eski davranış, 8 sn)
+  const t = new HoldGate();
+  assert.equal(t.update({ prebufferSec: 5, pending: true, ready: true, elapsedMs: 4000, aheadSec: 1 }), true);
+  assert.equal(t.update({ prebufferSec: 5, pending: true, ready: true, elapsedMs: 6000, aheadSec: 3 }), true);
+  assert.equal(t.needSec, SEP.high);
+  assert.equal(t.etaSec, null, 'rtf bilinmiyor');
+});
+
+test('Bekletme: girdi yokken başlangıçta bekletilmez ama başlangıç evresi bitmez', () => {
+  const g = new HoldGate();
+  const u = (o) => g.update({ prebufferSec: 20, ready: true, elapsedMs: 3000, aheadSec: 9, pending: true, ...o });
+  assert.equal(u({ pending: false }), false);
+  assert.equal(g.initial, true, 'kısa girdi boşluğu ön tamponu bitirmemeli');
+  assert.equal(u({}), true);
+});
+
+test('speechAt: orijinal − eşlik; aralığın tamamı yoksa null', async () => {
+  const w = new EventTarget();
+  globalThis.window ??= w;
+  globalThis.location ??= { origin: 'https://www.youtube.com' };
+  const { SeparatedAudio } = await import('../../extension/content/separation.js');
+  const sa = Object.create(SeparatedAudio.prototype);
+  sa.sep = new PcmTimeline(SR);
+  sa.orig = new PcmTimeline(SR);
+  sa.orig.write(0, ramp(10000), ramp(10000));
+  sa.sep.write(2000, new Float32Array(5000).fill(1), new Float32Array(5000).fill(2));
+  const sp = sa.speechAt(3, 4);
+  assert.equal(sp.sampleRate, SR);
+  assert.equal(sp.left.length, 1000);
+  assert.equal(sp.left[0], 3000 - 1);
+  assert.equal(sp.right[999], 3999 - 2);
+  assert.equal(sa.speechAt(6, 8), null, 'ayrılmış ses yetmiyor');
+  sa.orig.prune(0, 3500);
+  assert.equal(sa.speechAt(3, 4), null, 'orijinal yetmiyor');
 });

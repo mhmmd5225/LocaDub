@@ -16,7 +16,8 @@ export const DEFAULTS = Object.freeze({
   voice4: null,
   speakerCount: 2,         // konuşmacı değişimlerinde (>>) sırayla dönen ses sayısı (2–4)
   voiceBlend: null,        // ses karıştırma (yalnızca Supertonic): { with: 'F1'…'M5', amount: 0…0.9 } | null
-  genderVoices: true,      // konuşanın cinsiyetine göre kadın / erkek sesi (videonun sesinden perde ölçülür, content/gender.js)
+  genderVoices: false,     // konuşanın cinsiyetine göre kadın / erkek sesi (videonun sesinden perde ölçülür, content/gender.js);
+                           // isabet yetersiz olduğu için varsayılan kapalı, ayarlardan açılabilir
   favFemale: null,         // favori kadın sesi ve tonu: { voice, style, pitch } | null (otomatik seçimde öncelikli)
   favMale: null,           // favori erkek sesi ve tonu
   glossaryMt: '',          // çeviri düzeltmeleri ("yanlış => doğru" satırları, common/glossary.js)

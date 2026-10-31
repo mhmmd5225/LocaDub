@@ -261,3 +261,147 @@ test('Sahte işçi: sözleşme (load → progress + loaded, process → result �
   handleMessage({ type: 'dispose', id: 4 }, post);
   assert.equal(out.pop().m.type, 'disposed');
 });
+
+// ---- akış kipi ----
+
+async function streamCalls(sep, L, R, sr, start, cuts) {
+  const outs = [];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const a = cuts[i], b = cuts[i + 1];
+    outs.push(await sep.process(L.slice(a, b), R.slice(a, b), sr, { startSample: start + a, final: i === cuts.length - 2 }));
+  }
+  return outs;
+}
+
+test('Akış: ardışık çağrılar tek çağrıyla örneği örneğine aynı (48 kHz ve 44.1 kHz, farklı batch)', async () => {
+  for (const [id, sr] of [['kim-vocal-2', 48000], ['mdxnet-lite', 44100]]) {
+    const model = sepModelById(id);
+    const n = Math.round(sr * 19.3), start = sr * 7 + 123;
+    const [L, R] = signal(n, sr, 9);
+    const whole = await createSeparator({ model, ort: fakeOrt, session: fakeSession('mask'), batch: 1 })
+      .process(L.slice(), R.slice(), sr, { startSample: start, final: true });
+    assert.equal(whole.startSample, start);
+    assert.equal(whole.left.length, n, 'final: tüm girdi kesinleşir');
+    const sep = createSeparator({ model, ort: fakeOrt, session: fakeSession('mask'), batch: 3 });
+    const outs = await streamCalls(sep, L, R, sr, start, [0, sr * 3 + 7, sr * 9, sr * 9 + 5, sr * 15 + 1000, n]);
+    assert.equal(outs[0].reset, true);
+    assert.ok(outs.slice(1).every((o) => !o.reset), 'bitişik çağrılar akışı sıfırlamamalı');
+    let at = start, s = 0, e = 0;
+    for (const o of outs) {
+      assert.equal(o.startSample, at, 'çıktılar ardışık');
+      for (let j = 0; j < o.left.length; j++) {
+        const k = o.startSample - start + j;
+        s += whole.left[k] ** 2 + whole.right[k] ** 2;
+        e += (o.left[j] - whole.left[k]) ** 2 + (o.right[j] - whole.right[k]) ** 2;
+      }
+      at += o.left.length;
+    }
+    assert.equal(at, start + n);
+    const snr = e ? 10 * Math.log10(s / e) : Infinity;
+    assert.ok(snr > 120, `${id}: akış ↔ tek çağrı SNR ${snr}`);
+    // final olmayan çağrı yalnızca kesinleşeni verir: çıktı girdinin (pencere − adım)..pencere gerisinde
+    const cut = outs[2].startSample + outs[2].left.length, inEnd = start + sr * 9 + 5;
+    assert.ok(inEnd - cut >= Math.round(2.9 * sr) && inEnd - cut <= Math.round(6 * sr), `gecikme ${(inEnd - cut) / sr}`);
+  }
+});
+
+test('Akış: kesinti (bitişik olmayan startSample, reset, hız değişimi) akışı sıfırlar', async () => {
+  const model = sepModelById('mdxnet-lite'), sr = 48000;
+  const [L, R] = signal(sr * 12, sr, 4);
+  const a = createSeparator({ model, ort: fakeOrt, session: fakeSession('mask') });
+  await a.process(L.slice(0, sr * 8), R.slice(0, sr * 8), sr, { startSample: 0 });
+  const jump = await a.process(L.slice(sr * 9), R.slice(sr * 9), sr, { startSample: sr * 9 + 5, final: true });
+  const fresh = await createSeparator({ model, ort: fakeOrt, session: fakeSession('mask') })
+    .process(L.slice(sr * 9), R.slice(sr * 9), sr, { startSample: sr * 9 + 5, final: true });
+  assert.equal(jump.reset, true);
+  assert.equal(jump.startSample, sr * 9 + 5);
+  assert.deepEqual([...jump.left], [...fresh.left], 'sıfırlanan akış yeni akışla aynı');
+  const r1 = await a.process(L.slice(0, sr * 8), R.slice(0, sr * 8), sr, { startSample: 0 });
+  const r2 = await a.process(L.slice(sr * 8), R.slice(sr * 8), sr, { startSample: sr * 8, reset: true });
+  assert.equal(r1.reset, true);
+  assert.equal(r2.reset, true);
+  const r3 = await a.process(L.slice(0, 44100), R.slice(0, 44100), 44100, { startSample: Math.round(sr * 12 * 44100 / 48000) });
+  assert.equal(r3.reset, true, 'hız değişimi');
+});
+
+test('StreamResampler: rastgele bölünmüş girdi tek resample() ile aynı (48↔44.1 kHz)', async () => {
+  const { StreamResampler } = await import('../../extension/engines/sep/resample.js');
+  for (const [from, to] of [[48000, 44100], [44100, 48000], [48000, 48000]]) {
+    const x = noise(from * 2 + 17, from);
+    const ref = resample(x, from, to);
+    const s = new StreamResampler(from, to, 0);
+    const parts = [];
+    const r = rng(to);
+    for (let i = 0; i < x.length;) {
+      const m = Math.min(x.length - i, 1 + Math.floor((r() + 0.5) * 9000));
+      parts.push(s.push(x.subarray(i, i + m)));
+      i += m;
+    }
+    parts.push(s.flush(ref.length));
+    const y = new Float32Array(parts.reduce((k, p) => k + p.length, 0));
+    let o = 0;
+    for (const p of parts) { y.set(p, o); o += p.length; }
+    assert.equal(y.length, ref.length);
+    assert.equal(maxAbsDiff(y, ref), 0, `${from}→${to}`);
+  }
+});
+
+test('Batch: oturum toplu boyutla çağrılır, çıktı gruplamadan bağımsız; akış pencere işi ≈ 2×, tek parça ≈ 3×', async () => {
+  const model = sepModelById('mdxnet-lite'), sr = 48000;
+  const [L, R] = signal(sr * 13, sr, 6);
+  const dims = [];
+  const sess = fakeSession('mask');
+  const run = sess.run.bind(sess);
+  sess.run = (f) => { dims.push(f.input.dims[0]); return run(f); };
+  const s4 = createSeparator({ model, ort: fakeOrt, session: sess, batch: 4 });
+  const a = await s4.process(L.slice(), R.slice(), sr, { startSample: 0, final: true });
+  assert.ok(dims.every((d) => d === 4));
+  assert.equal(dims.length, Math.ceil(a.windows / 4));
+  const b = await createSeparator({ model, ort: fakeOrt, session: fakeSession('mask'), batch: 1 })
+    .process(L.slice(), R.slice(), sr, { startSample: 0, final: true });
+  assert.deepEqual([...a.left], [...b.left]);
+  // 120 sn ses: eski yol (12 sn + 2·1 sn bağlam) ile akış (12 sn'lik ardışık çağrılar) pencere sayısı
+  const step = 12 * sr, ctx = sr;
+  const old = createSeparator({ model, ort: fakeOrt, session: fakeSession('identity') });
+  const str = createSeparator({ model, ort: fakeOrt, session: fakeSession('identity') });
+  const total = 120 * sr, z = new Float32Array(total + 2 * ctx);
+  for (let p = 0; p < total; p += step) {
+    await old.process(z.slice(p, p + step + 2 * ctx), null, sr);
+    await str.process(z.slice(p, p + step), null, sr, { startSample: p, final: p + step >= total });
+  }
+  const perSecOld = old.stats.windows / 120, perSecNew = str.stats.windows / 120;
+  assert.ok(perSecOld / perSecNew > 1.35, `pencere/sn eski ${perSecOld.toFixed(3)}, akış ${perSecNew.toFixed(3)}`);
+  assert.ok(Math.abs(perSecNew * str.stepSec - 1) < 0.08, `akış ≈ 1/adım pencere/sn (${perSecNew})`);
+});
+
+test('Sahte işçi: akış kipi (kesinleşen aralık, final, kesinti) ve iptal', () => {
+  const out = [];
+  const post = (m) => out.push(m);
+  handleMessage({ type: 'load', id: 1 }, post);
+  const loaded = out.pop();
+  assert.equal(loaded.streaming, true);
+  assert.ok(loaded.stepSec > 0 && loaded.chunkSec > loaded.stepSec);
+  const sr = 48000, x = (n) => new Float32Array(n).fill(1);
+  handleMessage({ type: 'process', id: 2, left: x(sr * 10), sampleRate: sr, startSample: sr * 5 }, post);
+  const r1 = out.pop();
+  assert.equal(r1.reset, true);
+  assert.equal(r1.startSample, sr * 5);
+  const f = (Math.floor((15 - loaded.chunkSec) / loaded.stepSec) + 1) * loaded.stepSec;
+  assert.equal(r1.startSample + r1.left.length, Math.round(f * sr));
+  assert.equal(r1.left[0], MOCK_GAIN);
+  handleMessage({ type: 'process', id: 3, left: x(sr * 2), sampleRate: sr, startSample: sr * 15, final: true }, post);
+  const r2 = out.pop();
+  assert.equal(r2.reset, false);
+  assert.equal(r2.startSample, r1.startSample + r1.left.length);
+  assert.equal(r2.startSample + r2.left.length, sr * 17);
+  handleMessage({ type: 'process', id: 4, left: x(sr), sampleRate: sr, startSample: sr * 40 }, post);
+  assert.equal(out.pop().reset, true);
+  handleMessage({ type: 'mock-rtf', rtf: 5 }, post);
+  handleMessage({ type: 'process', id: 5, left: x(sr), sampleRate: sr, startSample: 0 }, post);
+  handleMessage({ type: 'process', id: 6, left: x(sr), sampleRate: sr, startSample: sr }, post);
+  handleMessage({ type: 'cancel', ids: [6] }, post);
+  assert.deepEqual(out.pop(), { type: 'error', id: 6, message: 'cancelled' });
+  handleMessage({ type: 'cancel', ids: [5] }, post); // süren iş de bırakılır (zamanlayıcı beklemesin)
+  handleMessage({ type: 'mock-rtf', rtf: 0 }, post);
+  handleMessage({ type: 'dispose', id: 7 }, post);
+});

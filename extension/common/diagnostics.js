@@ -30,10 +30,34 @@ const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoic
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
 
+const num = (v) => (Number.isFinite(v) ? v : null);
+const sn = (v) => `${Math.round(v * 10) / 10}`.replace(/\.0$/, '');
+
+/**
+ * [Ses ayırma] satırları. sep: null/undefined → açık YouTube sekmesi yok; { off:true } → kapalı;
+ * değilse son durum { status, backend, model, aheadSec, rtf, batch, chunkSec, streaming, holds, holdMs, lastError }.
+ */
+export function separationLines(sep) {
+  if (!sep) return ['yok (açık YouTube sekmesi yok)'];
+  if (sep.off || !sep.status || sep.status === 'off') return ['kapalı'];
+  const a = [`durum: ${sep.status}`, `arka uç: ${scrub(sep.backend || '?')}`, `model: ${scrub(sep.model || '?')}`];
+  if (num(sep.batch) != null) a.push(`toplu: ${sep.batch}`);
+  if (num(sep.chunkSec) != null) a.push(`parça: ${sn(sep.chunkSec)} sn`);
+  if (typeof sep.streaming === 'boolean') a.push(`akış: ${sep.streaming ? 'evet' : 'hayır'}`);
+  const b = [];
+  if (num(sep.rtf) > 0) b.push(`hız: ${sep.rtf.toFixed(2)} rtf (${(1 / sep.rtf).toFixed(1)}× gerçek zaman)`);
+  else b.push('hız: ölçülmedi');
+  if (num(sep.aheadSec) != null) b.push(`ileride hazır: ${sep.aheadSec.toFixed(1)} sn`);
+  const c = [];
+  if (num(sep.holds) != null) c.push(`bekleme: ${sep.holds} kez, toplam ${Math.round((num(sep.holdMs) || 0) / 1000)} sn`);
+  c.push(`son hata: ${sep.lastError ? scrub(sep.lastError) : 'yok'}`);
+  return [a.join(' · '), b.join(' · '), c.join(' · ')];
+}
+
 /**
  * @param {{ version:string, browser:string, platform:string, settings:object, status?:object,
  *           models?:{ name:string, sizeMB:number }[], errors?:object[], glossary?:{ mt:number, tts:number },
- *           timings?:{ at:number, line:string }[],
+ *           timings?:{ at:number, line:string }[], separation?:object|null,
  *           now?:number }} d
  */
 export function buildReport(d) {
@@ -52,6 +76,7 @@ export function buildReport(d) {
     L.push(one('çeviri', st.mt), one('ses', st.tts));
     L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU: ${!!st.webgpu} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
+  L.push('', '[Ses ayırma]', ...separationLines(d.separation));
   L.push('', '[İndirilen modeller]');
   if (!d.models?.length) L.push('yok');
   for (const m of d.models || []) L.push(`${m.name}: ${m.sizeMB.toFixed(1)} MB`);

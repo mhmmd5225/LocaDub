@@ -3,7 +3,7 @@
 //
 //   node tools/sep-bench.mjs [--model kim-vocal-2|all] [--runtime node|web] [--threads 4] [--seconds 30]
 //                            [--rate 48000] [--overlap 0.5] [--batch 1] [--denoise] [--music müzik.wav]
-//                            [--seam] [--out <dizin>] [--dir <model dizini>]
+//                            [--seam] [--stream] [--out <dizin>] [--dir <model dizini>]
 //
 // Karışım: tests/extension/fixtures/*.wav konuşmaları (16 kHz mono → girdi hızına), ortada; sentetik müzik
 // (davul, bas, akor, arpej; stereo) ya da --music ile verilen stereo/mono WAV. Ölçüler:
@@ -12,6 +12,8 @@
 //   kalıntı    eşlikteki konuşma bileşeni: <eşlik − müzik, konuşma> / |konuşma|², dB (girişte 0 dB)
 //   sessiz     konuşmasız bölümlerde müziğin bozulması (SDR, dB)
 //   --seam     aynı sesi iki çağrıda (CONTEXT_SEC bağlamı + joinOverlap) ve tek çağrıda işleyip farkın SNR'ı
+//   --stream   akış kipi (separator.js başı): 12 sn'lik ardışık çağrılar; pencere/sn, RTF, kalite ve tek akış
+//              çağrısına göre SNR (eski yol: 12 sn + 2·1 sn bağlamla aynı ses için pencere/sn)
 // --runtime web: paketli onnxruntime-web WASM (ort.wasm.min.mjs) Node içinde; node: onnxruntime-node (CPU).
 // Modeller --dir'e (varsayılan tests/extension/.models/sep) indirilir, boyut + sha256 denetlenir.
 
@@ -39,7 +41,7 @@ const threads = Number(opt('threads', 4));
 const seconds = Number(opt('seconds', 30));
 const rate = Number(opt('rate', 48000));
 const overlap = Number(opt('overlap', 0.5));
-const batch = Number(opt('batch', 1));
+const batch = opt('batch', null) != null ? Number(opt('batch')) : undefined; // yoksa arka ucun varsayılanı
 const denoise = flag('denoise');
 const dir = resolve(opt('dir', join(root, 'tests/extension/.models/sep')));
 const outDir = opt('out', null);
@@ -211,6 +213,7 @@ async function bench(m, ort, be, mix) {
   const q = metrics({ accL: r.left, accR: r.right, musL: mix.musL, musR: mix.musR, sp: mix.sp, mask: mix.mask });
   const row = { model: m.id, backend: sep.backend, loadMs: Math.round(loadMs), ms: Math.round(ms), rtf: ms / 1000 / seconds, ...q };
   if (flag('seam')) row.seam = await seam(sep, mix, r);
+  if (flag('stream')) row.stream = await streamBench(sep, mix);
   if (outDir) {
     await mkdir(outDir, { recursive: true });
     await writeWav(join(outDir, `${m.id}-acc.wav`), [r.left, r.right], rate);
@@ -247,6 +250,30 @@ async function seam(sep, mix, whole) {
   return out;
 }
 
+// Akış: 12 sn'lik ardışık çağrılar (içerik betiğinin WASM parça boyu) ↔ eski yol (12 sn + 2·1 sn bağlam).
+async function streamBench(sep, mix) {
+  const n = mix.L.length, C = 12 * rate, X = Math.round(CONTEXT_SEC * rate);
+  let w0 = sep.stats.windows, t = performance.now();
+  for (let p = 0; p < n; p += C) await sep.process(mix.L.slice(Math.max(0, p - X), Math.min(n, p + C + X)), mix.R.slice(Math.max(0, p - X), Math.min(n, p + C + X)), rate);
+  const old = { win: sep.stats.windows - w0, ms: performance.now() - t };
+  w0 = sep.stats.windows; t = performance.now();
+  const accL = new Float32Array(n), accR = new Float32Array(n);
+  for (let p = 0; p < n; p += C) {
+    const r = await sep.process(mix.L.slice(p, Math.min(n, p + C)), mix.R.slice(p, Math.min(n, p + C)), rate, { startSample: p, final: p + C >= n });
+    accL.set(r.left, r.startSample); accR.set(r.right, r.startSample);
+  }
+  const str = { win: sep.stats.windows - w0, ms: performance.now() - t };
+  const one = await sep.process(mix.L.slice(), mix.R.slice(), rate, { startSample: 0, final: true });
+  let s = 0, e = 0;
+  for (let i = 0; i < n; i++) { s += one.left[i] ** 2 + one.right[i] ** 2; e += (accL[i] - one.left[i]) ** 2 + (accR[i] - one.right[i]) ** 2; }
+  const q = metrics({ accL, accR, musL: mix.musL, musR: mix.musR, sp: mix.sp, mask: mix.mask });
+  return {
+    eskiPencereSn: +(old.win / seconds).toFixed(3), eskiRTF: +(old.ms / 1000 / seconds).toFixed(3),
+    akışPencereSn: +(str.win / seconds).toFixed(3), akışRTF: +(str.ms / 1000 / seconds).toFixed(3),
+    tekÇağrıSNR: e ? +db(s / e).toFixed(1) : Infinity, akışSDR: +q.sdr.toFixed(2),
+  };
+}
+
 async function main() {
   const n = Math.round(seconds * rate);
   let musL, musR;
@@ -280,7 +307,7 @@ async function main() {
   const models = modelArg === 'all' ? SEP_MODELS : modelArg.split(',').map((id) => sepModelById(id) || (() => { throw new Error(`bilinmeyen model ${id}`); })());
   for (const m of models) {
     const r = await bench(m, ort, backend, mix);
-    console.log(`${r.model.padEnd(12)} ${r.backend}: RTF ${r.rtf.toFixed(3)} (${r.ms} ms, yükleme ${r.loadMs} ms) · SDR ${r.sdr.toFixed(2)} dB (+${(r.sdr - base.sdr).toFixed(2)}) · kalıntı ${r.residual.toFixed(1)} dB · sessiz bölüm ${r.quiet.toFixed(1)} dB${r.seam ? ' · birleşme SNR ' + JSON.stringify(r.seam) : ''}`);
+    console.log(`${r.model.padEnd(12)} ${r.backend}: RTF ${r.rtf.toFixed(3)} (${r.ms} ms, yükleme ${r.loadMs} ms) · SDR ${r.sdr.toFixed(2)} dB (+${(r.sdr - base.sdr).toFixed(2)}) · kalıntı ${r.residual.toFixed(1)} dB · sessiz bölüm ${r.quiet.toFixed(1)} dB${r.seam ? ' · birleşme SNR ' + JSON.stringify(r.seam) : ''}${r.stream ? ' · akış ' + JSON.stringify(r.stream) : ''}`);
   }
 }
 

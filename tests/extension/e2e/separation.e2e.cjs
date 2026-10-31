@@ -5,9 +5,11 @@
 //      çapraz ilintisi: duyulan kayma ≤ 40 ms)
 //   3. ayırma yavaşlayınca (< 2 sn kaldı) video bekletilir ('waiting'), hızlanınca ≥ 8 sn hazır olunca sürer
 //   4. işlenmemiş bir yere atlayınca bekletilir, sonra orada da eşit çalar
-//   xvfb-run -a node tests/extension/e2e/separation.e2e.cjs
+//   5. akış kipi + hıza uyan bekletme (150 sn'lik video): rtf 0.7 → başladıktan sonra hiç durmaz; rtf 1.3 → bekletmeler
+//      seyrek (≥ 20 sn arayla), bekletirken etaSec / needSec bildirilir
+//   xvfb-run -a node tests/extension/e2e/separation.e2e.cjs   (SEP_E2E_QUICK=1: 5. adım atlanır)
 const assert = require('assert/strict');
-const { launch } = require('./common.cjs');
+const { launch, mseFiles } = require('./common.cjs');
 
 const VID = 'separation1';
 const videos = { [VID]: [
@@ -103,8 +105,65 @@ async function probeOk(page, after, what) {
     assert.ok(s4.resyncs <= 3, 'çok sık yeniden eşitleme: ' + s4.resyncs);
     assert.ok(logs.some((l) => /ayırma: playing/.test(l)), 'durum günlüğü yok:\n' + logs.join('\n'));
     if (process.env.VERBOSE) console.log(logs.join('\n'));
+    assert.equal(s4.streaming, true, 'akış kipi değil');
+    for (const k of ['etaSec', 'needSec', 'holds', 'holdMs', 'batch', 'chunkSec', 'streaming']) assert.ok(k in s4, 'durum alanı yok: ' + k);
     console.log('ok — separation', JSON.stringify(p4), 'yeniden eşitleme', s4.resyncs, 'rtf', s4.rtf);
   } finally {
     await ctx.close();
   }
+  if (!process.env.SEP_E2E_QUICK) {
+    await paced(0.7, 20, 35000);
+    await paced(1.3, 5, 75000);
+  }
 })().catch((e) => { console.error(e); process.exit(1); });
+
+// Sabit hızlı ayırmayla uzun oynatma: bekletmeleri (video 'pause' olayları) duvar saatiyle kaydeder.
+async function paced(rtf, prebufferSec, playMs) {
+  const vid = 'sepLongVid1';
+  const { ctx } = await launch({ videos: { [vid]: [{ t: 1500, d: 2000, text: 'Hello.' }, { t: 140000, d: 2000, text: 'Bye.' }] },
+    mse: mseFiles(150), settings: { prebufferSec, holdStart: false } });
+  try {
+    const page = await ctx.newPage();
+    await page.addInitScript((r) => {
+      window.__ev = [];
+      const snap = () => JSON.parse(document.documentElement?.dataset.locadubSep || 'null');
+      for (const k of ['pause', 'play']) {
+        document.addEventListener(k, (e) => window.__ev.push({ k, w: Date.now(), t: Math.round(e.target.currentTime * 10) / 10, s: snap() }), true);
+      }
+      const set = () => document.documentElement && (document.documentElement.dataset.locadubMockSepRtf = String(r));
+      if (!set()) document.addEventListener('readystatechange', set, { once: true });
+    }, rtf);
+    await page.goto(`https://www.youtube.com/watch?v=${vid}`);
+    await page.evaluate(() => { document.querySelector('video').play().catch(() => {}); });
+    const etas = [];
+    const first = await until(page, (x) => {
+      if (x.s.status === 'waiting' && x.s.etaSec != null) etas.push({ eta: x.s.etaSec, need: x.s.needSec, ahead: x.s.aheadSec });
+      return x.s.status === 'playing' && !x.paused && x.t > 0.3;
+    }, `ilk oynatma (rtf ${rtf})`, 90000);
+    const t0 = Date.now();
+    while (Date.now() - t0 < playMs) {
+      const x = await state(page);
+      if (x.s?.status === 'waiting' && x.s.etaSec != null) etas.push({ eta: x.s.etaSec, need: x.s.needSec, ahead: x.s.aheadSec });
+      await page.waitForTimeout(500);
+    }
+    const ev = await page.evaluate(() => window.__ev);
+    const fin = (await state(page)).s;
+    const firstPlay = ev.findIndex((e) => e.k === 'play' && e.w >= t0 - 3000);
+    const stalls = ev.filter((e, i) => e.k === 'pause' && e.s && e.s.status !== 'off' && e.t > first.t && i > firstPlay);
+    console.log(`rtf ${rtf}: ilk oynatma ${first.t.toFixed(1)} sn (hazır ${first.s.aheadSec}), ${playMs / 1000} sn içinde bekletme ${stalls.length}`,
+      `holds ${fin.holds}, holdMs ${fin.holdMs}, ölçülen rtf ${fin.rtf}, parça ${fin.chunkSec} sn, eta örnekleri ${JSON.stringify(etas.slice(0, 3))}`);
+    assert.equal(fin.streaming, true);
+    if (rtf < 1) {
+      assert.equal(stalls.length, 0, 'rtf < 1 iken başladıktan sonra durdu: ' + JSON.stringify(stalls.map((e) => [e.t, e.s.aheadSec])));
+      assert.equal(fin.holds, 0);
+    } else {
+      for (let i = 1; i < stalls.length; i++) {
+        assert.ok(stalls[i].w - stalls[i - 1].w >= 20000, 'bekletmeler sık: ' + JSON.stringify(stalls.map((e) => [e.w - t0, e.t])));
+      }
+      assert.ok(etas.length > 0, 'bekletirken etaSec bildirilmedi');
+      assert.ok(etas.every((e) => e.need >= 20 && e.eta >= 0) && etas.some((e) => e.eta > 5), 'eta/need: ' + JSON.stringify(etas));
+    }
+  } finally {
+    await ctx.close();
+  }
+}

@@ -146,9 +146,10 @@ test('konuşmacı sesleri: 2–4 ses, kendiliğinden seçim karşıt cinsiyetten
   assert.equal(voiceForSpeaker(S({ voice: 'antalia-mini', speakerCount: 3 }), 3), 'antalia-mini');
   assert.equal(voiceForSpeaker(S({ voice: 'antalia-mini', speakerCount: 3 }), 5), 'ema-lightning');
   assert.equal(voiceForSpeaker(S({ voice: 'antalia-mini' }), 2), 'antalia-mini');
-  assert.deepEqual(voicesInUse(S({ voice: 'antalia-mini', speakerCount: 3 })), ['antalia-mini', 'ahenk-cep', 'ema-lightning']);
+  assert.deepEqual(voicesInUse(S({ voice: 'antalia-mini', speakerCount: 3, genderVoices: true })), ['antalia-mini', 'ahenk-cep', 'ema-lightning']);
   assert.deepEqual(voicesInUse(normalizeSettings({ voice: 'antalia-mini', speakerCount: 3, genderVoices: false })), ['antalia-mini']);
-  // cinsiyet modu (varsayılan açık): karşıt cinsiyetin sesi de indirilecekler arasında
-  assert.deepEqual(voicesInUse(normalizeSettings({ voice: 'antalia-mini' })), ['antalia-mini', 'ahenk-cep']);
+  // cinsiyet modu açıkken karşıt cinsiyetin sesi de indirilecekler arasında
+  assert.deepEqual(voicesInUse(normalizeSettings({ voice: 'antalia-mini', genderVoices: true })), ['antalia-mini', 'ahenk-cep']);
+  assert.deepEqual(voicesInUse(normalizeSettings({ voice: 'antalia-mini' })), ['antalia-mini'], 'varsayılan kapalı');
   assert.deepEqual(voicesInUse(S({ voice: 'system' })), ['system']);
 });

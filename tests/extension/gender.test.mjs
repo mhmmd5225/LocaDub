@@ -146,7 +146,7 @@ test('favori: cinsiyeti uymayan ses atılır, ton normalleşir', () => {
   assert.deepEqual(normalizeFavorite({ voice: 'mock-beep' }, 'male'), { voice: 'mock-beep', style: 'natural', pitch: 0 });
   const s = normalizeSettings({ favMale: { voice: 'ema-lightning' } });
   assert.equal(s.favMale, null);
-  assert.equal(s.genderVoices, true);
+  assert.equal(s.genderVoices, false);
 });
 
 test('cinsiyet sesi: favori öncelikli, sonra birinci ses, sonra kendiliğinden', () => {
@@ -163,7 +163,7 @@ test('cinsiyet sesi: favori öncelikli, sonra birinci ses, sonra kendiliğinden'
 });
 
 test('chooseVoice ve toneFor: cinsiyet modu, sistem sesi, favorinin tonu', () => {
-  const s = normalizeSettings({ voice: 'antalia-mini', style: 'calm', pitch: -1, quality: 'high', favFemale: { voice: 'ahenk-cep', style: 'lively', pitch: 1 } });
+  const s = normalizeSettings({ genderVoices: true, voice: 'antalia-mini', style: 'calm', pitch: -1, quality: 'high', favFemale: { voice: 'ahenk-cep', style: 'lively', pitch: 1 } });
   assert.equal(chooseVoice(s, { gender: 'female' }), 'ahenk-cep');
   assert.equal(chooseVoice(s, { gender: 'male' }), 'antalia-mini');
   assert.equal(chooseVoice(s, { gender: null }), 'antalia-mini');
@@ -172,8 +172,8 @@ test('chooseVoice ve toneFor: cinsiyet modu, sistem sesi, favorinin tonu', () =>
   assert.deepEqual(toneFor(s, 'ahenk-cep'), { style: 'lively', pitch: 1, quality: 'high' });
   assert.deepEqual(toneFor(s, 'antalia-mini'), { style: 'calm', pitch: -1, quality: 'high' });
   // test motoru: yalnızca favoriler
-  const m = normalizeSettings({ engineMode: 'mock', voice: 'mock-beep', favFemale: { voice: 'mock-silent' } });
+  const m = normalizeSettings({ genderVoices: true, engineMode: 'mock', voice: 'mock-beep', favFemale: { voice: 'mock-silent' } });
   assert.equal(chooseVoice(m, { gender: 'female' }), 'mock-silent');
   assert.equal(chooseVoice(m, { gender: 'male' }), 'mock-beep');
-  assert.deepEqual(voicesInUse(normalizeSettings({ voice: 'supertonic-3:F1' })), ['supertonic-3:F1', 'supertonic-3:M1']);
+  assert.deepEqual(voicesInUse(normalizeSettings({ genderVoices: true, voice: 'supertonic-3:F1' })), ['supertonic-3:F1', 'supertonic-3:M1']);
 });

@@ -62,9 +62,12 @@ onnxruntime-node ile aynılığı tarayıcıda (SNR 144 dB) denetlendi.
 - `stft.js` — karışık tabanlı (2/3/4/5) Stockham FFT; n_fft'ler 2'nin kuvveti değil (7680 = 2⁹·3·5). İki kanal tek
   karmaşık FFT'ye paketlenir. STFT→ISTFT gidiş-dönüş hatası ~1.5e-8. Bir 5.92 sn'lik pencerenin STFT + ISTFT'si
   ~150 ms (JS, tek çekirdek); WebGPU'da model çalışırken bir sonraki pencerenin STFT'si hazırlanır.
-- `resample.js` — çok fazlı Kaiser pencereli sinc (48 ↔ 44.1 kHz, 30 sn ~160 ms).
+- `resample.js` — çok fazlı Kaiser pencereli sinc (48 ↔ 44.1 kHz, 30 sn ~160 ms); `StreamResampler`: aynı formül
+  mutlak örnek ızgarasında, parça parça (ardışık push'lar tek `resample()` ile örneği örneğine aynı).
 - `separator.js` — `createSeparator({ model, backend, onProgress, overlap, batch, denoise })` →
-  `{ load(), process(left, right, sampleRate), backend, model, contextSec, chunkSec, dispose() }`; `joinOverlap()`.
+  `{ load(), process(left, right, sampleRate, o?), backend, model, batch, contextSec, chunkSec, stepSec, stats,
+  resetStream(), dispose() }`; `joinOverlap()`. `o = { startSample, final?, reset?, isCancelled? }` akış kipidir
+  (aşağıda). `batch` verilmezse WebGPU'da 4, WASM'da 1; WebGPU'da batch 4 oturumu kurulamazsa önce batch 1 denenir.
 - `worker.js` — işçi sözleşmesi (aşağıda); `client.js` — Promise istemcisi + 90 sn çok iş parçacığı bekçisi.
 - `extension/engines/_mock/sep.js` — aynı sözleşmeli sahte işçi (çıktı = giriş × 0.5).
 
@@ -101,20 +104,86 @@ Bir çağrının son `contextSec` saniyesi bir sonraki çağrı gelene kadar kes
 duyarlılığı: tek çağrının çıktısı da iç pencerelerin nereye düştüğüne bağlı (aynı ses farklı başlangıçla verilince
 çıktı bu kadar değişir). Bu fark eşliğin kendi hatasının (SDR ~18 dB) 12+ dB altında, duyulmaz.
 
+### Akış kipi (sürekli pencere ızgarası)
+
+İçerik betiği eskiden 12 sn'lik işleri iki yanda 1 sn bağlamla gönderiyordu; ayırıcı her çağrıda pencereleri
+yeniden diziyor ve iki ucu ≈ 3 sn sıfırla dolguluyordu: 12 sn ses için 6 pencere (≈ 3× ses süresi model işi), üstüne
+iki çağrının birleşme yerinde ızgara farkı. Akış kipinde (`process(L, R, sr, { startSample })`, `startSample` = girdinin
+ilk örneğinin mutlak dizini, medya zamanı · sampleRate) pencereler **mutlak** model ızgarasında (44.1 kHz,
+k · adım) durur; ayırıcı bekleyen ağırlıklı toplamları (+ ağırlık toplamlarını), sonraki pencerenin girdisini ve iki
+durumlu yeniden örnekleyiciyi tutar. Her çağrı yalnızca **kesinleşen** aralığı döndürür (o örneği örten bütün
+pencereler bitti): `{ left, right, startSample, windows, reset, final }`.
+
+- Ardışık çağrıların çıktısı aynı girdinin tek çağrısınınkiyle **örneği örneğine aynıdır** (sahte modelle birim testi:
+  fark 0; gerçek modelle tarayıcıda: aşağıda). Dikiş yok, bağlam yok, model işi ≈ 1 / (1 − overlap) = 2× ses süresi.
+- Gecikme: çıktı girdinin (pencere − adım) … pencere (2.96–5.92 sn) gerisindedir; içerik tarafı bunu bilip girdiyi
+  pencere sonlarına hizalı gönderir (her iş tam `batch` katı pencere çalıştırır, son grup boş kalmaz).
+- Kesinti (startSample bitişik değil, örnek hızı değişti, `reset`) akışı sıfırlar: yeni akışın başında öncesi sıfır
+  sayılır; içerik tarafı ilk `contextSec`'i kırpar ve önceki parçayla 50 ms çapraz geçişle ekler (eski yol).
+- `final`: girdi sonrası sıfır sayılıp kalan her şey kesinleşir (video sonu ya da önceden ayrılmış parçaya varış;
+  sağ bağlam 1 sn), akış biter.
+- Eski tek parça kipi (startSample yok) aynen duruyor (bench, testler).
+
 ## İşçi sözleşmesi (`worker.js`)
 
 ```
 → { type:'load', id, model?:'auto'|<id>, backend?:'webgpu'|'wasm'|'auto', threads?, overlap?, batch? }
 ← { type:'progress', id, loaded, total }*                        (indirme sırasında)
-← { type:'loaded', id, backend, model, contextSec, chunkSec }  | { type:'error', id, message }
-→ { type:'process', id, left:Float32Array, right?:Float32Array, sampleRate }   (buffer'ları transfer edin)
-← { type:'result', id, left, right, ms, backend }   (transfer)  | { type:'error', id, message }
+← { type:'loaded', id, backend, model, contextSec, chunkSec, stepSec, batch, overlap, streaming:true }
+     | { type:'error', id, message }                             (chunkSec = model penceresi 5.92 sn)
+→ { type:'process', id, left:Float32Array, right?:Float32Array, sampleRate, startSample?, final?, reset? }
+← { type:'result', id, left, right, ms, backend, windows, startSample?, reset?, final? }  (transfer)
+     | { type:'error', id, message }                             (iptal: message 'cancelled')
+→ { type:'cancel', ids }        sıradaki işler hiç başlamaz, süren iş pencere grupları arasında durur (akış sıfırlanır)
 → { type:'dispose', id? }                                        ← { type:'disposed', id }
 ```
 
-İstekler sırayla işlenir. `threads` varsayılanı: crossOriginIsolated ise çekirdeklerin yarısı (en çok 4), değilse 1;
+İstekler sırayla işlenir; içerik tarafı iki işi art arda gönderir, ikincisi birincinin hemen ardından başlar. `threads` varsayılanı: crossOriginIsolated ise çekirdeklerin yarısı (en çok 4), değilse 1;
 ilk yüklemede sabitlenir. `client.js` çok iş parçacıklı yükleme indirme bittikten 90 sn sonra hâlâ bitmediyse işçiyi
 tek iş parçacığıyla yeniden başlatır (TTS'teki ort 1.22 askısı).
+
+## İçerik tarafı: boru hattı ve bekletme (`content/separation.js`, `content/sep-core.js`)
+
+- **Planlama** (`planStream`): oynatma konumundan sonraki ayrılmamış ilk nokta akışın kesinleşecek sonuysa akış
+  sürer (girdi = gönderilmiş girdinin sonundan, tam pencereler), değilse yeni akış (1 sn sol bağlamla). Parça:
+  WebGPU'da ≈ 24 sn (8 pencere = 2 × batch 4), WASM'da ≈ 12 sn; yeni akışın ilk parçası 8 sn (hızlı başlangıç, rtf
+  erken ölçülür). Sonraki ayrılmış parçaya ya da video sonuna varınca `final` iş.
+- **Boru hattı**: aynı anda 2 iş. Her işin çözmesi hemen başlar, gönderimi bir önceki işin gönderiminden sonradır
+  (akış sırası korunur). Atlamada artık gereksiz işler `cancel` ile bırakılır (24 sn'lik işler yeni konumu
+  bekletmesin). rtf = işçinin işlem süresi / gönderilen girdi süresi (üstel ortalama).
+- **Bekletme** (`HoldGate`, kalite sabit: model/örtüşme düşürülmez, yetişmezse beklenir). Ayrılmış ses parça parça
+  gelir; bir sonuç beklenirken hazır süre parça · rtf kadar düşer ("dip").
+  - Başta: gereken = rtf < 1 biliniyorsa min(prebufferSec, 2 + dip + 1), değilse prebufferSec. Gereken dolunca hemen
+    sürer. prebufferSec dolduğunda rtf < 1 ve iş sürüyorsa gereken dolana dek (en çok 60 sn fazladan) bekler; rtf
+    bilinmiyor ya da ≥ 1 ise olağan kurala geçer (bekletme sürme eşiğine dek sürer — oynatıp birkaç saniye sonra
+    yeniden durmak yerine).
+  - Oynarken ayırma darboğazsa: hazır < 2 sn → beklet; sürme eşiği rtf < 0.9 iken max(8, 2 + dip + 1), rtf ≥ 0.9
+    iken **30 sn** (kalan süreyle sınırlı): bekleme seyrek ama uzun. Girdi darboğazında (YouTube indirmedi)
+    bekletilmez.
+- **Durum** (`state` olayı; panel ve tanılama bu adları kullanır): `status, backend, model, aheadSec, cachedRanges,
+  progress, rtf, message` + `etaSec` (bekletme sürüyorsa tahmini kalan sn: bekletmede ayrılmış ses 1/rtf sn/sn
+  büyür → (needSec − aheadSec) · rtf; yoksa null), `needSec` (sürme hedefi), `holds` (başlangıç sonrası oynatma
+  bekletmesi sayısı), `holdMs` (toplam bekletilen ms, başlangıç dahil), `batch`, `chunkSec` (iş başına ses),
+  `streaming`.
+- **`speechAt(t0, t1)`** → `{ left, right, sampleRate } | null`: medya zamanı [t0, t1) için temiz konuşma = ayırmaya
+  gönderilmiş orijinal PCM − ayrılmış eşlik. İkisi o aralığın tamamında yoksa null (ek çözme yapılmaz). Konuşan
+  tanıma cümle çalmadan önce ölçebilsin diye: ayrılmış ses genelde oynatma konumunun ≥ 15 sn ilerisindedir. Bellek:
+  orijinal geride 5 sn, ileride işlenecek pencere kadar (≈ 1 dk @ 48 kHz stereo ≈ 23 MB).
+
+### "Aktif olduktan birkaç saniye sonra yeniden bekliyor" (v0.5.0, kök neden)
+
+1. Sürme eşiği (8 sn) bir sonucun dibinden küçüktü: tek iş uçuştayken 12 sn'lik bir sonuç 12 · rtf + çözme/aktarım
+   sürede geliyordu; rtf ≈ 1'de 8 sn hazırla sürülen video bir sonraki sonuçtan önce 2 sn'nin altına düşüp yeniden
+   duruyordu ("ses ayırma geride kaldı", araya orijinal sesli "hazırlanıyor"). Artık eşik dibi kapsıyor ya da
+   rtf ≥ 0.9'da 30 sn.
+2. `HoldGate.initial` tek bir karede `pending` yanlış olunca (YouTube bir sonraki ses parçasını henüz eklememiş,
+   planlayıcı acil değilken tam parçayı bekliyor) ön tampon dolmadan bitiyor, video 8–12 sn hazırla sürüyordu. Artık
+   girdi boşluğu başlangıç evresini bitirmiyor.
+3. Başlangıç süresi model yükleme/ısınmayı da sayıyordu; süre dolunca hazır az olsa da sürüyordu. Artık rtf < 1
+   biliniyorsa gereken hazır süre dolana dek beklenir.
+`app.js`'teki `_tickHold` ile etkileşimde hata bulunmadı: iki bekletme birbirinin videosunu sürdürmüyor
+(`otherHold` / `separation.holding`). Düğmenin "hazırlanıyor"a dönmesi ayrıca `prepStatus` (TTS ileri bakışı)
+kaynaklı olabilir; o ayırmadan bağımsızdır.
 
 ## Ölçümler
 
@@ -160,6 +229,48 @@ bitmedi (yavaşlık mı askı mı ayırt edilemedi). Bunlar tahmindir; gerçek d
 makinede, `--use-webgpu-adapter=swiftshader` bayrağı kaldırılarak) ölçülmeli. JS tarafı (STFT/ISTFT, yeniden
 örnekleme) pencere başına ~0.15 sn ve WebGPU çalışırken paralel hazırlanır.
 
+Not: yukarıdaki RTF'ler ses saniyesine düşen ideal (2×) pencere işiyle hesaplandı. v0.5.0'ın içerik tarafı ise 12 sn
++ 2·1 sn bağlamla 6 pencere / 12 sn (≈ 3×) çalıştırıyor, tek iş uçuşta olduğu için çözme/aktarım/STFT arasında GPU
+boşta kalıyordu.
+
+### Akış kipi: ölçülen kazanç
+
+**Model işi** (ses saniyesi başına pencere, overlap 0.5, adım 2.96 sn):
+
+| yol | pencere / ses sn | model işi / ses süresi |
+|---|---|---|
+| v0.5.0 (12 sn + 2·1 sn bağlam, her çağrı yeniden dizilir) | 0.500 | 2.96× |
+| akış, kararlı durum | 0.338 (= 1/adım) | 2.0× |
+| akış, 36 sn'lik ölçüm (akış başı + `final` dahil) | 0.389 | 2.3× |
+
+**Gerçek model, tarayıcı WASM (bu konteyner, GPU yok)**: Kim Vocal 2, 4 iş parçacığı, 36 sn stereo 48 kHz, 12 sn'lik
+işler (`SEP_REAL=1 xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --stream-seconds 36`):
+
+| yol | pencere | işlem | duvar RTF |
+|---|---|---|---|
+| eski (12 + 2·1 sn bağlam) | 18 | 339.6 sn | 9.44 |
+| akış (iki iş art arda) | 14 | 267.1 sn | 7.42 |
+
+Hızlanma 1.29× (pencere) / 1.27× (duvar); uzun oturumda kararlı durum oranına (1.48×) yaklaşır. **Eşitlik**:
+12 sn'lik parçalarla işlenen akışın çıktısı tek akış çağrısınınkiyle **birebir aynı** (SNR ∞, fark 0); sahte
+modelle birim testinde de (48 ve 44.1 kHz, farklı batch, rastgele parça sınırları) fark 0. Bu konteyner bu ölçümde
+önceki ölçümden yavaştı (aynı 12 sn tek çağrı RTF 9.46 ↔ önceden 5.0; paylaşılan CPU), oranlar karşılaştırılabilir.
+WASM'da tek CPU kaynağı olduğundan boru hattı ek hız getirmez; WebGPU'da çözme + aktarım + STFT model çalışırken yapılır.
+
+**Batch**: WebGPU'da varsayılan 4 (`load({ batch })` ile değiştirilebilir; çıktı pencere başına, gruplamadan bağımsız
+— testle denetlendi). 2/4/8 bu konteynerde ölçülemedi (GPU yok); 4, M4'ün bellek payı ile çekirdek doluluğu arasında
+güvenli bir varsayım. Oturum batch 4 ile kurulamazsa batch 1 denenir, o da olmazsa WASM.
+
+**Mac mini M4 için beklenti (TAHMİN, ölçülmedi)**: kullanıcı raporu v0.5.0'da etkin rtf ≈ 1 (ayırma yetişmiyor)
+gösteriyor. Aynı kaliteyle: pencere işi 1/1.48, iş arası GPU boşluğu kalkar (2 iş uçuşta), batch 4 ile çekirdek
+doluluğu artar (tahmini %10–30). Beklenen rtf ≈ 0.5–0.7 → başlangıçta gereken ön tampon ≈ 2 + 24·rtf + 1 ≈ 15–20 sn
+(prebufferSec ile sınırlı), sonra durma yok. rtf yine ≥ 0.9 çıkarsa durmalar 30 sn hedefle seyrek olur (rtf 0.95'te
+≈ 9 dk'da bir ~27 sn; rtf 1.3'te ≈ 2 dk'da bir ~36 sn) ve panelde `etaSec` ile kalan süre görünür.
+
+**Bekletme (e2e, sahte ayırıcı, `tests/extension/e2e/separation.e2e.cjs`)**: rtf 0.7 → 20 sn ön tamponla başladı,
+35 sn oynatmada hiç durmadı (holds 0); rtf 1.3 → başta 30 sn hazır olana dek bekledi (eta ≈ 28 sn bildirildi),
+sonraki 75 sn'de durma yok.
+
 ## Bilinen sınırlar
 
 - Vokal modelleri müzikteki **şarkı sözlerini de** konuşma gibi çıkarır (şarkılı sahnede eşlik enstrümantale döner).
@@ -180,7 +291,10 @@ makinede, `--use-webgpu-adapter=swiftshader` bayrağı kaldırılarak) ölçülm
 cd tests/tts && ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci && cd ../..
 node tools/sep-bench.mjs --model all --seconds 30            # modelleri tests/extension/.models/sep'e indirir
 node tools/sep-bench.mjs --model kim-vocal-2 --seam          # çağrılar arası birleşme
+node tools/sep-bench.mjs --model kim-vocal-2 --stream        # akış kipi: pencere/sn, RTF, tek çağrıya SNR
 node tools/sep-bench.mjs --music muzik.wav --out /tmp/sep    # kendi müziğinle; WAV'ları dinlemek için
 node --test tests/extension/sep.test.mjs
 xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --seconds 30 --model kim-vocal-2
+SEP_REAL=1 xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --stream-seconds 36   # akış ↔ eski yol
+xvfb-run -a node tests/extension/e2e/separation.e2e.cjs     # bekletme senaryoları (SEP_E2E_QUICK=1: kısa)
 ```
