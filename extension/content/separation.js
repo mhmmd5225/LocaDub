@@ -294,7 +294,8 @@ export class SeparatedAudio extends EventTarget {
     const h = sepHost();
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
-      .then(() => h.load())
+      // model kendiliğinden: WebGPU'da Kim Vocal 2, yoksa hafif model daha az örtüşmeyle (engines/sep/worker.js)
+      .then(() => h.load({ model: 'auto', backend: 'auto', ...(h.gpu ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
         this.ready = true;
@@ -622,7 +623,8 @@ export class SeparatedAudio extends EventTarget {
       case 'buffering': return this._hold.active
         ? `Gerçek dublaj hazırlanıyor: konuşma sesten ayrılıyor… (${a}/${Math.round(this.prebufferSec)} sn)`
         : 'Ses ayırma yetişmedi: bu bölümde orijinal ses çalıyor.';
-      case 'playing': return `Gerçek dublaj: yalnızca müzik ve efektler${this.backend ? ` (${this.backend})` : ''}.`;
+      case 'playing': return `Gerçek dublaj: yalnızca müzik ve efektler${this.backend ? ` (${this.backend})` : ''}.` +
+        (this.backend === 'wasm' ? ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.' : '');
       default: void t; return '';
     }
   }

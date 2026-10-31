@@ -101,6 +101,23 @@ https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt adresin
   nicemlendi (`tools/tts/quantize-supertonic.py`), diğer dosyalar resmî dosyaların aynısı. Depo lisansı, özgün model
   kartını, değişiklik bildirimini ve kullanım kısıtlarını içerir.
 
+## Ses ayırma motoru (`engines/sep/`)
+
+Kod (STFT/ISTFT, yeniden örnekleme, parçalama) bu projeye özgüdür; MDX-Net ön/son işlemesi (STFT düzeni, en alt
+3 binin sıfırlanması, `compensate` katsayıları) Ultimate Vocal Remover'ın davranışını izler.
+
+### Ayırma modelleri (eklentiye paketlenmez, ilk kullanımda HuggingFace'ten indirilir)
+
+- **Kim Vocal 2** (varsayılan) — MDX-Net vokal modeli, Kimberley Jensen; Ultimate Vocal Remover (UVR) ile dağıtılır.
+- **UVR-MDX-NET Voc FT**, **UVR-MDX-NET Inst HQ 3**, **UVR-MDX-NET Inst HQ 5** — UVR ekibi (Anjok07, aufr33).
+- Mimari: MDX-Net / TFC-TDF-U-Net, KUIELab (Minseok Kim vd., MIT).
+- Lisans: MIT — UVR (https://github.com/Anjok07/ultimatevocalremovergui) modellerini MIT lisansıyla dağıtır ve
+  modelleri kullanan uygulamalardan UVR'ye ve geliştiricilerine atıf ister. Atıf: "Ses ayırma: Ultimate Vocal
+  Remover (UVR) MDX-Net modelleri — Anjok07, aufr33, Kimberley Jensen; MIT".
+- Eklentinin indirdiği kopya: https://huggingface.co/Politrees/UVR_resources (commit
+  `929e057b81aa49bc2e6490bef8671f47b2c120f6`, MIT etiketli ayna), dosyalar değiştirilmeden; sha256 değerleri
+  `engines/sep/models.js` içinde.
+
 ## Referans proje
 
 - harfiyen — https://github.com/ozcancelik/harfiyen (MIT). Kod alındıysa ilgili motor
