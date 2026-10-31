@@ -30,6 +30,7 @@ const SEP_TEXT = {
 };
 const SEP_STATUS = { off: 'off', 'loading-model': 'active', buffering: 'active', playing: 'done', waiting: 'warn', error: 'error' };
 const BARS = 5;
+const fmtEta = (e) => (Number.isFinite(e) && e > 0 ? `~${Math.ceil(e)} sn` : '');
 // panelin içinde kalan olaylar YouTube'a (kısayollar, tıklayınca oynat/duraklat) ulaşmaz
 const ISOLATE = ['keydown', 'keyup', 'keypress', 'click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup',
   'wheel', 'contextmenu', 'touchstart', 'touchend'];
@@ -503,7 +504,11 @@ export class Panel {
     // bekletmede ayırmanın ileri süresi: oturumdan, yoksa son ayırma olayından
     const hold = S?.hold ? { ...S.hold, aheadSec: S.hold.aheadSec ?? (Number.isFinite(this.sep?.aheadSec) ? this.sep.aheadSec : null) } : null;
     const notice = S?.notice?.text ? S.notice : null;
-    const urgent = st === 'preparing' || st === 'warn' || st === 'error' || !!hold;
+    // ses ayırma yetişiyor: dublaj hazırlığından ayrı, kendi durumu ("Hazırlanıyor" değil)
+    const catchUp = this._catchUp(S);
+    this.pill.dataset.phase = catchUp ? 'sep' : st === 'preparing' ? 'dub' : '';
+    this.root.dataset.phase = this.pill.dataset.phase;
+    const urgent = st === 'preparing' || st === 'warn' || st === 'error' || !!hold || !!catchUp;
     this.root.classList.toggle('ld-sticky', urgent);
     // altyazı itmesi için oynatıcıda: hap var mı, kontroller gizliyken de görünür mü
     this.player.classList.toggle('ld-pill-on', st !== 'off');
@@ -535,21 +540,22 @@ export class Panel {
 
     // hap metni
     let label = STATE_TEXT[st];
-    if (hold) label = `Bekletiliyor · ${Math.ceil(hold.sec)} sn`;
+    if (catchUp) label = ['Ses ayırma yetişiyor', fmtEta(catchUp.etaSec)].filter(Boolean).join(' · ');
+    else if (hold) label = `Bekletiliyor · ${Math.ceil(hold.sec)} sn`;
     else if (st === 'preparing' && detail) label = `Hazırlanıyor · ${detail}`;
     else if ((st === 'warn' || st === 'error') && detail) label = detail;
     this.pillLabel.textContent = label;
     this.pillLabel.hidden = !!sp;
-    this.pillSpin.hidden = st !== 'preparing';
+    this.pillSpin.hidden = st !== 'preparing' || !!catchUp;
     const pTitle = sp ? `Şu an konuşan: ${name}${vg ? ` (${GENDER[vg].label.toLocaleLowerCase('tr')})` : ''}` : label;
     this.pill.title = `${pTitle} — panel için tıklayın`;
     this.pill.setAttribute('aria-label', `LocaDub: ${pTitle}. Paneli ${this._open ? 'kapat' : 'aç'}`);
-    const holdPct = hold ? this._holdPct(hold) : 0;
-    this.pillBar.hidden = !hold;
+    const holdPct = catchUp ? catchUp.pct : hold ? this._holdPct(hold) : 0;
+    this.pillBar.hidden = !hold && !catchUp;
     this.pillBar.firstChild.style.width = `${Math.round(holdPct * 100)}%`;
 
     if (!this._open) return;
-    this.headState.textContent = sp ? `Konuşuyor · ${name}` : (enabled ? STATE_TEXT[st] + (detail && st !== 'active' ? ` · ${detail}` : '') : STATE_TEXT.off);
+    this.headState.textContent = sp ? `Konuşuyor · ${name}` : catchUp ? label : (enabled ? STATE_TEXT[st] + (detail && st !== 'active' ? ` · ${detail}` : '') : STATE_TEXT.off);
     this.notice.hidden = !notice;
     if (notice) { this.notice.textContent = notice.text; this.notice.dataset.kind = notice.kind || 'info'; }
     this._renderNowCard(sp, name, vg, spk);
@@ -557,9 +563,21 @@ export class Panel {
     this.holdEl.hidden = !hold;
     if (hold) {
       const ahead = hold.aheadSec != null ? ` · ${Math.floor(hold.aheadSec)}/${this.settings?.prebufferSec ?? 20} sn hazır` : '';
-      this.holdEl.firstChild.textContent = `Video bekletiliyor: ${Math.ceil(hold.sec)} sn (en çok ${Math.round(hold.maxSec)} sn)${ahead}`;
+      this.holdEl.firstChild.textContent = catchUp
+        ? `Video bekletiliyor (ses ayırma yetişiyor): ${Math.ceil(hold.sec)} sn (en çok ${Math.round(hold.maxSec)} sn)${ahead}`
+        : `Video bekletiliyor: ${Math.ceil(hold.sec)} sn (en çok ${Math.round(hold.maxSec)} sn)${ahead}`;
       this.holdEl.lastChild.firstChild.style.width = `${Math.round(holdPct * 100)}%`;
     }
+  }
+
+  // Ayırma dublajın gerisinde mi: 'waiting' ya da video bekletilirken 'buffering'. { etaSec, pct, aheadSec, needSec } | null
+  _catchUp(S) {
+    const d = this.sep;
+    if (!this._sepTarget || !d || this.settings?.separation === 'off' || !this.vm.enabled) return null;
+    if (d.status !== 'waiting' && !(d.status === 'buffering' && S?.hold)) return null;
+    const need = Number.isFinite(d.needSec) && d.needSec > 0 ? d.needSec : this.settings?.prebufferSec || 20;
+    const ahead = Number.isFinite(d.aheadSec) ? d.aheadSec : 0;
+    return { etaSec: Number.isFinite(d.etaSec) ? d.etaSec : undefined, aheadSec: ahead, needSec: need, pct: Math.min(1, Math.max(0, ahead / need)) };
   }
 
   _holdPct(hold) {
@@ -620,6 +638,13 @@ export class Panel {
     const status = SEP_STATUS[d.status] || 'wait';
     const be = d.backend ? (/gpu/i.test(d.backend) ? 'WebGPU' : /wasm/i.test(d.backend) ? 'WASM' : String(d.backend)) : '';
     const ahead = Number.isFinite(d.aheadSec) ? `${Math.floor(d.aheadSec)} sn ileri` : '';
+    const catchUp = this._catchUp(this.vm.session);
+    if (catchUp) {
+      const eta = fmtEta(catchUp.etaSec);
+      const text = [`${Math.floor(catchUp.aheadSec)} / ${Math.round(catchUp.needSec)} sn hazır`, eta].filter(Boolean).join(' · ');
+      return { status: 'warn', text, bar: catchUp.pct };
+    }
+    const speed = d.status === 'playing' && d.rtf > 0 ? `${(1 / d.rtf).toFixed(1)}× gerçek zaman` : '';
     let text = SEP_TEXT[d.status] || d.status;
     let bar = null;
     if (d.status === 'loading-model') {
@@ -630,8 +655,8 @@ export class Panel {
     } else if (d.status === 'error' && d.message) {
       text = d.message;
     }
-    text = [text, d.status !== 'error' && d.status !== 'off' ? be : '', d.status === 'playing' || d.status === 'buffering' || d.status === 'waiting' ? ahead : '']
-      .filter(Boolean).join(' · ');
+    text = [speed ? '' : text, d.status !== 'error' && d.status !== 'off' ? be : '', speed,
+      d.status === 'playing' || d.status === 'buffering' || d.status === 'waiting' ? ahead : ''].filter(Boolean).join(' · ');
     return { status, text, bar };
   }
 

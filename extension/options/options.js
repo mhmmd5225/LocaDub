@@ -4,6 +4,7 @@
 import { DEFAULTS, getSettings, setSettings, onSettingsChanged, speakerVoice, voicesInUse, genderVoice } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav } from '../common/pcm.js';
 import { BLEND_MAX } from '../engines/tts/styles.js';
+import { SEP_MODELS } from '../engines/sep/models.js';
 import { listCached, deleteByPrefix, fetchModel } from '../engines/common/model-cache.js';
 import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
@@ -808,15 +809,24 @@ async function browserInfo() {
 }
 
 async function diagnosticsReport() {
-  const [status, errors, timings, info] = await Promise.all([
-    bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), bg({ type: 'diag.timings' }), browserInfo(),
+  const [status, errors, timings, info, sep] = await Promise.all([
+    bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), bg({ type: 'diag.timings' }), browserInfo(), bg({ type: 'diag.separation' }),
   ]);
-  const models = [...lists.backends, ...lists.voices]
-    .filter((m) => m.cachePrefix && cachedBytes(m.cachePrefix) > 0)
-    .map((m) => ({ name: m.label, sizeMB: bytesMB(cachedBytes(m.cachePrefix)) }));
+  const models = [];
+  const seen = new Set();
+  for (const m of [...lists.backends, ...lists.voices]) {
+    if (!m.cachePrefix || cachedBytes(m.cachePrefix) <= 0) continue;
+    // ortak paket (Supertonic: 10 ön ayar tek dosya takımı) tek satır
+    const key = m.pack ? 'pack:' + m.pack : m.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const n = m.pack ? lists.voices.filter((v) => v.pack === m.pack).length : 0;
+    models.push({ name: m.pack ? `${PACK_NAMES[m.pack] || m.pack} paketi (${n} ses)` : m.label, sizeMB: bytesMB(cachedBytes(m.cachePrefix)) });
+  }
+  for (const m of SEP_MODELS) if (cachedBytes(m.url) > 0) models.push({ name: `Ses ayırma — ${m.label.replace(/\s*\(.*\)\s*$/, '')}`, sizeMB: bytesMB(cachedBytes(m.url)) });
   return buildReport({
     version: chrome.runtime.getManifest().version, ...info, settings,
-    status: status.ok ? status.result : null, models, errors: errors.ok ? errors.result : [],
+    status: status.ok ? status.result : null, separation: sep.ok ? sep.result : null, models, errors: errors.ok ? errors.result : [],
     timings: timings.ok ? timings.result : [],
     glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
   });

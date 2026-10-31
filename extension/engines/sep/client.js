@@ -5,6 +5,7 @@
 //   const sep = createSepClient();
 //   await sep.load({ model: 'kim-vocal-2', backend: 'auto', onProgress });
 //   const { left, right, ms, backend } = await sep.process(L, R, 48000);   // L, R transfer edilir
+//   const r = await sep.process(L, R, 48000, { startSample, final });     // akış kipi (separator.js başı)
 
 const THREADED_LOAD_TIMEOUT_MS = 90000;
 
@@ -69,10 +70,15 @@ export function createSepClient({ mock = false, workerUrl } = {}) {
 
   return {
     load,
-    process(left, right, sampleRate) {
+    process(left, right, sampleRate, { startSample, final, reset } = {}) {
       const transfer = [left.buffer];
       if (right && right.buffer !== left.buffer) transfer.push(right.buffer);
-      return send({ type: 'process', left, right, sampleRate }, transfer);
+      const extra = startSample != null ? { startSample, final: !!final, reset: !!reset } : {};
+      return send({ type: 'process', left, right, sampleRate, ...extra }, transfer);
+    },
+    /** Sıradaki/süren işleri bırak (kimlikler: process çağrısının sırası değil, istemcinin iç kimliği). */
+    cancelAll() {
+      if (worker && pending.size) worker.postMessage({ type: 'cancel', ids: [...pending.keys()] });
     },
     async dispose() {
       if (!worker) return;

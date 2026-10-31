@@ -148,7 +148,7 @@ const overflow = (page) => page.evaluate(() => {
 
     // ★ Favori: kartta favori kadın/erkek sesi; aynı cinsiyetin eskisinin yerine geçer, ikinci basış kaldırır;
     // favori ses seçiliyken üslup değişikliği favorinin tonuna da yazılır
-    await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'real', voice: 'ahenk-cep', style: 'lively', pitch: 1, favFemale: null, favMale: null }));
+    await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'real', voice: 'ahenk-cep', style: 'lively', pitch: 1, favFemale: null, favMale: null, genderVoices: true }));
     await page.goto(url('', '#seslendirme'));
     await page.waitForSelector('[data-fk="fav:ahenk-cep"]');
     await page.click('[data-fk="fav:ahenk-cep"]');

@@ -80,6 +80,21 @@ async function sendToOffscreen(msg) {
 // Service worker yeniden başlarsa küme boşalır; YouTube sekmeleri adresten de bulunur.
 const contentTabs = new Set();
 
+// [tanılama] ses ayırması olan ilk YouTube sekmesi (etkin olan önce); yanıt veren yoksa null
+async function sepSummary() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
+    tabs.sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0) || (b.audible ? 1 : 0) - (a.audible ? 1 : 0));
+    let off = null;
+    for (const t of tabs) {
+      const r = await chrome.tabs.sendMessage(t.id, { type: 'diag.separation' }, { frameId: 0 }).catch(() => null);
+      if (r && !r.off) return r;
+      off ||= r;
+    }
+    return off;
+  } catch { return null; }
+}
+
 async function broadcastToTabs(msg) {
   try {
     const tabs = await chrome.tabs.query({ url: ['https://www.youtube.com/*'] });
@@ -226,6 +241,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return false;
     case 'diag.timings':
       chrome.storage.session.get('timings').then(({ timings = [] }) => sendResponse({ ok: true, result: timings }));
+      return true;
+    case 'diag.separation':
+      // etkin/ilk YouTube sekmesinin içerik betiğinden ses ayırma özeti (yanıt yoksa null → "açık sekme yok")
+      sepSummary().then((result) => sendResponse({ ok: true, result }));
       return true;
     case 'diag.errors':
       chrome.storage.session.get('errors').then(({ errors = [] }) => sendResponse({ ok: true, result: errors }));
