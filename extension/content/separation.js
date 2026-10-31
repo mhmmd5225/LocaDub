@@ -2,21 +2,31 @@
 //
 //   MAIN dünyası (main-world.js): YouTube'un ses SourceBuffer eklemelerinin kopyası → window.postMessage
 //   → burada: WebM/MP4 ayrıştırma (sep-demux.js) → kodlanmış paketler (medya zamanıyla, PacketStore)
-//   → iş başına WebCodecs AudioDecoder ile PCM ([a − bağlam, b + bağlam]) → gizli eklenti çerçevesi (sep/host.html,
-//     MessageChannel, aktarılabilir Float32Array) → ayırma işçisi (engines/sep/worker.js; WebGPU)
-//   → bağlam kırpılır, ekler çapraz geçişle önbelleğe (PcmTimeline) → AudioBufferSourceNode'larla video.currentTime'a
-//     eşitlenmiş çalma; bu sırada videonun kendi sesi grafikte susturulur (player.js videoGraph().mute).
+//   → iş başına WebCodecs AudioDecoder ile PCM → gizli eklenti çerçevesi (sep/host.html, MessageChannel, aktarılabilir
+//     Float32Array) → ayırma işçisi (engines/sep/worker.js; WebGPU)
+//   → akış kipi (separator.js başı): ardışık işler mutlak pencere ızgarasında tek sinyal gibi işlenir (dikişsiz, ≈ 2×
+//     ses süresi model işi); akış başı/sonunda bağlam kırpılır, ekler çapraz geçişle önbelleğe (PcmTimeline)
+//   → AudioBufferSourceNode'larla video.currentTime'a eşitlenmiş çalma; bu sırada videonun kendi sesi grafikte
+//     susturulur (player.js videoGraph().mute).
 //
-// Yalnızca oynatma konumunun ilerisi işlenir (en yakın önce). Başta video en çok prebufferSec bekletilir; oynarken
-// ayırma yetişmezse (< 2 sn) video duraklatılır, ≥ 8 sn hazır olunca sürer (kalite düşürülmez).
+// Yalnızca oynatma konumunun ilerisi işlenir (en yakın önce). Aynı anda SEP.inflight (2) iş gönderilir: sonrakinin
+// çözülmesi + aktarımı model çalışırken yapılır; işler akış içinde sıralıdır. Parça: WebGPU'da ≈ 24 sn (ilk parça
+// 8 sn), WASM'da ≈ 12 sn. Bekletme kalite düşürmeden (HoldGate, sep-core.js): başta gereken ön tampon, oynarken
+// ölçülen hıza (rtf) göre eşik (yavaşsa seyrek ama uzun bekleme).
 // Durum: 'state' olayı (CustomEvent.detail) ve .state → { status, backend, model, aheadSec, cachedRanges, progress,
-// rtf, message }; status: 'off' | 'loading-model' | 'buffering' | 'playing' | 'waiting' | 'error'.
+// rtf, message, etaSec, needSec, holds, holdMs, batch, chunkSec, streaming }
+//   status: 'off' | 'loading-model' | 'buffering' | 'playing' | 'waiting' | 'error'
+//   etaSec: bekletme sürüyorsa tahmini kalan sn (yoksa null); needSec: sürme hedefi (hazır sn); holds: başlangıç
+//   sonrası oynatma bekletmesi sayısı; holdMs: toplam bekletilen süre (başlangıç dahil); batch: model çalıştırması
+//   başına pencere; chunkSec: iş başına ses (sn); streaming: akış kipi.
+// speechAt(t0, t1): konuşanı cümle çalmadan önce ölçmek için temiz konuşma (orijinal − eşlik); sınıf başlığında.
 
 import { audioContext, videoGraph } from './player.js';
 import { callMain } from './bridge.js';
 import { createDemuxer } from './sep-demux.js';
 import {
   SEP, PacketStore, PcmTimeline, HoldGate, DriftMeter, planNext, runJob, aheadOf, committedEnd, rangeAt, windowFor, bestLag,
+  planStream, writeStreamResult, mergeRanges, streamChunkSec,
 } from './sep-core.js';
 
 const FROM_MAIN = 'yt-tr-dub:main';
@@ -89,8 +99,13 @@ class SepHost {
     return this.loadP;
   }
 
+  /** → Promise (.id: istek kimliği, cancel için) */
   process(left, right, sampleRate, extra = {}) {
     return this._req({ type: 'process', left, right, sampleRate, ...extra }, [left.buffer, right.buffer]);
+  }
+
+  cancel(ids) {
+    if (ids.length) this.post({ type: 'cancel', ids });
   }
 
   post(msg) { this.ready.then(() => this.port.postMessage(msg)).catch(() => {}); }
@@ -98,10 +113,12 @@ class SepHost {
   _req(msg, transfer = []) {
     if (this.error) return Promise.reject(new Error(this.error));
     const id = ++this.seq;
-    return new Promise((res, rej) => {
+    const p = new Promise((res, rej) => {
       this.reqs.set(id, { res, rej });
       this.port.postMessage({ ...msg, id }, transfer);
     });
+    p.id = id;
+    return p;
   }
 
   _rejectAll(message) {
@@ -216,6 +233,15 @@ async function decodeRange(packets, ra, rb, sr) {
 
 // ---- ayrılmış sesin çalınması ----
 
+/**
+ * Ayrılmış sesin çalınması ve durum.
+ *
+ * speechAt(t0, t1) → { left, right, sampleRate } | null: medya zamanı [t0, t1) için temiz konuşma = çözülmüş orijinal
+ * PCM − ayrılmış eşlik (aynı örnek hızında, video ses düzeyinden bağımsız). İkisi de o aralığın tamamında hazır değilse
+ * null (orijinal yalnızca ayırmaya gönderilmiş girdiden tutulur; ek çözme yapılmaz). Cümle çalınmadan önce konuşanı
+ * ölçmek için: ayrılmış ses genelde oynatma konumunun ≥ 15 sn ilerisindedir. Bellek sınırlı: geride ~5 sn, ileride
+ * işlenecek pencere kadar tutulur.
+ */
 export class SeparatedAudio extends EventTarget {
   /**
    * video: <video>; mode: 'real' | 'mock'; prebufferSec: başta en çok bekletme (5–60);
@@ -233,7 +259,18 @@ export class SeparatedAudio extends EventTarget {
     this.xfSec = SEP.xfSec;
     this.sources = new Map(); // msId → { url, store, demux: Map<sbId, demuxer> }
     this.sep = null;          // PcmTimeline (ayrılmış)
-    this.job = null;
+    this.orig = null;         // PcmTimeline (ayırmaya gönderilen orijinal; speechAt)
+    this.job = null;          // tek parça kipinde süren iş
+    this.jobs = [];           // akış kipinde gönderilmiş işler (sıralı)
+    this.stream = null;       // { a0, inEndS, inEnd, out } (sn; inEndS örnek)
+    this.streaming = false;
+    this.geo = null;          // işçi ızgarası { win, step }
+    this.batch = 1;
+    this.chunkSec = SEP.chunkSec;
+    this.holds = 0;
+    this._holdMs = 0;
+    this._gen = 0;
+    this._sendChain = Promise.resolve();
     this.ready = false;
     this.error = null;
     this.offReason = null;
@@ -244,7 +281,7 @@ export class SeparatedAudio extends EventTarget {
     this.aheadSec = 0;
     this.gate = new HoldGate();
     this.drift = new DriftMeter();
-    this._hold = { active: false, ours: false, resuming: false };
+    this._hold = { active: false, ours: false, resuming: false, since: 0 };
     this._sched = [];         // { node, k0, k1, m0 }
     this._anchor = null;
     this._schedEnd = 0;
@@ -273,7 +310,26 @@ export class SeparatedAudio extends EventTarget {
       progress: this.ready ? 1 : Math.round(this.progress * 100) / 100,
       rtf: Math.round(this.rtf * 1000) / 1000,
       message: this._message(t),
+      etaSec: this._hold.active ? this.gate.etaSec : null,
+      needSec: Math.round(this.gate.needSec * 10) / 10,
+      holds: this.holds,
+      holdMs: Math.round(this._holdMs + (this._hold.active ? performance.now() - this._hold.since : 0)),
+      batch: this.batch,
+      chunkSec: Math.round(this.chunkSec * 100) / 100,
+      streaming: this.streaming,
     };
+  }
+
+  /** Temiz konuşma (orijinal − eşlik) [t0, t1) için; sınıf başlığına bakın. */
+  speechAt(t0, t1) {
+    if (!this.sep || !this.orig || !(t1 > t0)) return null;
+    const sr = this.sep.sr;
+    const a = Math.round(t0 * sr), b = Math.round(t1 * sr);
+    const has = (tl) => tl.ranges().some(([s, e]) => s <= a + tl.tol && e >= b - tl.tol);
+    if (!has(this.sep) || !has(this.orig)) return null;
+    const o = this.orig.read(a, b), m = this.sep.read(a, b);
+    for (let i = 0; i < o.L.length; i++) { o.L[i] -= m.L[i]; o.R[i] -= m.R[i]; }
+    return { left: o.L, right: o.R, sampleRate: sr };
   }
 
   setPrebuffer(sec) { this.prebufferSec = sec; }
@@ -288,7 +344,7 @@ export class SeparatedAudio extends EventTarget {
     on('volumechange', () => this._applyVolume());
     on('play', () => {
       // bekletme sırasında kullanıcı oynattı: bekletme biter, ayırma yeniden yetişene dek video durdurulmaz
-      if (this._hold.active && !this._hold.resuming) { this.gate.userOverride(); this._hold.active = false; this._hold.ours = false; }
+      if (this._hold.active && !this._hold.resuming) { this.gate.userOverride(); this._hold.ours = false; this._releaseHold(); }
     });
     callMain('sep-subscribe').catch(() => {});
     const h = sepHost();
@@ -298,10 +354,16 @@ export class SeparatedAudio extends EventTarget {
       .then(() => h.load({ model: 'auto', backend: 'auto', ...(h.gpu ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
-        this.ready = true;
         this.backend = info.backend || null;
         this.model = info.model || null;
         if (Number.isFinite(info.contextSec)) this.ctxSec = Math.min(3, Math.max(0, info.contextSec));
+        this.batch = Math.max(1, Number(info.batch) || 1);
+        if (info.streaming && info.stepSec > 0 && info.chunkSec > 0) {
+          this.streaming = true;
+          this.geo = { win: info.chunkSec, step: info.stepSec };
+          this.chunkSec = streamChunkSec(this.backend, info.stepSec, this.batch);
+        }
+        this.ready = true;
       })
       .catch((e) => this._fail(e?.message || String(e)));
     this._timer = setInterval(() => this._tick(), TICK_MS);
@@ -401,28 +463,44 @@ export class SeparatedAudio extends EventTarget {
 
     // önbellek ve iş
     const raw = cur ? cur.store.ranges() : [];
-    if (cur && !this.sep && cur.store.size) this.sep = new PcmTimeline(cur.store.list[0].cfg.sampleRate);
+    if (cur && !this.sep && cur.store.size) this._resetTimeline(cur.store.list[0].cfg.sampleRate);
     const sepR = this.sep ? this.sep.rangesSec() : [];
     this.aheadSec = aheadOf(sepR, t, { duration, xfSec: this.xfSec });
-    const windowSec = windowFor(this.prebufferSec);
-    const plan = this.error || this.offReason || !this.sep ? null : planNext({
-      t, raw, sep: sepR, duration, windowSec, aheadSec: this.aheadSec, ctxSec: this.ctxSec, xfSec: this.xfSec,
-    });
-    if (plan && this.ready && !this.job) this._run(plan, cur);
+    const windowSec = windowFor(this.prebufferSec, this.gate.highFor(this.rtf, this.chunkSec), this.chunkSec);
+    const can = !this.error && !this.offReason && !!this.sep;
+    let plan = null;
+    if (can && this.ready && this.streaming) {
+      this._cancelStale(t, windowSec);
+      while (this.jobs.length < SEP.inflight) {
+        plan = planStream({
+          t, raw, sep: mergeRanges(sepR, this.jobs.map((j) => [j.a, j.b])), stream: this.stream, geo: this.geo, duration,
+          windowSec, aheadSec: this.aheadSec, chunkSec: this.chunkSec, ctxSec: this.ctxSec, xfSec: this.xfSec,
+        });
+        if (!plan) break;
+        this._submit(plan, cur);
+      }
+    } else if (can) {
+      plan = planNext({ t, raw, sep: sepR, duration, windowSec, aheadSec: this.aheadSec, ctxSec: this.ctxSec, xfSec: this.xfSec });
+      if (plan && this.ready && !this.job) this._run(plan, cur);
+    }
     if (now - (this._lastPrune || 0) > 1000) {
       this._lastPrune = now;
       for (const s of this.sources.values()) s.store.prune(t - SEP.packetsBehindSec);
       if (this.sep) {
-        const sr = this.sep.sr;
-        this.sep.prune(Math.round((t - SEP.keepBehindSec) * sr), Math.round((t + windowSec + SEP.chunkSec + 5) * sr));
+        const sr = this.sep.sr, hi = Math.round((t + windowSec + 2 * this.chunkSec + 10) * sr);
+        this.sep.prune(Math.round((t - SEP.keepBehindSec) * sr), hi);
+        this.orig.prune(Math.round((t - 5) * sr), hi);
       }
     }
 
     // bekletme
     const detecting = blob && !cur?.store.size && now - this._t0 <= DETECT_MS;
-    const pending = !!this.job || !!plan || detecting;
+    const pending = !!this.job || this.jobs.length > 0 || !!plan || detecting;
     const failed = !!this.error || !!this.offReason || !rateOk || v.ended;
-    const want = this.gate.update({ elapsedMs: now - this._t0, prebufferSec: this.prebufferSec, aheadSec: this.aheadSec, pending, ready: this.ready, failed });
+    const want = this.gate.update({
+      elapsedMs: now - this._t0, prebufferSec: this.prebufferSec, aheadSec: this.aheadSec, pending, ready: this.ready, failed,
+      rtf: this.rtf, chunkSec: this.chunkSec, remainingSec: duration - t,
+    });
     this._applyHold(want);
 
     // durum
@@ -436,6 +514,87 @@ export class SeparatedAudio extends EventTarget {
     this._tickPlay();
     if (this.mode === 'mock') this._mockTick(now);
     this._emit();
+  }
+
+  _resetTimeline(rate) {
+    this._gen++;
+    this.sep = new PcmTimeline(rate);
+    this.orig = new PcmTimeline(rate);
+    this._cancelJobs(this.jobs);
+  }
+
+  _cancelJobs(jobs) {
+    if (!jobs.length) return;
+    for (const j of jobs) j.cancelled = true;
+    sepHost().cancel(jobs.map((j) => j.reqId).filter((x) => x != null));
+    this.jobs = this.jobs.filter((j) => !j.cancelled);
+    this.stream = null;
+  }
+
+  // atlamadan sonra işe yaramayacak gönderilmiş işler (ve akışın kalanı) bırakılır
+  _cancelStale(t, windowSec) {
+    if (this.jobs.some((j) => j.b < t - 0.5 || j.a > t + windowSec + this.chunkSec)) this._cancelJobs(this.jobs);
+  }
+
+  _measure(sec, ms) {
+    if (!(sec > 0.5) || !Number.isFinite(ms)) return;
+    const r = ms / 1000 / sec;
+    this.rtf = this.rtf ? this.rtf * 0.7 + r * 0.3 : r;
+  }
+
+  // Akış işi: çözme hemen başlar; gönderim önceki işin gönderiminden sonra (işçide sıra = akış sırası).
+  _submit(job, cur) {
+    const sr = this.sep.sr;
+    const raS = job.cont && this.stream ? this.stream.inEndS : Math.round(job.ra * sr);
+    const rbS = Math.max(raS + 1, Math.round(job.rb * sr));
+    job.gen = this._gen;
+    if (job.final) { job.stream = this.stream; this.stream = null; } else {
+      if (!job.cont || !this.stream) this.stream = { a0: job.a };
+      Object.assign(this.stream, { inEndS: rbS, inEnd: rbS / sr, out: job.b, last: job });
+      job.stream = this.stream;
+    }
+    this.jobs.push(job);
+    const h = sepHost();
+    const tl = this.sep, orig = this.orig;
+    const decodeP = decodeRange(cur.store.packetsIn(raS / sr - PREROLL, rbS / sr), raS, rbS, sr);
+    decodeP.catch(() => {});
+    const prev = this._sendChain;
+    let sent;
+    this._sendChain = new Promise((r) => { sent = r; });
+    (async () => {
+      try {
+        const d = await decodeP;
+        await prev;
+        if (d.rate !== sr) throw Object.assign(new Error('örnekleme hızı değişti'), { rate: d.rate });
+        if (!this.alive || job.cancelled || job.gen !== this._gen) throw new Error('cancelled');
+        orig.write(raS, d.L, d.R); // kopyalanır (aktarımdan önce)
+        const p = h.process(d.L, d.R, sr, {
+          startSample: raS, final: job.final, reset: job.reset, ...(this.mode === 'mock' ? { mockRtf: this._mockRtf() } : {}),
+        });
+        job.reqId = p.id;
+        sent();
+        const res = await p;
+        if (!this.alive || job.cancelled || job.gen !== this._gen) return;
+        writeStreamResult(tl, job, res, { xfSec: this.xfSec, ctxSec: this.ctxSec, duration: this._duration() });
+        const n = res.left.length;
+        // gerçekleşen akış sonu (tahminden birkaç örnek sapabilir)
+        if (this.stream && this.stream === job.stream && this.stream.last === job && n) this.stream.out = (res.startSample + n) / sr;
+        this._measure((rbS - raS) / sr, res.ms); // girdi süresi: akışta kararlı hız (ilk çağrının gecikmesi sayılmaz)
+        if (res.backend) this.backend = res.backend;
+        this._fails = 0;
+      } catch (e) {
+        sent();
+        if (!this.alive) return;
+        if (job.stream && this.stream === job.stream) this.stream = null; // akış koptu: sonraki iş yeni akış
+        if (job.cancelled || job.gen !== this._gen || e?.message === 'cancelled') return;
+        if (e?.rate) { this._resetTimeline(e.rate); this._stopAll(); return; } // ayrılmış önbellek yeni hızla
+        console.warn('[yt-tr-dub] ayırma parçası başarısız', job, e);
+        if (++this._fails >= 3 || h.error) this._fail(e?.message || String(e));
+      } finally {
+        const i = this.jobs.indexOf(job);
+        if (i >= 0) this.jobs.splice(i, 1);
+      }
+    })();
   }
 
   async _run(job, cur) {
@@ -457,14 +616,12 @@ export class SeparatedAudio extends EventTarget {
         separate: (L, R, rate) => h.process(L, R, rate, this.mode === 'mock' ? { mockRtf: this._mockRtf() } : {}),
       });
       if (!this.alive) return;
-      const sec = job.b - job.a;
-      const r = (res.ms ?? performance.now() - t0) / 1000 / Math.max(0.1, sec);
-      this.rtf = this.rtf ? this.rtf * 0.7 + r * 0.3 : r;
+      this._measure(job.b - job.a, res.ms ?? performance.now() - t0);
       if (res.backend) this.backend = res.backend;
       this._fails = 0;
     } catch (e) {
       if (!this.alive) return;
-      if (e?.rate) { this.sep = new PcmTimeline(e.rate); this._stopAll(); return; } // ayrılmış önbellek yeni hızla
+      if (e?.rate) { this._resetTimeline(e.rate); this._stopAll(); return; } // ayrılmış önbellek yeni hızla
       console.warn('[yt-tr-dub] ayırma parçası başarısız', job, e);
       if (++this._fails >= 3 || h.error) this._fail(e?.message || String(e));
     } finally {
@@ -477,8 +634,12 @@ export class SeparatedAudio extends EventTarget {
   _applyHold(want) {
     const v = this.video, h = this._hold;
     if (want && !h.active) {
-      if (!v.paused) { h.active = true; h.ours = true; v.pause(); }
-      else if (this.otherHold()) { h.active = true; h.ours = true; } // dublajın başlangıç bekletmesini devral
+      const start = () => {
+        h.active = true; h.ours = true; h.since = performance.now();
+        if (!this.gate.initial) this.holds++;
+      };
+      if (!v.paused) { start(); v.pause(); }
+      else if (this.otherHold()) start(); // dublajın başlangıç bekletmesini devral
       // kullanıcı durdurmuşsa dokunma; oynatınca yeniden bakılır
     } else if (!want && h.active) {
       this._releaseHold();
@@ -491,6 +652,8 @@ export class SeparatedAudio extends EventTarget {
     const ours = h.ours;
     h.active = false;
     h.ours = false;
+    if (h.since) this._holdMs += performance.now() - h.since;
+    h.since = 0;
     if (ours && v.paused && !this.otherHold()) {
       h.resuming = true;
       v.play().catch(() => {}).finally(() => { h.resuming = false; });
@@ -619,9 +782,11 @@ export class SeparatedAudio extends EventTarget {
         ? 'Oynatma hızı 1x değil: orijinal ses çalıyor (ayrılmış ses perdesi korunamaz).' : 'Ses ayırma kapalı.');
       case 'loading-model': return `Ses ayırma modeli yükleniyor… %${Math.round(this.progress * 100)}` +
         (this._hold.active ? ' Video hazır olunca sürecek.' : '');
-      case 'waiting': return `Ses ayırma geride kaldı; ${SEP.high} sn hazır olunca video sürecek (${a} sn hazır).`;
+      case 'waiting': return `Ses ayırma geride kaldı; ${Math.round(this.gate.needSec)} sn hazır olunca video sürecek ` +
+        `(${a} sn hazır${this.gate.etaSec != null ? `, ≈ ${Math.ceil(this.gate.etaSec)} sn` : ''}).`;
       case 'buffering': return this._hold.active
-        ? `Gerçek dublaj hazırlanıyor: konuşma sesten ayrılıyor… (${a}/${Math.round(this.prebufferSec)} sn)`
+        ? `Gerçek dublaj hazırlanıyor: konuşma sesten ayrılıyor… (${a}/${Math.round(this.gate.needSec)} sn` +
+          `${this.gate.etaSec != null ? `, ≈ ${Math.ceil(this.gate.etaSec)} sn` : ''})`
         : 'Ses ayırma yetişmedi: bu bölümde orijinal ses çalıyor.';
       case 'playing': return `Gerçek dublaj: yalnızca müzik ve efektler${this.backend ? ` (${this.backend})` : ''}.` +
         (this.backend === 'wasm' ? ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.' : '');
@@ -670,7 +835,7 @@ export class SeparatedAudio extends EventTarget {
       ...this.state, holding: this._hold.active, initial: this.gate.initial,
       origGain: g ? Math.round(g.mute.gain.value * 1000) / 1000 : null,
       scheduled: this._sched.length, drift: this._lastDrift != null ? Math.round(this._lastDrift * 1000) : null,
-      resyncs: this._resyncs || 0, probe: this._probe || null, job: this.job ? [this.job.a, this.job.b] : null,
+      resyncs: this._resyncs || 0, probe: this._probe || null, job: this.job ? [this.job.a, this.job.b] : this.jobs.length ? [this.jobs[0].a, this.jobs[0].b] : null, inflight: this.jobs.length,
     });
   }
 }

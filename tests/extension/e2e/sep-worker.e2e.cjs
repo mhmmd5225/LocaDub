@@ -3,8 +3,12 @@
 //  2) gerçek işçi (engines/sep/worker.js) gerçek modelle — model tests/extension/.models/sep altında varsa
 //     (node tools/sep-bench.mjs indirir) ya da SEP_REAL=1 ise (HF'ten iner). WASM'da RTF ölçülür; varsa
 //     onnxruntime-node ile aynı girdinin sonucuyla karşılaştırılır (SNR). --webgpu: SwiftShader/GPU WebGPU da denenir.
+//  3) akış kipi (gerçek modelle, WASM): --stream-seconds'lık ses içerik betiğinin eski yoluyla (12 sn + 2·1 sn bağlam)
+//     ve akışla (12 sn'lik ardışık çağrılar) işlenir: ses saniyesi başına pencere ve duvar saati RTF'i; akışın
+//     parçalı çıktısı tek akış çağrısınınkiyle karşılaştırılır (SNR, ≥ 60 dB).
 //
 //   xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs [--seconds 12] [--threads 4] [--webgpu] [--model kim-vocal-2]
+//                                                         [--stream-seconds 36] (0: akış ölçümü atlanır)
 const { chromium } = require('playwright');
 const http = require('http');
 const fs = require('fs');
@@ -17,6 +21,7 @@ const SECONDS = Number(arg('--seconds', 12));
 const THREADS = Number(arg('--threads', 4));
 const MODEL = arg('--model', 'kim-vocal-2');
 const WEBGPU = process.argv.includes('--webgpu');
+const STREAM_SECONDS = Number(arg('--stream-seconds', 36));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json' };
 
 function serve() {
@@ -136,6 +141,72 @@ async function main() {
     console.log(`gerçek işçi [${backend}${backend === 'webgpu' ? `, adapter ${r.gpu}` : ''}] → ${r.backend}: yükleme ${Math.round(r.loadMs)} ms, işlem ${r.ms} ms, RTF ${(r.ms / 1000 / SECONDS).toFixed(3)} (${SECONDS} sn stereo @ ${sr}, ${THREADS} iş parçacığı)`);
   }
   if (haveLocal) console.log(`model yerel kopyadan verildi (${routed} istek)`);
+
+  // 3) akış ↔ eski yol (WASM)
+  if (STREAM_SECONDS > 0) {
+    const r = await page.evaluate(async ({ threads, model, n, sr, gen }) => {
+      const makeInput = new Function(`return (${gen})`)();
+      const w = new Worker('/extension/engines/sep/worker.js', { type: 'module' });
+      let id = 10;
+      const call = (msg, transfer = []) => new Promise((res, rej) => {
+        msg.id = ++id;
+        const h = (e) => {
+          if (e.data.id !== msg.id || e.data.type === 'progress') return;
+          w.removeEventListener('message', h);
+          e.data.type === 'error' ? rej(new Error(e.data.message)) : res(e.data);
+        };
+        w.addEventListener('message', h);
+        w.postMessage(msg, transfer);
+      });
+      const loaded = await call({ type: 'load', model, backend: 'wasm', threads });
+      const [L, R] = makeInput(n, sr);
+      const cut = (a, b) => [L.slice(a, b), R.slice(a, b)];
+      const C = 12 * sr, X = sr;
+      // eski yol: 12 sn çekirdek + iki yanda 1 sn bağlam, iş başına bir çağrı
+      let t = performance.now(), oldWin = 0, oldMs = 0;
+      for (let p = 0; p < n; p += C) {
+        const [l, rr] = cut(Math.max(0, p - X), Math.min(n, p + C + X));
+        const res = await call({ type: 'process', left: l, right: rr, sampleRate: sr }, [l.buffer, rr.buffer]);
+        oldWin += res.windows; oldMs += res.ms;
+      }
+      const oldWall = performance.now() - t;
+      // akış: 12 sn'lik ardışık çağrılar, sonuncusu final; iki iş art arda gönderilir (boru hattı)
+      t = performance.now();
+      const parts = [], pend = [];
+      let newWin = 0, newMs = 0;
+      for (let p = 0; p < n; p += C) {
+        const [l, rr] = cut(p, Math.min(n, p + C));
+        pend.push(call({ type: 'process', left: l, right: rr, sampleRate: sr, startSample: p, final: p + C >= n }, [l.buffer, rr.buffer]));
+      }
+      for (const q of pend) { const res = await q; parts.push(res); newWin += res.windows; newMs += res.ms; }
+      const newWall = performance.now() - t;
+      const [l1, r1] = cut(0, n);
+      const one = await call({ type: 'process', left: l1, right: r1, sampleRate: sr, startSample: 0, final: true }, [l1.buffer, r1.buffer]);
+      w.terminate();
+      let s = 0, e = 0, at = 0, contiguous = true;
+      for (const q of parts) {
+        if (q.startSample !== at) contiguous = false;
+        for (let j = 0; j < q.left.length; j++) {
+          const k = q.startSample + j;
+          s += one.left[k] ** 2 + one.right[k] ** 2;
+          e += (q.left[j] - one.left[k]) ** 2 + (q.right[j] - one.right[k]) ** 2;
+        }
+        at = q.startSample + q.left.length;
+      }
+      return {
+        model: loaded.model, step: loaded.stepSec, batch: loaded.batch, oldWin, oldMs, oldWall, newWin, newMs, newWall,
+        oneWin: one.windows, oneMs: one.ms, snr: e ? 10 * Math.log10(s / e) : Infinity, contiguous, end: at, oneLen: one.left.length,
+      };
+    }, { threads: THREADS, model: MODEL, n: Math.round(STREAM_SECONDS * sr), sr, gen: makeInput.toString() });
+    const S = STREAM_SECONDS;
+    console.log(`akış [wasm, ${r.model}, adım ${r.step.toFixed(2)} sn, batch ${r.batch}], ${S} sn ses, 12 sn'lik işler:`);
+    console.log(`  eski yol (12 + 2·1 sn bağlam): ${r.oldWin} pencere = ${(r.oldWin / S).toFixed(3)} pencere/sn, işlem ${(r.oldMs / 1000).toFixed(1)} sn, duvar RTF ${(r.oldWall / 1000 / S).toFixed(3)}`);
+    console.log(`  akış:                          ${r.newWin} pencere = ${(r.newWin / S).toFixed(3)} pencere/sn, işlem ${(r.newMs / 1000).toFixed(1)} sn, duvar RTF ${(r.newWall / 1000 / S).toFixed(3)}`);
+    console.log(`  hızlanma: pencere ${(r.oldWin / r.newWin).toFixed(2)}×, duvar ${(r.oldWall / r.newWall).toFixed(2)}×; parçalı akış ↔ tek akış çağrısı SNR ${Number.isFinite(r.snr) ? r.snr.toFixed(1) + ' dB' : '∞ (birebir aynı)'}`);
+    assert.ok(r.contiguous && r.end === r.oneLen, 'akış çıktısı ardışık değil');
+    assert.ok(r.snr >= 60, `akış SNR ${r.snr}`);
+    assert.ok(r.newWin < r.oldWin, 'akış daha az pencere çalıştırmalı');
+  }
 
   // onnxruntime-node ile aynı girdinin sonucu (varsa)
   let ortNode = null;
