@@ -12,7 +12,15 @@ export const MALE_MAX_HZ = 155;
 export const FEMALE_MIN_HZ = 170;
 /** Bir cümlenin ölçülmesi için gereken ötümlü çerçeve sayısı (50 ms'de bir → ≈ 0.75 sn konuşma). */
 export const MIN_VOICED = 15;
+/** Erken karar (cümle sürerken) için yeterli ötümlü çerçeve (≈ 0.4–0.5 sn konuşma). */
+export const EARLY_VOICED = 8;
 const KEEP_SEC = 120;
+// Tutulan nota: art arda bu kadar çerçeve perdesi bu oranda sabit kalırsa müzik sayılır (konuşmada perde hep kayar).
+const HELD_FRAMES = 6;
+const HELD_TOL = 0.01;
+const HELD_GAP_SEC = 0.08;
+// Aralıkta hem erkek hem kadın bandında bu paydan fazla örnek: üst üste konuşma ya da müzik → belirsiz.
+const MIXED_SHARE = 0.45;
 /** Eşikten bu kadar uzak ölçüm tek başına yeter (sınıra yakın olanlarda son ölçümlerin çoğunluğu aranır). */
 export const CLEAR_MALE_HZ = 140;
 export const CLEAR_FEMALE_HZ = 185;
@@ -90,17 +98,38 @@ export class GenderTracker {
     this.samples = this.samples.filter(([st]) => Math.abs(st - t) < KEEP_SEC);
   }
 
-  /** [start, end] aralığının ölçümü → { hz, gender } ya da yeterli konuşma yoksa null. */
-  measure(start, end) {
-    const f = this.samples.filter(([t]) => t >= start && t <= end).map(([, f0]) => f0);
-    if (f.length < MIN_VOICED) return null;
+  /**
+   * [start, end] aralığının ölçümü → { hz, gender } ya da yeterli konuşma yoksa null. Tutulan notalar (müzik) atılır;
+   * hem erkek hem kadın bandı kalabalıksa gender null (belirsiz). opts.min: gereken örnek (erken karar: EARLY_VOICED).
+   */
+  measure(start, end, { min = MIN_VOICED } = {}) {
+    const f = dropHeld(this.samples.filter(([t]) => t >= start && t <= end).sort((a, b) => a[0] - b[0]));
+    if (f.length < min) return null;
+    const male = f.filter((v) => v < MALE_MAX_HZ).length;
+    const female = f.filter((v) => v > FEMALE_MIN_HZ).length;
+    const mixed = male > f.length * MIXED_SHARE && female > f.length * MIXED_SHARE;
     f.sort((a, b) => a - b);
     // oktav hatalarına karşı ortancanın iki katı/yarısı dışını at, sonra yeniden ortanca
     const m0 = f[f.length >> 1];
     const g = f.filter((v) => v > m0 / 1.8 && v < m0 * 1.8);
     const hz = g[g.length >> 1] ?? m0;
-    return { hz: Math.round(hz), gender: genderOf(hz) };
+    return { hz: Math.round(hz), gender: mixed ? null : genderOf(hz) };
   }
+}
+
+// Zamana göre sıralı [t, f0] örneklerinden tutulan nota dizilerini at → kalan perdeler.
+function dropHeld(s) {
+  const out = [];
+  let run = [];
+  let lastT = -Infinity;
+  const flush = () => { if (run.length < HELD_FRAMES) out.push(...run); run = []; };
+  for (const [t, f0] of s) {
+    if (run.length && (t - lastT > HELD_GAP_SEC || Math.abs(f0 / run[0] - 1) > HELD_TOL)) flush();
+    run.push(f0);
+    lastT = t;
+  }
+  flush();
+  return out;
 }
 
 /**

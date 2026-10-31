@@ -1,0 +1,57 @@
+/* LocaDub tasarım dili: ayarlar, açılır pencere ve oynatıcı paneli ortak belirteçleri.
+   Koyu cam yüzeyler, tek vurgu rengi (LocaDub kırmızı-mercan), yumuşak köşeler, sakin hareket. */
+:root, .ld-theme {
+  --ld-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --ld-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ld-radius-s: 8px;
+  --ld-radius-m: 12px;
+  --ld-radius-l: 18px;
+  --ld-gap: 12px;
+  --ld-ease: cubic-bezier(.2, .8, .2, 1);
+  --ld-dur: 180ms;
+
+  --ld-accent: #ff5a4e;
+  --ld-accent-2: #ff8a5c;
+  --ld-accent-grad: linear-gradient(135deg, #ff5a4e 0%, #ff8a5c 100%);
+  --ld-accent-fg: #ffffff;
+  --ld-female: #ff7ab8;
+  --ld-male: #5fb4ff;
+  --ld-ok: #3ccf8e;
+  --ld-warn: #f5b83d;
+  --ld-err: #ff6b63;
+
+  /* açık */
+  --ld-bg: #f5f6f8;
+  --ld-surface: #ffffff;
+  --ld-surface-2: #f0f1f4;
+  --ld-fg: #17181b;
+  --ld-muted: #646770;
+  --ld-line: rgba(20, 22, 28, .09);
+  --ld-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ld-bg: #0e0f12;
+    --ld-surface: #16171b;
+    --ld-surface-2: #1d1f24;
+    --ld-fg: #ececf1;
+    --ld-muted: #9a9daa;
+    --ld-line: rgba(255, 255, 255, .08);
+    --ld-shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  }
+}
+/* Oynatıcı üstü: her zaman koyu cam */
+.ld-glass {
+  --ld-fg: #f4f4f7;
+  --ld-muted: rgba(244, 244, 247, .64);
+  --ld-line: rgba(255, 255, 255, .12);
+  --ld-surface: rgba(18, 19, 23, .72);
+  --ld-surface-2: rgba(255, 255, 255, .07);
+  background: var(--ld-surface);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--ld-line);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .45);
+  color: var(--ld-fg);
+  font-family: var(--ld-font);
+}

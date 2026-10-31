@@ -63,6 +63,8 @@ bindRange('ttsVolume', (v) => `%${Math.round(v * 100)}`);
 bindRange('originalVolume', (v) => `%${Math.round(v * 100)}`);
 
 $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
+$('separation').checked = settings.separation !== 'off';
+$('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
 $('openOptions').addEventListener('click', () => openOptions());
 
 // ---------- Seslendirme seçimi ----------
@@ -207,6 +209,7 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 onSettingsChanged((s) => {
   settings = s;
+  $('separation').checked = s.separation !== 'off';
   for (const id of ['ttsVolume', 'originalVolume']) {
     if (document.activeElement !== $(id)) { $(id).value = s[id]; $(id).dispatchEvent(new Event('input')); }
   }

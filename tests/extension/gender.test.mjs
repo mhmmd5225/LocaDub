@@ -2,7 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { estimateF0, genderOf, GenderTracker, predictGender, turnGender, MIN_VOICED } from '../../extension/content/gender.js';
+import {
+  estimateF0, genderOf, GenderTracker, predictGender, turnGender, MIN_VOICED, EARLY_VOICED,
+} from '../../extension/content/gender.js';
 import {
   normalizeSettings, normalizeFavorite, genderVoice, genderVoiceList, chooseVoice, toneFor, voicesInUse, voiceGender,
 } from '../../extension/common/settings.js';
@@ -36,11 +38,13 @@ test('genderOf: erkek < 155 Hz < belirsiz < 170 Hz < kadın', () => {
 
 test('GenderTracker: aralık ortancası, az örnekte ölçüm yok, oktav hataları ayıklanır', () => {
   const g = new GenderTracker();
-  for (let i = 0; i < 30; i++) g.push(10 + i * 0.05, i % 7 === 0 ? 240 : 120); // ara sıra oktav atlaması
-  assert.deepEqual(g.measure(10, 12), { hz: 120, gender: 'male' });
+  // konuşma gibi kayan perde (≈ 120 Hz ± %4), ara sıra oktav atlaması
+  for (let i = 0; i < 30; i++) g.push(10 + i * 0.05, i % 7 === 0 ? 240 : Math.round(120 * (1 + 0.04 * Math.sin(i))));
+  assert.equal(g.measure(10, 12).gender, 'male');
+  assert.ok(Math.abs(g.measure(10, 12).hz - 120) <= 5, String(g.measure(10, 12).hz));
   assert.equal(g.measure(20, 22), null, 'örnek yok');
   const few = new GenderTracker();
-  for (let i = 0; i < MIN_VOICED - 1; i++) few.push(i * 0.05, 220);
+  for (let i = 0; i < MIN_VOICED - 1; i++) few.push(i * 0.05, 220 + (i % 3) * 8);
   assert.equal(few.measure(0, 10), null);
   few.push(0, 0); // ötümsüz çerçeve sayılmaz
   assert.equal(few.measure(0, 10), null);
@@ -48,20 +52,67 @@ test('GenderTracker: aralık ortancası, az örnekte ölçüm yok, oktav hatalar
   assert.equal(g.samples.length, 0);
 });
 
+test('GenderTracker: tutulan notalar (müzik) atılır, iki cinsiyet karışıksa belirsiz, erken kararda az örnek yeter', () => {
+  const held = new GenderTracker();
+  for (let i = 0; i < 40; i++) held.push(i * 0.05, i < 20 ? 220 : 147); // iki sabit nota
+  assert.equal(held.measure(0, 2), null);
+  const mixed = new GenderTracker();
+  for (let i = 0; i < 30; i++) mixed.push(i * 0.05, i % 2 ? 118 + (i % 5) * 3 : 228 + (i % 5) * 4);
+  assert.equal(mixed.measure(0, 2).gender, null);
+  const early = new GenderTracker();
+  for (let i = 0; i < EARLY_VOICED; i++) early.push(i * 0.05, 230 + (i % 4) * 6);
+  assert.equal(early.measure(0, 1), null, 'tam ölçüm için az');
+  assert.equal(early.measure(0, 1, { min: EARLY_VOICED }).gender, 'female');
+});
+
 // Eklentinin kendi sesleriyle üretilmiş 3 sn'lik konuşma (16 kHz), 50 ms'de bir 43 ms'lik çerçeve: tarayıcıdaki gibi
-function speech(name) {
+const RATE16 = 16000;
+const rms = (x) => Math.sqrt(x.reduce((a, v) => a + v * v, 0) / x.length);
+function wav(name) {
   const b = readFileSync(new URL(`./fixtures/${name}.wav`, import.meta.url));
-  const x = Float32Array.from(new Int16Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length)), (v) => v / 32768);
-  const rate = 16000;
-  const W = Math.round(0.0427 * rate);
-  const g = new GenderTracker();
-  for (let s = 0; s + W <= x.length; s += Math.round(0.05 * rate)) g.push(s / rate, estimateF0(x.subarray(s, s + W), rate));
-  return g.measure(0, 3);
+  return Float32Array.from(new Int16Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length)), (v) => v / 32768);
 }
+// Arka plan müziği: 0.5 sn'lik akorlar (kök + beşli + oktav, harmonikli), konuşmanın `db` altında
+function withMusic(x, db) {
+  const roots = [220, 196, 262, 247, 220, 330];
+  const m = Float32Array.from({ length: x.length }, (_, i) => {
+    const r = roots[Math.floor(i / (RATE16 * 0.5)) % roots.length];
+    let v = 0;
+    for (const f of [r, r * 1.5, r * 2]) for (let h = 1; h <= 3; h++) v += Math.sin((2 * Math.PI * f * h * i) / RATE16) / h;
+    return v;
+  });
+  const k = ((rms(x) || 0.1) * 10 ** (db / 20)) / rms(m);
+  return x.map((v, i) => v + m[i] * k);
+}
+function speech(x, end = 3, opts) {
+  const W = Math.round(0.0427 * RATE16);
+  const g = new GenderTracker();
+  for (let s = 0; s + W <= x.length; s += Math.round(0.05 * RATE16)) g.push(s / RATE16, estimateF0(x.subarray(s, s + W), RATE16));
+  return g.measure(0, end, opts);
+}
+const MALE = ['male-antalia', 'male-supertonic'];
+const FEMALE = ['female-ahenk', 'female-ema', 'female-supertonic'];
+const cases = [...MALE.map((n) => [n, 'male']), ...FEMALE.map((n) => [n, 'female'])];
 
 test('gerçek konuşma: erkek ve kadın sesler doğru sınıflanır', () => {
-  for (const n of ['male-antalia', 'male-supertonic']) assert.equal(speech(n)?.gender, 'male', n);
-  for (const n of ['female-ahenk', 'female-ema', 'female-supertonic']) assert.equal(speech(n)?.gender, 'female', n);
+  for (const [n, want] of cases) assert.equal(speech(wav(n))?.gender, want, n);
+});
+
+test('müzik: hafif müzik altında doğru, belirgin müzikte yanlış değil belirsiz; yalnız müzik ölçülmez', () => {
+  for (const [n, want] of cases) {
+    assert.equal(speech(withMusic(wav(n), -10))?.gender, want, `${n} −10 dB`);
+    const g = speech(withMusic(wav(n), -6))?.gender ?? null;
+    assert.ok(g === want || g === null, `${n} −6 dB: ${g}`);
+  }
+  assert.equal(speech(withMusic(new Float32Array(3 * RATE16), 0))?.gender ?? null, null);
+});
+
+test('erken karar: konuşmanın ilk 0.7 sn\'si yeter, yanlış karar yok', () => {
+  for (const [n, want] of cases) {
+    const g = speech(wav(n), 0.7, { min: EARLY_VOICED })?.gender ?? null;
+    if (n === 'male-supertonic') assert.ok(g === want || g === null, `${n}: ${g}`); // başında oktav atlamaları
+    else assert.equal(g, want, n);
+  }
 });
 
 test('predictGender: kendi ölçümü → sıranın cinsiyeti → iki sıra öncesi → en son duyulan → varsayılan', () => {

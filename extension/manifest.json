@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LocaDub — YouTube Türkçe Dublaj",
   "short_name": "LocaDub",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "İngilizce YouTube videolarını bilgisayarınızda Türkçeye çevirir ve seslendirir. Metin ve ses hiçbir sunucuya gitmez.",
   "minimum_chrome_version": "116",
   "permissions": ["alarms", "offscreen", "storage", "tts", "unlimitedStorage"],
@@ -49,7 +49,7 @@
     {
       "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/embed/*"],
       "js": ["content/loader.js"],
-      "css": ["content/overlay.css"],
+      "css": ["common/theme.css", "content/overlay.css", "content/panel.css"],
       "run_at": "document_idle",
       "all_frames": true
     }
@@ -57,7 +57,7 @@
   "web_accessible_resources": [
     {
       "resources": ["content/*.js", "common/*.js", "engines/tts/styles.js",
-        "engines/tts/voices.js"],
+        "engines/tts/voices.js", "sep/host.html", "sep/host.js"],
       "matches": ["https://www.youtube.com/*", "https://www.youtube-nocookie.com/*"]
     }
   ],

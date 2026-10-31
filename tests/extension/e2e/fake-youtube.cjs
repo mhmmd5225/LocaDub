@@ -5,6 +5,8 @@
 //   /embed/ID      → gömülü oynatıcı: #movie_player, yanıt yalnızca player.getPlayerResponse() ile
 //   /api/timedtext → json3 (videos[ID]); hangi kökenden istendiği onTimedtext(id, origin) ile bildirilir
 //   /__test/video  → test videosu (dosya yolu: opts.videoFile)
+//   opts.mse = { video, audio } → oynatıcı YouTube gibi MediaSource ile oynatır: ayrı görüntü (video/webm; vp8) ve ses
+//                  (audio/webm; opus) SourceBuffer'larına parça parça ekler (/__test/mse-video, /__test/mse-audio)
 //   https://example.test/?v=ID → içinde youtube.com/embed/ID çerçevesi olan üçüncü taraf sayfa
 // Kullanım: tests/extension/e2e/*.e2e.cjs (xvfb-run -a node …); Playwright ve Chromium gerekir.
 
@@ -20,11 +22,29 @@ function playerResponse(videoId, origin, asr = false) {
   };
 }
 
-const VIDEO = '<video class="html5-main-video" src="/__test/video" style="width:100%;height:100%" playsinline></video>';
+const videoTag = (mse) => `<video class="html5-main-video"${mse ? '' : ' src="/__test/video"'} style="width:100%;height:100%" playsinline></video>`;
+// MSE oynatıcı: YouTube gibi görüntü ve ses ayrı SourceBuffer'lara, rastgele bayt sınırlarında parça parça eklenir
+const MSE_SCRIPT = `(async () => {
+  const v = document.querySelector('video');
+  const ms = new MediaSource();
+  v.src = URL.createObjectURL(ms);
+  await new Promise((r) => ms.addEventListener('sourceopen', r, { once: true }));
+  const feed = async (mime, url, piece) => {
+    const sb = ms.addSourceBuffer(mime);
+    const b = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    for (let i = 0; i < b.length; i += piece) {
+      sb.appendBuffer(b.subarray(i, i + piece));
+      await new Promise((r) => sb.addEventListener('updateend', r, { once: true }));
+    }
+  };
+  await Promise.all([feed('video/webm; codecs="vp8"', '/__test/mse-video', 200003), feed('audio/webm; codecs="opus"', '/__test/mse-audio', 40009)]);
+  ms.endOfStream();
+})();`;
 const CONTROLS = '<div class="ytp-chrome-bottom" style="position:absolute;bottom:0;right:0"><div class="ytp-right-controls"></div></div>';
 
-function page(kind, videoId, asr) {
+function page(kind, videoId, asr, mse) {
   const pr = JSON.stringify(playerResponse(videoId, 'https://www.youtube.com', asr));
+  const VIDEO = videoTag(mse);
   let body, script;
   if (kind === 'shorts') {
     body = `<ytd-reel-video-renderer is-active><div id="shorts-player" class="html5-video-player" style="position:relative;width:360px;height:640px">${VIDEO}</div></ytd-reel-video-renderer>`;
@@ -36,16 +56,16 @@ function page(kind, videoId, asr) {
       : `window.ytInitialPlayerResponse = ${pr};`;
   }
   return `<!doctype html><html><head><meta charset="utf-8"><title>${kind} ${videoId}</title></head>` +
-    `<body style="margin:0;background:#000">${body}<script>${script}</script></body></html>`;
+    `<body style="margin:0;background:#000">${body}<script>${script}${mse ? MSE_SCRIPT : ''}</script></body></html>`;
 }
 
 /** videos: { [id]: [{ t: ms, d: ms, text }] }; asr: otomatik altyazı (kind:'asr') sayılacak video kimlikleri */
-async function installFakeYouTube(ctx, { videos, videoFile, onTimedtext, asr = [] } = {}) {
+async function installFakeYouTube(ctx, { videos, videoFile, onTimedtext, asr = [], mse = null } = {}) {
   const isAsr = (id) => asr.includes(id);
   const handler = async (route) => {
     const u = new URL(route.request().url());
     let m;
-    if (u.pathname === '/watch') return route.fulfill({ contentType: 'text/html', body: page('watch', u.searchParams.get('v'), isAsr(u.searchParams.get('v'))) });
+    if (u.pathname === '/watch') return route.fulfill({ contentType: 'text/html', body: page('watch', u.searchParams.get('v'), isAsr(u.searchParams.get('v')), mse) });
     if ((m = /^\/shorts\/([\w-]{11})/.exec(u.pathname))) return route.fulfill({ contentType: 'text/html', body: page('shorts', m[1]) });
     if ((m = /^\/embed\/([\w-]{11})/.exec(u.pathname))) return route.fulfill({ contentType: 'text/html', body: page('embed', m[1]) });
     if (u.pathname === '/api/timedtext') {
@@ -54,6 +74,8 @@ async function installFakeYouTube(ctx, { videos, videoFile, onTimedtext, asr = [
       const events = (videos[id] || []).map((c) => ({ tStartMs: c.t, dDurationMs: c.d, segs: [{ utf8: c.text }] }));
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ events }) });
     }
+    if (mse && u.pathname === '/__test/mse-video') return route.fulfill({ contentType: 'video/webm', body: fs.readFileSync(mse.video) });
+    if (mse && u.pathname === '/__test/mse-audio') return route.fulfill({ contentType: 'audio/webm', body: fs.readFileSync(mse.audio) });
     if (u.pathname === '/__test/video') return route.fulfill({ contentType: 'video/webm', body: fs.readFileSync(videoFile) });
     return route.abort();
   };
