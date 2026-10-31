@@ -12,8 +12,8 @@
 // Tek parça kipi (startSample yok): pencereler girdinin başına göre dizilir, iki uç (pencere − adım) kadar sıfırla
 // dolgulanır; bir çağrının içinde parça sınırı duyulmaz. Çağrılar arası birleşmede model her iki yanda ~CONTEXT_SEC
 // bağlam görmeden kenarda biraz farklı sonuç verir: ardışık çağrılar en az 2·CONTEXT_SEC örtüşmeli ve çıktılar
-// örtüşmenin ortasından kısa çapraz geçişle birleşmelidir (joinOverlap). Pencere işi ≈ 3.5× ses süresi
-// (12 sn + 2·1 sn bağlam + iki uçta dolgu ≈ 7 pencere).
+// örtüşmenin ortasından kısa çapraz geçişle birleşmelidir (joinOverlap). Pencere işi ≈ 3× ses süresi
+// (12 sn + 2·1 sn bağlam + iki uçta dolgu = 6 pencere · 5.92 sn).
 //
 // Akış kipi (o.startSample = girdinin ilk örneğinin mutlak dizini, girdi hızında: medya zamanı · sampleRate):
 // pencereler mutlak model ızgarasında (44.1 kHz, medya zamanı · 44100) k·adım konumlarındadır. Ayırıcı bekleyen

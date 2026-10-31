@@ -8,7 +8,8 @@
 //       chunkSec: model penceresi (5.92 sn), stepSec: akış ızgarasının adımı  |  { type:'error', id, message }
 //   → { type:'process', id, left, right?, sampleRate, startSample?, final?, reset? }   (buffer'ları transfer edin)
 //       startSample verilirse akış kipi (separator.js başı): yalnızca kesinleşen aralık döner
-//   ← { type:'result', id, left, right, ms, backend, startSample?, windows?, reset?, final? }  (transfer edilir)
+//   ← { type:'result', id, left, right, ms, backend, windows, startSample?, reset?, final? }  (transfer edilir)
+//       windows: çalıştırılan model penceresi (ölçüm)
 //     | { type:'error', id, message }   (iptal edilen: message 'cancelled')
 //   → { type:'cancel', ids:[...] }      sıradaki ya da süren işleri bırakır (süren iş grup arasında durur)
 //   → { type:'dispose', id? }                            ← { type:'disposed', id }
@@ -80,13 +81,14 @@ self.onmessage = (ev) => {
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');
         if (cancelled.has(id)) throw new Error('cancelled');
-        const t0 = performance.now();
+        const t0 = performance.now(), w0 = sep.stats.windows;
         const stream = msg.startSample != null
           ? { startSample: msg.startSample, final: !!msg.final, reset: !!msg.reset, isCancelled: () => cancelled.has(id) }
           : undefined;
         const r = await sep.process(msg.left, msg.right, msg.sampleRate, stream);
         const ms = Math.round(performance.now() - t0);
-        const extra = stream ? { startSample: r.startSample, windows: r.windows, reset: r.reset, final: r.final } : {};
+        const extra = stream ? { startSample: r.startSample, reset: r.reset, final: r.final } : {};
+        extra.windows = sep.stats.windows - w0;
         self.postMessage({ type: 'result', id, left: r.left, right: r.right, ms, backend: r.backend, ...extra }, [r.left.buffer, r.right.buffer]);
       } else if (msg.type === 'dispose') {
         const s = sep;
