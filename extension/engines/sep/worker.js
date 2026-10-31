@@ -2,13 +2,18 @@
 //
 //   → { type:'load', id, model?, backend?:'webgpu'|'wasm'|'auto', threads?, overlap?, batch? }
 //       model: models.js kimliği ya da 'auto' (varsayılan): WebGPU'da kim-vocal-2, WASM'da mdxnet-lite
+//       batch: bir model çalıştırmasındaki pencere (yoksa WebGPU 4, WASM 1; çıktıyı değiştirmez)
 //   ← { type:'progress', id, loaded, total }*   (yalnızca indirme sırasında)
-//   ← { type:'loaded', id, backend, model, contextSec, chunkSec }  |  { type:'error', id, message }
-//   → { type:'process', id, left, right?, sampleRate }   (Float32Array, buffer'ları transfer edin)
-//   ← { type:'result', id, left, right, ms, backend }     (transfer edilir)  |  { type:'error', id, message }
+//   ← { type:'loaded', id, backend, model, contextSec, chunkSec, stepSec, batch, overlap, streaming:true }
+//       chunkSec: model penceresi (5.92 sn), stepSec: akış ızgarasının adımı  |  { type:'error', id, message }
+//   → { type:'process', id, left, right?, sampleRate, startSample?, final?, reset? }   (buffer'ları transfer edin)
+//       startSample verilirse akış kipi (separator.js başı): yalnızca kesinleşen aralık döner
+//   ← { type:'result', id, left, right, ms, backend, startSample?, windows?, reset?, final? }  (transfer edilir)
+//     | { type:'error', id, message }   (iptal edilen: message 'cancelled')
+//   → { type:'cancel', ids:[...] }      sıradaki ya da süren işleri bırakır (süren iş grup arasında durur)
 //   → { type:'dispose', id? }                            ← { type:'disposed', id }
 //
-// İstekler sırayla çalışır. Çağrılar arası birleşme için separator.js başındaki notu okuyun (contextSec).
+// İstekler sırayla çalışır; iki iş art arda gönderilirse ikincisi birincinin hemen ardından başlar (boru hattı).
 // WASM iş parçacığı sayısı ilk yüklemede sabitlenir (ort sınırı); asılı kalan çok iş parçacıklı yükleme için
 // 90 sn bekçisi client.js'tedir.
 
@@ -22,6 +27,7 @@ let sep = null;
 let sepKey = '';
 let configured = false;
 let queue = Promise.resolve();
+const cancelled = new Set();
 
 /** Çekirdeklerin yarısı (en çok 4), yalnızca crossOriginIsolated iken; aksi halde 1. */
 function defaultThreads() {
@@ -61,18 +67,27 @@ async function load(msg) {
 
 self.onmessage = (ev) => {
   const msg = ev.data || {};
+  if (msg.type === 'cancel') { for (const id of msg.ids || []) cancelled.add(id); return; } // sıraya girmez
   queue = queue.then(async () => {
     const { id } = msg;
     try {
       if (msg.type === 'load') {
         const s = await load(msg);
-        self.postMessage({ type: 'loaded', id, backend: s.backend, model: s.model.id, contextSec: s.contextSec, chunkSec: s.chunkSec });
+        self.postMessage({
+          type: 'loaded', id, backend: s.backend, model: s.model.id, contextSec: s.contextSec, chunkSec: s.chunkSec,
+          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true,
+        });
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');
+        if (cancelled.has(id)) throw new Error('cancelled');
         const t0 = performance.now();
-        const r = await sep.process(msg.left, msg.right, msg.sampleRate);
+        const stream = msg.startSample != null
+          ? { startSample: msg.startSample, final: !!msg.final, reset: !!msg.reset, isCancelled: () => cancelled.has(id) }
+          : undefined;
+        const r = await sep.process(msg.left, msg.right, msg.sampleRate, stream);
         const ms = Math.round(performance.now() - t0);
-        self.postMessage({ type: 'result', id, left: r.left, right: r.right, ms, backend: r.backend }, [r.left.buffer, r.right.buffer]);
+        const extra = stream ? { startSample: r.startSample, windows: r.windows, reset: r.reset, final: r.final } : {};
+        self.postMessage({ type: 'result', id, left: r.left, right: r.right, ms, backend: r.backend, ...extra }, [r.left.buffer, r.right.buffer]);
       } else if (msg.type === 'dispose') {
         const s = sep;
         sep = null;
@@ -82,6 +97,8 @@ self.onmessage = (ev) => {
       } else throw new Error(`Bilinmeyen ileti: ${msg.type}`);
     } catch (e) {
       self.postMessage({ type: 'error', id, message: e?.message || String(e) });
+    } finally {
+      cancelled.delete(id);
     }
   });
 };
