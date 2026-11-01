@@ -4,32 +4,20 @@
 // 1920×1080, küçük oynatıcı ve tam ekranda panel oynatıcının içinde kalır, taşma yok. Hap TR düğmesinin yanında, kontrol
 // çubuğunun hemen üstünde, Türkçe altyazıyla çakışmaz; panel hapın üstünde açılır; dublaj kapalıyken hap yok.
 // Ekran görüntüleri: tests/extension/e2e/out/.
-// Video: önce erkek, sonra kadın konuşma (gender-voices ile aynı fikstür). Favori erkek = mock-silent, kadın = mock-beep;
+// Video: önce erkek, sonra kadın konuşma (gender-voices ile aynı fikstür, MSE + sahte ses ayırma). Favori erkek ve kadın = mock-beep;
 // erkek bölümde panelden kadın favorisi mock-silent yapılır → kadın cümleleri de mock-silent.
 //   xvfb-run -a node tests/extension/e2e/player-panel.e2e.cjs
 const assert = require('assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
-const { launch } = require('./common.cjs');
+const { launch, clipsMse } = require('./common.cjs');
 
 const VID = 'panelvideo1';
-const FIX = path.resolve(__dirname, '../fixtures');
 const OUT = path.resolve(__dirname, 'out');
 const CLIPS = ['male-antalia', 'male-supertonic', 'male-antalia', 'female-ahenk', 'female-ema', 'female-supertonic', 'female-ahenk'];
 const videos = { [VID]: CLIPS.map((c, i) => ({ t: i * 3000 + 200, d: 2600, text: `This is sentence number ${i + 1}.` })) };
 
-function genderVideo() {
-  const f = path.join(os.tmpdir(), 'locadub-gender-e2e.webm');
-  if (!fs.existsSync(f)) {
-    const list = path.join(os.tmpdir(), 'locadub-gender-e2e.txt');
-    fs.writeFileSync(list, CLIPS.map((c) => `file '${path.join(FIX, c + '.wav')}'`).join('\n'));
-    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `testsrc=size=320x180:rate=10:duration=${CLIPS.length * 3}`,
-      '-f', 'concat', '-safe', '0', '-i', list, '-c:v', 'libvpx', '-b:v', '60k', '-c:a', 'libopus', '-shortest', f]);
-  }
-  return f;
-}
 
 // Hap: sağ kenarı TR düğmesininkiyle hizalı, kontrol çubuğunun hemen üstünde, oynatıcının içinde, altyazıyla kesişmez.
 async function checkPill(page, label) {
@@ -98,8 +86,8 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const { ctx, opt } = await launch({
-    videos, videoFile: genderVideo(),
-    settings: { voice: 'mock-beep', holdStart: false, genderVoices: true, favMale: { voice: 'mock-silent' }, favFemale: { voice: 'mock-beep' } },
+    videos, mse: clipsMse(CLIPS),
+    settings: { voice: 'mock-beep', holdStart: false, prebufferSec: 5, genderVoices: true, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-beep' } },
   });
   const problems = [];
   try {
@@ -138,7 +126,7 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
     await page.waitForSelector('.ld-panel', { state: 'hidden' });
 
     // oynatma: şu an konuşan ses = `ses N` kaydı
-    await page.evaluate(() => document.querySelector('video').play());
+    await page.evaluate(() => document.querySelector('video').play().catch(() => {}));
     const samples = [];
     let changed = false;
     let subChecks = 0; // altyazı görünürken hap denetimi
@@ -150,9 +138,10 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
       });
       if (!(await page.locator('.ld-panel').isVisible()) && (await checkPill(page, `oynatma ${s.t.toFixed(1)} sn`)).sub) subChecks++;
       if (!s.hidden && s.idx) {
-        const last = logs.map((l) => /ses (\d+): (\S+)/.exec(l)).filter((m) => m && m[1] === s.idx).at(-1);
-        assert.ok(last, `ses ${s.idx} kaydı yok`);
-        assert.equal(s.voice, last[2], `konuşan ses ${s.idx}: panel ${s.voice}, kayıt ${last[2]}`);
+        // ayırmayla cümle çalmadan önce yeniden hazırlanabilir: panel o cümle için kullanılmış seslerden birini gösterir
+        const used = logs.map((l) => /ses (\d+): (\S+)/.exec(l)).filter((m) => m && m[1] === s.idx).map((m) => m[2]);
+        assert.ok(used.length, `ses ${s.idx} kaydı yok`);
+        assert.ok(used.includes(s.voice), `konuşan ses ${s.idx}: panel ${s.voice}, kayıtlar ${used.join(',')}`);
         samples.push(s);
         if (samples.length === 1) {
           await page.screenshot({ path: path.join(OUT, 'pill-playing.png') });
@@ -195,7 +184,7 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
     const steps = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.ld-step')].map((l) => [l.dataset.step, [l.dataset.status, l.querySelector('.ld-step-meta').textContent]])));
     assert.equal(steps.captions[0], 'done', JSON.stringify(steps));
     assert.equal(steps.mt[0], 'done');
-    assert.equal(steps.sep[1], 'Kapalı');
+    assert.match(steps.sep[1], /^(Kapalı|Arabellek · mock)/, steps.sep[1]); // MSE videoda sahte ayırma çalışır
 
     // layout: 1280×720
     await checkLayout(page, '1280×720');
@@ -247,7 +236,7 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
       });
     };
     assert.deepEqual(await sep({ status: 'loading-model', backend: 'webgpu', progress: 0.42 }), { status: 'active', text: 'Model yükleniyor %42 · WebGPU', bar: '42%' });
-    assert.deepEqual(await sep({ status: 'buffering', backend: 'wasm', aheadSec: 8.6 }), { status: 'active', text: 'Arabellek · WASM · 8 sn ileri', bar: '43%' });
+    assert.deepEqual(await sep({ status: 'buffering', backend: 'wasm', aheadSec: 8.6 }), { status: 'active', text: 'Arabellek · WASM · 8 sn ileri', bar: '100%' });
     await page.screenshot({ path: path.join(OUT, 'panel-separation.png') });
     // yetişiyor: pillde ve adımda "Hazırlanıyor" yok; ETA + hazır/gereken ve çubuk
     assert.deepEqual(await sep({ status: 'waiting', backend: 'webgpu', aheadSec: 12, needSec: 30, etaSec: 7.2 }), { status: 'warn', text: '12 / 30 sn hazır · ~8 sn', bar: '40%' });

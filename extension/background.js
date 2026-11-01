@@ -7,7 +7,7 @@ import { pushError } from './common/diagnostics.js';
 const OFFSCREEN_URL = 'offscreen.html';
 const FORWARD = new Set([
   'mt.translate', 'tts.synthesize', 'engine.init', 'engine.status', 'engine.list', 'jobs.cancel', 'models.clear',
-  'engine.reset',
+  'engine.reset', 'spk.embed',
 ]);
 
 // ---------- Offscreen document ----------

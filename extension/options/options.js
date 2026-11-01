@@ -17,7 +17,7 @@ let lists = { backends: [], voices: [], errors: {} };
 let systemVoices = [];
 let cached = []; // [{ url, size }]
 // Kartlarda gösterilen indirme: motor → { id, loaded, total, error }
-const downloads = { mt: null, tts: null, punct: null };
+const downloads = { mt: null, tts: null, punct: null, spk: null };
 
 // Chrome Translator dil paketi kullanıcı etkileşimi ister: modülü önceden yükle, tıklamada doğrudan çağır.
 let chromeTranslatorMod = null;
@@ -357,6 +357,15 @@ function renderDownloads() {
       title: v.license ? `Lisans: ${v.license}` : undefined,
     }));
   }
+  // konuşmacı modeli (engines/spk): konuşanın cinsiyetine göre ses açıkken kullanılır
+  const sp = lists.speaker;
+  if (sp) {
+    rows.push(modelRow({
+      engine: 'spk', id: sp.id, name: 'Konuşmacı tanıma', kind: 'konuşmacı', prefix: sp.cachePrefix,
+      downloaded: !!sp.cached || mock, canDownload: !mock, sizeMB: sp.sizeMB, inUse: spkInUse(),
+      title: sp.license ? `Lisans: ${sp.license}` : undefined,
+    }));
+  }
   $('modelRows').replaceChildren(...rows);
   $('punctModels').replaceChildren(punctRow());
   const total = cached.reduce((n, f) => n + f.size, 0);
@@ -516,6 +525,7 @@ function renderSpeakerVoices() {
     return v ? `${shortName(v)}${favOf(id) ? ' ★' : ''}${v.cached || isMock() ? '' : ' (indirilmedi)'}` : '—';
   };
   $('genderNote').replaceChildren(...(first === 'system' ? ['Sistem sesinde kullanılmaz.']
+    : settings.genderVoices && settings.separation === 'off' ? ['Ses ayırma kapalı: tek ses kullanılır. Gerçek dublajı açınca kadın/erkek sesi devreye girer.']
     : settings.genderVoices ? ['Kadın: ', el('b', { textContent: name(genderVoice(s, 'female')) }), ' · Erkek: ', el('b', { textContent: name(genderVoice(s, 'male')) })]
       : []));
   // otomatik cinsiyetle birlikte sırayla seçeneği aynı cinsiyetten konuşmacıları ayırır (o cinsiyetin ikinci sesi);
@@ -596,9 +606,14 @@ $('preview').addEventListener('click', async () => {
   }
 });
 
+// Konuşmacı modeli: cinsiyete göre ses açık ve sistem sesi seçili değilken.
+const spkInUse = () => !!settings.genderVoices && effectiveVoiceId() !== 'system';
+
 // Kullanılacak (seçili) modellerden indirilmemiş olanlar.
 function missingSelected() {
   const out = [];
+  const sp = lists.speaker;
+  if (sp && !sp.cached && spkInUse()) out.push({ engine: 'spk', id: sp.id, label: 'Konuşmacı tanıma', mb: sp.sizeMB - bytesMB(cachedBytes(sp.cachePrefix)) });
   const b = lists.backends.find((x) => x.id === effectiveBackendId());
   if (b && b.id !== 'chrome-translator' && !b.downloaded) out.push({ engine: 'mt', id: b.id, label: b.label, mb: b.sizeMB - bytesMB(cachedBytes(b.cachePrefix)) });
   // birinci ses ve (açıksa) konuşmacı sesleri; bir paketin sesleri tek indirmedir
@@ -614,7 +629,7 @@ function missingSelected() {
 
 function renderPrepare() {
   const miss = settings.engineMode === 'mock' ? [] : missingSelected();
-  const busy = !!(downloads.mt && !downloads.mt.error) || !!(downloads.tts && !downloads.tts.error);
+  const busy = ['mt', 'tts', 'spk'].some((e) => downloads[e] && !downloads[e].error);
   $('prepareBox').hidden = !miss.length && settings.modelsApproved;
   const mb = miss.reduce((n, m) => n + Math.max(0, m.mb), 0);
   $('prepareSelected').disabled = busy;
@@ -721,7 +736,7 @@ async function refreshModels() {
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type !== 'engine.progress' || msg.target) return false;
   const e = msg.engine;
-  const id = downloads[e]?.id || (e === 'mt' ? effectiveBackendId() : effectiveVoiceId());
+  const id = downloads[e]?.id || (e === 'mt' ? effectiveBackendId() : e === 'spk' ? lists.speaker?.id : effectiveVoiceId());
   if (msg.done) downloads[e] = null;
   else if (msg.error) downloads[e] = { id, error: msg.error };
   else if (!msg.cached) downloads[e] = { id, loaded: msg.loaded, total: msg.total };

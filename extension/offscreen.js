@@ -1,8 +1,8 @@
-// Offscreen document: çeviri (mt) ve seslendirme (tts) motorlarını yükler ve çalıştırır.
+// Offscreen document: çeviri (mt), seslendirme (tts) ve konuşmacı (spk) motorlarını yükler ve çalıştırır.
 // Yalnızca background'dan gelen { target:'offscreen' } mesajlarını işler.
 
 import { clearModels } from './engines/common/model-cache.js';
-import { encodePcmBase64 } from './common/pcm.js';
+import { encodePcmBase64, decodePcmBase64ToInt16 } from './common/pcm.js';
 import { normalizeTone } from './engines/tts/styles.js';
 import { restoreTexts, disposePunct } from './engines/mt/restore-engine.js';
 
@@ -20,7 +20,7 @@ function newState() {
     progress: new Map(), lastEmit: 0,
   };
 }
-const state = { mt: newState(), tts: newState() };
+const state = { mt: newState(), tts: newState(), spk: newState() };
 const jobs = new Map(); // tag → Set<AbortController>
 
 class EngineError extends Error {
@@ -169,12 +169,50 @@ async function resetEngine(engine) {
   state[engine] = newState();
 }
 
+// ---- konuşmacı motoru (engines/spk): cümlenin sesi → konuşmacı vektörü, content/gender.js kümeler ----
+const spk = { mods: {}, mode: null, initP: null, queue: Promise.resolve() };
+const SPK_PATHS = { real: './engines/spk/index.js', mock: './engines/_mock/spk.js' };
+
+async function spkModule(mode) {
+  if (!spk.mods[mode]) spk.mods[mode] = await import(SPK_PATHS[mode]);
+  return spk.mods[mode];
+}
+
+async function ensureSpk(settings, { userInitiated = false } = {}) {
+  const mode = settings.engineMode === 'mock' ? 'mock' : 'real';
+  if (spk.mode === mode && spk.initP) return spk.initP;
+  if (mode === 'real' && !settings.modelsApproved && !userInitiated) {
+    throw new EngineError('Modeller henüz hazırlanmadı.', 'NOT_APPROVED');
+  }
+  if (spk.mode && spk.mode !== mode) await spk.mods[spk.mode]?.dispose?.().catch(() => {});
+  spk.mode = mode;
+  const p = (async () => {
+    const mod = await spkModule(mode);
+    await mod.init({ onProgress: makeProgress('spk') });
+    send({ type: 'engine.progress', engine: 'spk', done: true, loaded: 1, total: 1 });
+    return mod;
+  })();
+  spk.initP = p;
+  p.catch((e) => {
+    if (spk.initP === p) spk.initP = null;
+    send({ type: 'engine.progress', engine: 'spk', error: e?.message || String(e) });
+  });
+  return p;
+}
+
+async function resetSpk() {
+  for (const m of Object.values(spk.mods)) { try { await m?.dispose?.(); } catch { /* yoksay */ } }
+  spk.initP = null;
+  spk.mode = null;
+}
+
 async function handle(msg) {
   const settings = msg.settings || {};
   switch (msg.type) {
     case 'engine.init': {
       const engine = msg.engine;
-      if (engine !== 'mt' && engine !== 'tts') throw new EngineError('Bilinmeyen motor: ' + engine, 'BAD_REQUEST');
+      if (engine !== 'mt' && engine !== 'tts' && engine !== 'spk') throw new EngineError('Bilinmeyen motor: ' + engine, 'BAD_REQUEST');
+      if (engine === 'spk') { await ensureSpk(settings, { userInitiated: !!msg.userInitiated }); return status(); }
       if (engine === 'tts' && (msg.options?.voice ?? settings.voice) === 'system') return status();
       await ensure(engine, settings, msg.options || {}, { userInitiated: !!msg.userInitiated });
       return status();
@@ -186,6 +224,7 @@ async function handle(msg) {
       const out = { mode, backends: [], voices: [], errors: {} };
       try { out.backends = await (await loadModule('mt', mode)).listBackends?.() ?? []; } catch (e) { out.errors.mt = e.message; }
       try { out.voices = await (await loadModule('tts', mode)).listVoices?.() ?? []; } catch (e) { out.errors.tts = e.message; }
+      try { out.speaker = await (await spkModule(mode)).info(); } catch (e) { out.errors.spk = e.message; }
       return out;
     }
     case 'mt.translate': {
@@ -217,6 +256,25 @@ async function handle(msg) {
       }
       return { pcmBase64: encodePcmBase64(r.pcm), sampleRate: r.sampleRate, format: 's16le', samples: r.pcm.length };
     }
+    case 'spk.embed': {
+      const mod = await ensureSpk(settings, { userInitiated: !!msg.userInitiated });
+      const i16 = decodePcmBase64ToInt16(String(msg.pcmBase64 || ''));
+      const pcm = Float32Array.from(i16, (v) => v / 32768);
+      const ac = new AbortController();
+      if (msg.tag) { if (!jobs.has(msg.tag)) jobs.set(msg.tag, new Set()); jobs.get(msg.tag).add(ac); }
+      const task = spk.queue.then(() => {
+        if (ac.signal.aborted) throw new EngineError('İptal edildi', 'ABORTED');
+        return mod.embed(pcm, { signal: ac.signal });
+      });
+      spk.queue = task.catch(() => {});
+      try {
+        const r = await task;
+        return { vector: r.vector ? Array.from(r.vector, (v) => Math.round(v * 1e5) / 1e5) : null, voicedSec: r.voicedSec, score: r.score ?? null, f0: r.f0 || [] };
+      } finally {
+        jobs.get(msg.tag)?.delete(ac);
+        if (msg.tag && !jobs.get(msg.tag)?.size) jobs.delete(msg.tag);
+      }
+    }
     case 'jobs.cancel': {
       const set = jobs.get(msg.tag);
       let n = 0;
@@ -225,6 +283,7 @@ async function handle(msg) {
     }
     case 'models.clear': {
       for (const engine of ['mt', 'tts']) await resetEngine(engine);
+      await resetSpk();
       await disposePunct();
       const n = await clearModels();
       return { cleared: n };
@@ -232,6 +291,7 @@ async function handle(msg) {
     case 'engine.reset': {
       // Ayarlar sayfası tek bir modeli silmeden önce motoru bellekten boşaltır.
       if (msg.engine === 'punct') { await disposePunct(); return status(); }
+      if (msg.engine === 'spk') { await resetSpk(); return status(); }
       if (msg.engine !== 'mt' && msg.engine !== 'tts') throw new EngineError('Bilinmeyen motor: ' + msg.engine, 'BAD_REQUEST');
       await resetEngine(msg.engine);
       return status();

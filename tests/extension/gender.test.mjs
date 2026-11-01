@@ -146,7 +146,7 @@ test('favori: cinsiyeti uymayan ses atılır, ton normalleşir', () => {
   assert.deepEqual(normalizeFavorite({ voice: 'mock-beep' }, 'male'), { voice: 'mock-beep', style: 'natural', pitch: 0 });
   const s = normalizeSettings({ favMale: { voice: 'ema-lightning' } });
   assert.equal(s.favMale, null);
-  assert.equal(s.genderVoices, false);
+  assert.equal(s.genderVoices, true);
 });
 
 test('cinsiyet sesi: favori öncelikli, sonra birinci ses, sonra kendiliğinden', () => {

@@ -31,6 +31,23 @@ function mseFiles(sec = 60) {
   return { video: v, audio: a };
 }
 
+// Konuşma fikstürlerinden (tests/extension/fixtures/*.wav, 3 sn) MSE videosu: art arda klipler = ses (opus, stereo 48 kHz).
+// Otomatik kadın/erkek sesi yalnız ses ayırma (MSE) açıkken çalışır; test motorunda ayırma sahtedir.
+function clipsMse(clips) {
+  const key = clips.join('+').replace(/[^a-z0-9+]/gi, '');
+  const v = path.join(os.tmpdir(), `locadub-clips-v-${key}.webm`), a = path.join(os.tmpdir(), `locadub-clips-a-${key}.webm`);
+  if (!fs.existsSync(v) || !fs.existsSync(a)) {
+    const fix = path.resolve(__dirname, '../fixtures');
+    const list = path.join(os.tmpdir(), `locadub-clips-${key}.txt`);
+    fs.writeFileSync(list, clips.map((c) => `file '${path.join(fix, c + '.wav')}'`).join('\n'));
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `testsrc=size=320x180:rate=10:duration=${clips.length * 3}`,
+      '-c:v', 'libvpx', '-b:v', '60k', '-an', v]);
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-ac', '2', '-ar', '48000',
+      '-c:a', 'libopus', '-b:a', '96k', '-vn', a]);
+  }
+  return { video: v, audio: a };
+}
+
 async function launch({ videos, settings = {}, onTimedtext, asr, videoFile, mse } = {}) {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'locadub-prof-')), {
     headless: false,
@@ -47,4 +64,4 @@ async function launch({ videos, settings = {}, onTimedtext, asr, videoFile, mse 
   return { ctx, id, opt };
 }
 
-module.exports = { launch, mseFiles };
+module.exports = { launch, mseFiles, clipsMse };

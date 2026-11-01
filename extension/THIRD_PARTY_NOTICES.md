@@ -118,6 +118,29 @@ Kod (STFT/ISTFT, yeniden örnekleme, parçalama) bu projeye özgüdür; MDX-Net 
   `929e057b81aa49bc2e6490bef8671f47b2c120f6`, MIT etiketli ayna), dosyalar değiştirilmeden; sha256 değerleri
   `engines/sep/models.js` içinde.
 
+## Konuşmacı tanıma motoru (`engines/spk/`)
+
+Kod (Kaldi uyumlu fbank, kümeleme, cinsiyet kararı) bu projeye özgüdür; fbank Kaldi'nin `compute-fbank-feats`
+varsayılanlarını izler ve kaldi-native-fbank (Apache-2.0) değerleriyle sınanır (`tests/extension/spk.test.mjs`).
+
+### Konuşmacı modeli (eklentiye paketlenmez, ilk kullanımda HuggingFace'ten indirilir)
+
+- **WeSpeaker ResNet34-LM (VoxCeleb)** — WeSpeaker projesi (https://github.com/wenet-e2e/wespeaker, kod Apache-2.0).
+  Lisans: **CC-BY 4.0** — WeSpeaker'ın önceden eğitilmiş modelleri eğitim verisinin lisansını izler; VoxCeleb modelleri
+  VoxCeleb'in Creative Commons Attribution 4.0 lisansıyla dağıtılır (https://mm.kaist.ac.kr/datasets/voxceleb/).
+  Atıf: "Konuşmacı tanıma: WeSpeaker ResNet34-LM, VoxCeleb (Nagrani vd.) ile eğitilmiş — CC-BY 4.0".
+- Eklentinin indirdiği kopya: sherpa-onnx projesinin ONNX dışa aktarımı,
+  https://huggingface.co/csukuangfj/speaker-embedding-models (commit `0743f301363dec56491a490f6d6cbc9d67f9a3bf`,
+  `wespeaker_en_voxceleb_resnet34_LM.onnx`), değiştirilmeden; boyut ve sha256 `engines/spk/models.js` içinde.
+- Katalogdaki diğer seçenek (yalnız ölçüm aracı kullanır): 3D-Speaker ERes2Net VoxCeleb (Apache-2.0, ModelScope
+  `iic/speech_eres2net_sv_en_voxceleb_16k`).
+
+### Cinsiyet katmanı — `engines/spk/gender-wespeaker-r34.json`
+
+Konuşmacı vektöründen kadın/erkek puanı veren 257 sayılık doğrusal katman; bu projede `tools/spk-eval.mjs
+--train-gender` ile **LibriSpeech test-clean** (V. Panayotov vd., CC-BY 4.0, https://www.openslr.org/12) konuşmacılarının
+cümlelerinden ve sentetik müzikle karıştırılmış kopyalarından eğitildi. Atıf: "LibriSpeech ASR corpus, CC-BY 4.0".
+
 ## Referans proje
 
 - harfiyen — https://github.com/ozcancelik/harfiyen (MIT). Kod alındıysa ilgili motor
