@@ -72,9 +72,11 @@ export function memoryLines(sep) {
   if (num(m.heapMB) != null) a.push(`JS yığını: ${m.heapMB} MB`);
   a.push(`cümle: ${m.sentences ?? 0}`, `cümle sesi: ${m.blobs ?? 0} blob, ${sn(m.audioSec || 0)} sn`);
   const L = [a.join(' · ')];
+  if (m.longTasks) L.push(`ana iş parçacığı takılmaları (>50 ms): ${m.longTasks.n} kez, toplam ${sn((m.longTasks.ms || 0) / 1000)} sn, en uzun ${m.longTasks.max || 0} ms`);
   if (num(m.packetBytes) != null) {
     L.push([`ayırma paketleri: ${mb(m.packetBytes)} (${m.packets ?? 0} paket)`, `ayrılmış PCM: ${sn(m.sepSec || 0)} sn`,
-      `orijinal PCM: ${sn(m.origSec || 0)} sn`, `PCM belleği: ${mb(m.pcmBytes || 0)}`].join(' · '));
+      `orijinal PCM: ${sn(m.origSec || 0)} sn`, `PCM belleği: ${mb(m.pcmBytes || 0)}`,
+      `GPU hız sınırı beklemesi: ${sn(m.paceIdleSec || 0)} sn`].join(' · '));
   }
   return L;
 }

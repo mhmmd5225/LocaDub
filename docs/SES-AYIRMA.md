@@ -298,3 +298,11 @@ xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --seconds 30 --model kim
 SEP_REAL=1 xvfb-run -a node tests/extension/e2e/sep-worker.e2e.cjs --stream-seconds 36   # akış ↔ eski yol
 xvfb-run -a node tests/extension/e2e/separation.e2e.cjs     # bekletme senaryoları (SEP_E2E_QUICK=1: kısa)
 ```
+
+## GPU güvenliği ve hız sınırı (0.5.4)
+
+- **Toplu boyut:** WebGPU'da varsayılan 1 (`DEFAULT_BATCH`). Büyük toplu boyut tek model çağrısını uzatır; Windows ≈ 2 sn'den uzun GPU komutunu keser
+  (sürücü sıfırlanır, ekran kararır) ve bellek baskısı yapar. Daha büyük değer yalnız Hız testi ölçümüyle seçilir (Ayarlar → Diğer → Tanılama).
+- **Hız sınırı:** `process({ pace: { targetRtf } })` ile her pencere grubu en az (grubun ses süresi × targetRtf) sürer; fazlası bekleme
+  (en çok 1 sn). İçerik betiği (`gpuPace`): video bekletilirken 0.25, oynarken ve ileride ≥ 12 sn tampon varken 0.6, yetişmek gerekirken sınır yok.
+  WASM'da sınır yok. Çıktı hız sınırından etkilenmez (birim testi: fark 0). Değerler başlangıç tahminidir (`SEP.paceHold`, `SEP.pacePlay`).

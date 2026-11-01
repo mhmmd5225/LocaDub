@@ -6,7 +6,9 @@ export const BENCH = Object.freeze({
   sepRate: 48000,
   sepChunkSec: 8,        // akış kipinde art arda parçalar; ilki ısınma sayılır
   sepChunks: 3,
-  sepBatches: [1, 2, 4, 8], // yalnız WebGPU'da; WASM'da tek yapılandırma
+  sepBatches: [1, 2, 4],  // yalnız WebGPU'da; WASM'da tek yapılandırma. 8 yok: tek GPU işi sürücü sınırını aşabilir
+  maxRunSec: 0.8,        // sonraki toplu boyutun tahmini tek model çağrısı süresi bunu aşacaksa denenmez (Windows ≈ 2 sn'de sürücüyü sıfırlar)
+  capDays: 7,            // yarım kalan (çöken) denemenin toplu boyut sınırı bu kadar gün geçerli
   sepTimeoutMs: 90000,   // tek parça (yükleme hariç) için üst sınır
   loadTimeoutMs: 300000, // model indirmesi dahil
   tts: ['Merhaba, bu bir hız testidir.', 'Bugün hava çok güzel ve sakin.', 'Yarın sabah erkenden yola çıkacağız.', 'Toplantı saat üçte başlayacak.'],
@@ -48,23 +50,53 @@ function withTimeout(p, ms, what) {
 
 /**
  * Ses ayırma: her toplu boyutu için yeni istemci yükler, akış kipinde art arda parçalar işler.
+ * GPU güvenliği: toplu boyut küçükten büyüğe gider; bir sonrakinin tahmini tek model çağrısı süresi (toplu × pencere süresi)
+ * maxRunSec'i aşacaksa denenmez. Çökme koruması (guard): her deneme öncesi "yarım" işaretlenir, başarıyla bitince silinir; sayfa/sürücü
+ * denemenin ortasında giderse bir sonraki testte o toplu boyut ve üstü atlanır (sınır capDays gün geçerli).
  * @param {{ createClient: () => { load:Function, process:Function, dispose:Function }, now?: () => number,
- *           batches?: number[], chunkSec?: number, chunks?: number, rate?: number, onStep?: (s:string)=>void }} o
- * @returns {Promise<{ runs: { batch:number, backend?:string, model?:string, loadMs?:number, rtfs?:number[], rtf?:number, error?:string }[] }>}
+ *           batches?: number[], chunkSec?: number, chunks?: number, rate?: number, onStep?: (s:string)=>void,
+ *           guard?: { read:()=>Promise<{ inflight?:number, cap?:{ batch:number, at:number }|null }>, mark:(b:number)=>Promise<void>,
+ *                     clear:()=>Promise<void>, setCap:(b:number)=>Promise<void> }, maxRunSec?: number, nowMs?: () => number }} o
+ * @returns {Promise<{ runs: { batch:number, backend?:string, model?:string, loadMs?:number, rtfs?:number[], rtf?:number, error?:string }[],
+ *           interrupted?: number, cap?: number, stopped?: { batch:number, reason:string } }>}
  */
 export async function runSepBench({ createClient, now = () => performance.now(), batches = BENCH.sepBatches, chunkSec = BENCH.sepChunkSec,
-  chunks = BENCH.sepChunks, rate = BENCH.sepRate, onStep } = {}) {
+  chunks = BENCH.sepChunks, rate = BENCH.sepRate, onStep, guard, maxRunSec = BENCH.maxRunSec, nowMs = () => Date.now() } = {}) {
   const runs = [];
+  const out = { runs };
+  // önceki test yarıda kaldıysa o toplu boyut ve üstü atlanır
+  if (guard) {
+    const st = await guard.read().catch(() => ({}));
+    let capBatch = st?.cap && nowMs() - st.cap.at < BENCH.capDays * 86400000 ? st.cap.batch : null;
+    if (st?.inflight) {
+      out.interrupted = st.inflight;
+      capBatch = Math.min(capBatch ?? Infinity, st.inflight);
+      await guard.setCap(capBatch).catch(() => {});
+      await guard.clear().catch(() => {});
+    }
+    if (capBatch != null) {
+      out.cap = capBatch;
+      batches = batches.filter((b) => b < capBatch);
+      if (!batches.length) batches = [];
+    }
+  }
+  let prev = null;
   for (const batch of batches) {
+    if (prev?.rtf > 0 && prev.stepSec > 0 && batch * prev.rtf * prev.stepSec > maxRunSec) {
+      out.stopped = { batch, reason: `tahmini tek GPU işi ${(batch * prev.rtf * prev.stepSec).toFixed(1)} sn > ${maxRunSec} sn (sürücü sınırına yakın)` };
+      break;
+    }
     const run = { batch };
     const client = createClient();
     try {
+      await guard?.mark(batch).catch(() => {});
       onStep?.(`Ses ayırma: toplu ${batch} yükleniyor…`);
       const t0 = now();
       const info = await withTimeout(client.load({ model: 'auto', backend: 'auto', batch }), BENCH.loadTimeoutMs, 'Ayırma modeli yükleme');
       run.loadMs = now() - t0;
       run.backend = info?.backend;
       run.model = info?.model;
+      run.stepSec = info?.stepSec > 0 ? info.stepSec : 2.96;
       const rtfs = [];
       for (let k = 0; k < chunks; k++) {
         onStep?.(`Ses ayırma: toplu ${batch}, parça ${k + 1}/${chunks}…`);
@@ -75,15 +107,18 @@ export async function runSepBench({ createClient, now = () => performance.now(),
       }
       run.rtfs = rtfs;
       run.rtf = mean(rtfs.slice(1)); // ilk parça ısınma/akış başlangıcı sayılmaz
+      await guard?.clear().catch(() => {}); // bu toplu boyut çökmeden bitti
     } catch (e) {
       run.error = String(e?.message || e);
+      await guard?.clear().catch(() => {}); // hata yakalandı (sayfa gitmedi): çökme değil
     } finally {
       try { await client.dispose?.(); } catch { /* sessiz: ölçüm sonrası temizlik */ }
     }
     runs.push(run);
     if (run.error || run.backend !== 'webgpu') break; // WASM'da toplu boyutu farksız; hata varsa daha büyüğü denenmez
+    prev = run;
   }
-  return { runs };
+  return out;
 }
 
 /** Seslendirme: ilk cümle ısınma; kalanların toplam süresi / toplam ses süresi. synth(text) → { ms, audioSec } | { skipped } */
@@ -139,15 +174,22 @@ export function fastestBatch(runs) {
   return ok.reduce((a, b) => (b.rtf < a.rtf ? b : a));
 }
 
+function sepNotes(sep) {
+  if (sep.interrupted) return [`  UYARI: önceki test toplu ${sep.interrupted}'de yarım kaldı (sürücü/sekme çökmüş olabilir): toplu ${sep.cap} ve üstü atlandı`];
+  if (sep.cap) return [`  not: önceki yarım kalan test nedeniyle toplu ${sep.cap} ve üstü atlandı`];
+  return [];
+}
+
 /** Sonuç → metin satırları (ayarlar sayfasında gösterim ve tanılama raporu). */
 export function formatBench(r) {
   const L = [];
   const sep = r?.sep;
   if (!sep) L.push('ses ayırma: çalıştırılmadı');
-  else if (!sep.runs.length) L.push('ses ayırma: sonuç yok');
+  else if (!sep.runs.length) L.push('ses ayırma: sonuç yok', ...sepNotes(sep));
   else {
     const h = sep.runs.find((x) => x.backend) || sep.runs[0];
     L.push(`ses ayırma: arka uç ${h.backend || '?'} · model ${h.model || '?'}${h.loadMs != null ? ` · yükleme ${f1(h.loadMs / 1000)} sn` : ''}`);
+    L.push(...sepNotes(sep));
     for (const x of sep.runs) {
       if (x.error) L.push(`  toplu ${x.batch}: hata — ${x.error}`);
       else if (!(x.rtf > 0)) L.push(`  toplu ${x.batch}: ölçülemedi`);
@@ -155,6 +197,7 @@ export function formatBench(r) {
     }
     const best = fastestBatch(sep.runs);
     if (best && sep.runs.filter((x) => !x.error).length > 1) L.push(`  en hızlı: toplu ${best.batch}`);
+    if (sep.stopped) L.push(`  toplu ${sep.stopped.batch} denenmedi: ${sep.stopped.reason}`);
     if (best && best.backend !== 'webgpu') L.push('  WebGPU yok ya da kullanılamadı: ayırma işlemcide (WASM) çalıştı');
   }
   const t = r?.tts;

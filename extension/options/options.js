@@ -868,6 +868,18 @@ document.querySelector('.diag').addEventListener('toggle', async (e) => {
 // ---------- Hız testi ----------
 // common/bench.js: ayırma (bu sayfada işçi olarak, WebGPU erişimi var), seslendirme ve çeviri arka plan motorlarından.
 
+// Çökme koruması (common/bench.js runSepBench guard): deneme öncesi toplu boyut işaretlenir, bitince silinir; sayfa/sürücü
+// denemenin ortasında giderse işaret kalır ve bir sonraki testte o toplu boyut ve üstü atlanır.
+const benchGuard = {
+  read: async () => {
+    const o = await chrome.storage.local.get(['benchInflight', 'benchCap']);
+    return { inflight: o.benchInflight || null, cap: o.benchCap || null };
+  },
+  mark: (b) => chrome.storage.local.set({ benchInflight: b }),
+  clear: () => chrome.storage.local.remove('benchInflight'),
+  setCap: (b) => chrome.storage.local.set({ benchCap: { batch: b, at: Date.now() } }),
+};
+
 let benchRunning = false;
 let benchText = '';
 
@@ -883,7 +895,7 @@ async function startBench() {
     const voice = effectiveVoiceId();
     const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
     const result = await runBench({
-      sep: { createClient: () => createSepClient({ mock: isMock() }) },
+      sep: { createClient: () => createSepClient({ mock: isMock() }), guard: benchGuard },
       tts: {
         synth: async (text) => {
           if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };

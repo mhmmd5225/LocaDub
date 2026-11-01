@@ -17,6 +17,9 @@ export const SEP = Object.freeze({
   keepBehindSec: 15,     // oynatma konumunun gerisinde tutulan ayrılmış ses
   packetsBehindSec: 300, // gerisinde tutulan kodlanmış ses (geri sarınca yeniden ayırmak için)
   driftSec: 0.04,        // |kayma| bunu aşarsa yeniden eşitle
+  paceHold: 0.25,        // GPU hız sınırı (ses süresi × bu kadar ≥ iş süresi): video başta bekletilirken en az 4× gerçek zaman
+  pacePlay: 0.6,         // oynarken ve ileride rahat tampon varken (≥ paceComfortSec): GPU'yu sürekli meşgul etme, ≈ 1.7× gerçek zaman yeter
+  paceComfortSec: 12,
   gpuChunkSec: 24,       // WebGPU'da akış parçası (pencere adımına ve batch'e hizalanır); WASM'da chunkSec
   firstSec: 8,           // yeni akışın ilk parçası (hızlı başlangıç, rtf erken ölçülür)
   inflight: 2,           // aynı anda gönderilmiş iş (çözme + aktarım model çalışırken yapılır)
@@ -35,6 +38,18 @@ export function streamChunkSec(backend, stepSec, batch = 1) {
   const target = backend === 'webgpu' ? SEP.gpuChunkSec : SEP.chunkSec;
   const g = Math.max(1, batch) * stepSec;
   return Math.max(1, Math.round(target / g)) * g;
+}
+
+/**
+ * WebGPU'da modelin GPU'yu sürekli meşgul etmemesi için hız sınırı ({ targetRtf }) ya da null (tam hız).
+ * Sürücüye/oynatıcıya soluk aldırır: tam hızda ardışık model çağrıları ekranı ve videoyu takıltır. Yetişmek gerekirken
+ * (tampon düşük) sınır yoktur; WASM'da GPU yok, sınır yok.
+ */
+export function gpuPace({ backend, holding, aheadSec }) {
+  if (backend !== 'webgpu') return null;
+  if (holding) return { targetRtf: SEP.paceHold };
+  if (aheadSec >= SEP.paceComfortSec) return { targetRtf: SEP.pacePlay };
+  return null;
 }
 
 /** Sıralı aralık birleşimi. */

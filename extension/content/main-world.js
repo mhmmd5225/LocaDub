@@ -41,8 +41,11 @@
   // ---- gerçek dublaj: MSE ses eklemelerinin kopyası (content/separation.js) ----
   // YouTube'un eklediği veriye dokunulmaz; ses SourceBuffer'larına başarıyla eklenen baytların kopyası tutulur (içerik
   // betiği sayfadan sonra yüklenir: abone olunca baştan gönderilir) ve abone varsa hemen iletilir (aktarılabilir
-  // ArrayBuffer). Opus ≈ 16 KB/sn: kaynak başına 32 MB sınırı ≈ yarım saat.
+  // ArrayBuffer). Opus ≈ 16 KB/sn: abone varken (dublaj/ayırma açık) kaynak başına 32 MB ≈ yarım saat. Abone yokken (dublaj kapalı:
+  // her YouTube videosu) yalnız 6 MB ≈ son 6 dk tutulur: sonradan açılan dublaj oynatma noktasından sonrasını bulur, bellek/ısınma
+  // yükü diğer videolarda en aza iner.
   const SEP_CAP = 32 << 20;
+  const SEP_IDLE_CAP = 6 << 20;
   const sepMs = new Map(); // msId → { url, sbs: [rec] }
   const msOf = new WeakMap(); // MediaSource → msId
   const sbOf = new WeakMap(); // SourceBuffer → rec
@@ -81,7 +84,8 @@
     const e = { data: u8.slice().buffer, tso: Number(tso) || 0, init: isInit(u8), mime: rec.mime };
     rec.entries.push(e);
     rec.bytes += e.data.byteLength;
-    while (rec.bytes > SEP_CAP && rec.entries.length > 1) {
+    const cap = sepSub ? SEP_CAP : SEP_IDLE_CAP;
+    while (rec.bytes > cap && rec.entries.length > 1) {
       const old = rec.entries.shift();
       rec.bytes -= old.data.byteLength;
       if (old.init) rec.lastInit = old;

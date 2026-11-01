@@ -27,7 +27,7 @@ import { logError } from '../common/errlog.js';
 import { createDemuxer } from './sep-demux.js';
 import {
   SEP, PacketStore, PcmTimeline, HoldGate, DriftMeter, planNext, runJob, aheadOf, committedEnd, rangeAt, windowFor, bestLag,
-  planStream, writeStreamResult, mergeRanges, streamChunkSec,
+  planStream, writeStreamResult, mergeRanges, streamChunkSec, gpuPace,
 } from './sep-core.js';
 
 const FROM_MAIN = 'yt-tr-dub:main';
@@ -269,6 +269,7 @@ export class SeparatedAudio extends EventTarget {
     this.batch = 1;
     this.chunkSec = SEP.chunkSec;
     this.holds = 0;
+    this.paceIdleMs = 0;
     this._holdMs = 0;
     this._gen = 0;
     this._sendChain = Promise.resolve();
@@ -331,6 +332,7 @@ export class SeparatedAudio extends EventTarget {
       pcmBytes: (this.sep?.bytes || 0) + (this.orig?.bytes || 0),
       sepSec: Math.round(secOf(this.sep) * 10) / 10,
       origSec: Math.round(secOf(this.orig) * 10) / 10,
+      paceIdleSec: Math.round(this.paceIdleMs / 100) / 10,
     };
   }
 
@@ -584,7 +586,8 @@ export class SeparatedAudio extends EventTarget {
         if (!this.alive || job.cancelled || job.gen !== this._gen) throw new Error('cancelled');
         orig.write(raS, d.L, d.R); // kopyalanır (aktarımdan önce)
         const p = h.process(d.L, d.R, sr, {
-          startSample: raS, final: job.final, reset: job.reset, ...(this.mode === 'mock' ? { mockRtf: this._mockRtf() } : {}),
+          startSample: raS, final: job.final, reset: job.reset, pace: gpuPace({ backend: this.backend, holding: this._hold.active, aheadSec: this.aheadSec }),
+          ...(this.mode === 'mock' ? { mockRtf: this._mockRtf() } : {}),
         });
         job.reqId = p.id;
         sent();
@@ -594,6 +597,7 @@ export class SeparatedAudio extends EventTarget {
         const n = res.left.length;
         // gerçekleşen akış sonu (tahminden birkaç örnek sapabilir)
         if (this.stream && this.stream === job.stream && this.stream.last === job && n) this.stream.out = (res.startSample + n) / sr;
+        this.paceIdleMs += res.idleMs || 0; // GPU hız sınırı beklemesi (tanılama)
         this._measure((rbS - raS) / sr, res.ms); // girdi süresi: akışta kararlı hız (ilk çağrının gecikmesi sayılmaz)
         if (res.backend) this.backend = res.backend;
         this._fails = 0;

@@ -81,14 +81,18 @@ self.onmessage = (ev) => {
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');
         if (cancelled.has(id)) throw new Error('cancelled');
-        const t0 = performance.now(), w0 = sep.stats.windows;
+        const t0 = performance.now(), w0 = sep.stats.windows, i0 = sep.stats.idleMs;
         const stream = msg.startSample != null
-          ? { startSample: msg.startSample, final: !!msg.final, reset: !!msg.reset, isCancelled: () => cancelled.has(id) }
+          ? {
+            startSample: msg.startSample, final: !!msg.final, reset: !!msg.reset, isCancelled: () => cancelled.has(id),
+            pace: Number(msg.pace?.targetRtf) > 0 ? { targetRtf: Math.min(2, Number(msg.pace.targetRtf)) } : undefined,
+          }
           : undefined;
         const r = await sep.process(msg.left, msg.right, msg.sampleRate, stream);
         const ms = Math.round(performance.now() - t0);
         const extra = stream ? { startSample: r.startSample, reset: r.reset, final: r.final } : {};
         extra.windows = sep.stats.windows - w0;
+        extra.idleMs = Math.round(sep.stats.idleMs - i0);
         self.postMessage({ type: 'result', id, left: r.left, right: r.right, ms, backend: r.backend, ...extra }, [r.left.buffer, r.right.buffer]);
       } else if (msg.type === 'dispose') {
         const s = sep;

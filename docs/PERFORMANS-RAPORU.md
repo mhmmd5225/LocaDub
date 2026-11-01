@@ -39,6 +39,28 @@ Bu rapor ölçülenleri, tahmin edilenleri ve koddan çıkan stabilite bulgular�
 8. **Bilinen sınırlar:** reklam sonrası ayırma baştan; 1x dışı hızda ayırma kapalı; DRM / canlı yayın desteklenmiyor; sentetik seslerde
    konuşmacı tutarlılığı %89; ayırma kapalıyken otomatik kadın/erkek kapalı.
 
+## GPU güvenliği bulgusu (0.5.4, kullanıcı raporu: RTX 5060 / Windows)
+**Belirti:** Hız testi sırasında ekran gidiyor (sürücü sıfırlanıyor), ses işleme sırasında sistem yavaşlıyor, GPU sürekli meşgul, oynatma takılıyor.
+**Nedenler:**
+1. WebGPU'da varsayılan toplu boyut 4 ve Hız testinde 8: GPU'da hiç ölçülmemiş varsayımlardı. Tek model çağrısı çok uzun sürerse Windows
+   ≈ 2 sn'de sürücüyü sıfırlar (TDR) ya da GPU belleği dolar. Her pencere ≈ 379 GMAC; toplu 8 → ≈ 3 TMAC tek çağrıda.
+2. Model çağrıları arka arkaya tam hızda çalışıyordu: GPU %100 meşgul, tarayıcının sayfa/video çizimi aynı GPU'yu bekliyor (takılma).
+**Düzeltme:** WebGPU varsayılan toplu boyut 1; Hız testi 1 → 2 → 4 sırasıyla ve yalnız tahmini tek GPU işi < 0.8 sn ise; çökme koruması
+(yarım kalan deneme bir sonraki testte sınır olur); ayırmada **GPU hız sınırı** (bekletmede ≥ 4×, oynarken tampon rahatsa ≈ 1.7× gerçek zaman yeter;
+yetişmek gerekirse tam hız). Rapora: ana iş parçacığı takılmaları (>50 ms) ve GPU hız sınırı beklemesi.
+**Doğrulanmadı:** bu konteynerde GPU yok; etki RTX 5060 / M4'te kullanıcı tarafından doğrulanmalı (Hız testi + videoda takılma + rapor).
+
+## Diğer videolar ve boşta kaynak kullanımı (0.5.4)
+Kullanıcı sorusu: "diğer videoları oynatırken performans düşüşü için geliştirme yaptın mı?" — o güne kadar hayır. Koddan bulunanlar ve düzeltmeler:
+1. **Ses yakalama kancası her YouTube videosunda** (dublaj kapalıyken de) ses parçalarını kopyalıyordu (kaynak başına 32 MB'a kadar bellek).
+   → Dublaj/ayırma kapalıyken (abone yok) tampon 6 MB ≈ son 6 dk ile sınırlı (`content/main-world.js` `SEP_IDLE_CAP`); abone olunca 32 MB.
+2. **Motorlar hiç boşaltılmıyordu:** çeviri (OPUS-MT ≈ 286 MB), seslendirme (WebGPU oturumu) ve konuşmacı modeli bir kez yüklenince dublaj kapatılsa
+   ya da başka videoya geçilse de bellekte ve ekran kartı belleğinde kalıyordu.
+   → Son motor isteğinden 3 dk sonra boşaltılır (`common/idle.js`, `offscreen.js`); canlı dublaj oynarken dakikada bir `engine.keepalive`
+   gönderir; durum/liste sorguları etkinlik sayılmaz; sonraki istek (ya da oynatınca `_rewarm`) motoru yeniden yükler.
+3. Zamanlayıcılar (100 ms tick, 50 ms perde): arka plan sekmelerinde Chrome zaten yavaşlatıyor; ölçülmedi, bu turda dokunulmadı (T6).
+**Doğrulanmadı:** bellek/CPU kazancı gerçek cihazda ölçülmedi; yakalama sınırı ayrıca e2e ile sınanmadı (mantık basit). Ölçüm için rapordaki `[Bellek]` ve Hız testi.
+
 ## Öncelik (kişisel kullanım, sağlamlık)
 **Önce ölç** (Hız testi + zaman kırılımı), **sonra görünür kıl** (hata günlüğü, bellek), **sonra düzelt** (boşta CPU, güncelleme adresi, kalite ayarı,
 batch otomasyonu). Mağaza hazırlığı en sona.

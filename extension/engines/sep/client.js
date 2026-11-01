@@ -70,10 +70,10 @@ export function createSepClient({ mock = false, workerUrl } = {}) {
 
   return {
     load,
-    process(left, right, sampleRate, { startSample, final, reset } = {}) {
+    process(left, right, sampleRate, { startSample, final, reset, pace } = {}) {
       const transfer = [left.buffer];
       if (right && right.buffer !== left.buffer) transfer.push(right.buffer);
-      const extra = startSample != null ? { startSample, final: !!final, reset: !!reset } : {};
+      const extra = startSample != null ? { startSample, final: !!final, reset: !!reset, ...(pace ? { pace } : {}) } : {};
       return send({ type: 'process', left, right, sampleRate, ...extra }, transfer);
     },
     /** Sıradaki/süren işleri bırak (kimlikler: process çağrısının sırası değil, istemcinin iç kimliği). */

@@ -30,6 +30,7 @@ const KEEP_BEHIND_SEC = 90;
 const KEEP_AHEAD_EXTRA_SEC = 120;
 const CACHE_VIDEOS = 5;
 const PERSIST_MS = 15000;
+const KEEPALIVE_MS = 60000; // oynarken motorları canlı tut (offscreen boşta bırakma: common/idle.js)
 const PITCH_MS = 50;
 const PEEK_SEC = 1.5; // konuşmacı tanıma: çalan cümlenin bu kadarı duyulunca en yakın kümeye bakılır
 
@@ -119,6 +120,14 @@ class Session {
     this._wakers = new Set();
     // başlangıç süreleri (ms, oturum başından): altyazı, motorlar, ilk çeviri, ilk ses, aktif
     this.timing = { t0: performance.now() };
+    // [tanılama] ana iş parçacığı takılmaları: 50 ms'yi aşan uzun görevler (video takılmasının sayfa tarafı nedenleri için)
+    this.longTasks = { n: 0, ms: 0, max: 0 };
+    try {
+      this._ltObs = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) { this.longTasks.n++; this.longTasks.ms += e.duration; this.longTasks.max = Math.max(this.longTasks.max, e.duration); }
+      });
+      this._ltObs.observe({ type: 'longtask' });
+    } catch (e) { this._ltObs = null; /* longtask desteklenmiyor: sayaç boş kalır (günlüğe yazılmaz: beklenen) */ }
     this._hold = { done: false, active: false, since: 0, ours: false };
     // konuşanın cinsiyeti (content/gender.js): perde örnekleri, konuşmacı sırası → cinsiyet, en son duyulan
     this.pitch = new GenderTracker();
@@ -185,6 +194,7 @@ class Session {
     }
     // Çeviriler kalıcı önbelleğe yazılır (sekme kapanırsa da kaybolmasın).
     this._persistTimer = setInterval(() => this._persist(), PERSIST_MS);
+    this._keepTimer = setInterval(() => this._keepalive(), KEEPALIVE_MS);
     this._on(window, 'pagehide', () => this._persist());
     // çeviri ve seslendirme ayrı döngülerde: ilk cümlenin sesi hazırlanırken sonraki cümleler çevrilir
     this.loopTr();
@@ -205,6 +215,7 @@ class Session {
     return {
       sentences: this.sentences.length, blobs, audioSec: Math.round(audioSec * 10) / 10,
       heapMB: Math.round((performance.memory?.usedJSHeapSize || 0) / 1048576) || null,
+      longTasks: { n: this.longTasks.n, ms: Math.round(this.longTasks.ms), max: Math.round(this.longTasks.max) },
       ...(this.separation?.memoryInfo?.() || {}),
     };
   }
@@ -234,9 +245,11 @@ class Session {
   destroy() {
     if (!this.alive) return;
     this.alive = false;
+    this._ltObs?.disconnect();
     clearInterval(this._tick);
     clearInterval(this._pitchTimer);
     clearInterval(this._persistTimer);
+    clearInterval(this._keepTimer);
     this._wakeUp();
     for (const [el, ev, fn] of this._listeners) el.removeEventListener(ev, fn);
     this._listeners = [];
@@ -278,6 +291,7 @@ class Session {
       // yoksa bekletme biter ama video duraklatılmış kalır ve kimse sürdürmez.
       if (this._hold.active && !this._hold.resuming && !v.paused) this._endHold();
       resumeAudio();
+      this._rewarm();
       if (this.audio.busy || this.sys.busy) {
         this.ducker.duck(settings.originalVolume);
         this.audio.resume();
@@ -420,6 +434,21 @@ class Session {
   }
 
   // Yeni çeviri varsa kalıcı önbelleğe yaz.
+  // Oynarken offscreen'e "canlıyım" de: motorlar yalnız dublaj kapalıyken / video uzun süre durmuşken boşaltılır.
+  _keepalive() {
+    if (!this.alive || !this.enginesReady || !this.video || this.video.paused) return;
+    sendBg({ type: 'engine.keepalive' });
+  }
+
+  // Uzun duraklamadan sonra oynatınca motorlar boşaltılmışsa ilk cümleden önce yeniden yükle (yüklüyse anında döner).
+  _rewarm() {
+    const now = performance.now();
+    if (!this.alive || !this.enginesReady || now - (this._rewarmAt || 0) < 20000) return;
+    this._rewarmAt = now;
+    sendBg({ type: 'engine.init', engine: 'mt' });
+    if (settings.voice !== 'system') sendBg({ type: 'engine.init', engine: 'tts' });
+  }
+
   _persist() {
     const n = this.sentences.reduce((k, s) => k + (s.tr != null ? 1 : 0), 0);
     if (!n || n === this._savedCount) return;
