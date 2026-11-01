@@ -16,8 +16,8 @@ export const DEFAULTS = Object.freeze({
   voice4: null,
   speakerCount: 2,         // konuşmacı değişimlerinde (>>) sırayla dönen ses sayısı (2–4)
   voiceBlend: null,        // ses karıştırma (yalnızca Supertonic): { with: 'F1'…'M5', amount: 0…0.9 } | null
-  genderVoices: false,     // konuşanın cinsiyetine göre kadın / erkek sesi (videonun sesinden perde ölçülür, content/gender.js);
-                           // isabet yetersiz olduğu için varsayılan kapalı, ayarlardan açılabilir
+  genderVoices: true,      // konuşanın cinsiyetine göre kadın / erkek sesi (konuşmacı tanıma, content/gender.js + engines/spk);
+                           // yalnız ses ayırma çalışırken etkindir (temiz konuşmada isabet yeterli), ayırma yokken tek ses
   favFemale: null,         // favori kadın sesi ve tonu: { voice, style, pitch } | null (otomatik seçimde öncelikli)
   favMale: null,           // favori erkek sesi ve tonu
   glossaryMt: '',          // çeviri düzeltmeleri ("yanlış => doğru" satırları, common/glossary.js)
@@ -192,7 +192,7 @@ export function voicesInUse(s) {
   const out = [s.voice || DEFAULT_VOICE];
   if (s.voice === 'system' || s.engineMode === 'mock') return out;
   if (s.speakerVoices) for (let n = 1; n < s.speakerCount; n++) out.push(speakerVoice(s, n));
-  if (s.genderVoices) {
+  if (s.genderVoices && s.separation !== 'off') {
     for (const g of ['female', 'male']) {
       out.push(genderVoice(s, g));
       if (s.speakerVoices) out.push(genderVoice(s, g, 1));

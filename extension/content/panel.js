@@ -224,7 +224,7 @@ export class Panel {
     this.holdEl = h('div', { class: 'ld-hold', hidden: true }, h('span', { class: 'ld-hold-text' }), h('span', { class: 'ld-bar' }, h('span')));
 
     // b. sesler
-    this.genderSwitch = toggle('Otomatik kadın/erkek', (on) => setSettings({ genderVoices: on }));
+    this.genderSwitch = toggle('Otomatik kadın/erkek (ses ayırma açıkken)', (on) => setSettings({ genderVoices: on }));
     this.rows = { female: this._voiceRow('female'), male: this._voiceRow('male'), main: this._voiceRow('main') };
     const voices = h('div', { class: 'ld-voices' }, this.rows.female.el, this.rows.male.el, this.rows.main.el);
 
@@ -412,7 +412,7 @@ export class Panel {
     const sys = s.voice === 'system';
     this.genderSwitch.input.checked = s.genderVoices && !sys;
     this.genderSwitch.input.disabled = sys;
-    const auto = s.genderVoices && !sys;
+    const auto = s.genderVoices && s.separation !== 'off' && !sys; // ayırma kapalıyken tek ses
     this.rows.female.el.hidden = !auto;
     this.rows.male.el.hidden = !auto;
     this.rows.main.el.hidden = auto;
@@ -529,7 +529,7 @@ export class Panel {
 
     // konuşanın cinsiyeti (ölçülen)
     const spk = S?.speaker?.gender && GENDER[S.speaker.gender] ? S.speaker : null;
-    this.speakerChip.hidden = !spk || !this.settings?.genderVoices;
+    this.speakerChip.hidden = !spk || !this.settings?.genderVoices || this.settings?.separation === 'off';
     if (spk) {
       this.speakerChip.textContent = GENDER[spk.gender].sign;
       this.speakerChip.dataset.gender = spk.gender;

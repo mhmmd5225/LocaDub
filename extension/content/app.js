@@ -297,6 +297,12 @@ class Session {
 
   _onSepState(st) {
     if (st.status === 'error' && st.message) this._sepLastError = st.message; // [tanılama]
+    const g = this._genderOn();
+    if (g !== this._genderPrev) { // otomatik kadın/erkek kipi açıldı ya da kapandı: çalınmamış cümleler yeniden hazırlanır
+      const first = this._genderPrev === undefined;
+      this._genderPrev = g;
+      if (!first && this.video) this._regender(this.video.currentTime);
+    }
     if (st.status !== this._sepStatus) {
       this._sepStatus = st.status;
       console.info(LOG, `ayırma: ${st.status}${st.backend ? ` (${st.backend})` : ''} — ${st.message}`);
@@ -603,25 +609,37 @@ class Session {
   // kaydı (capture.js, cümle bitince; çalan cümlenin ilk ≈ 1.5 sn'si en yakın kümeye bakılarak erken tahmin).
   // Motor yoksa (onaysız model, hata) eski yol: cümle başına perde (_measureGender).
 
+  // Otomatik kadın/erkek yalnız ses ayırma çalışırken etkindir: ölçüm (docs/SES-AYIRMA.md, tools/spk-eval.mjs) temiz
+  // konuşmada yeterli isabeti gösterdi; müzikli orijinal sesten tek ses kalır.
+  _genderOn() {
+    const st = this.separation?.state?.status;
+    return !!(settings.genderVoices && settings.voice !== 'system' && settings.separation === 'auto' && st && st !== 'off' && st !== 'error');
+  }
+
+  // chooseVoice için etkin ayarlar (genderVoices = _genderOn)
+  _eff() {
+    return { ...settings, genderVoices: this._genderOn() };
+  }
+
   _spkOn() {
-    return settings.genderVoices && settings.voice !== 'system' && !this.spk.off;
+    return this._genderOn() && !this.spk.off;
   }
 
   // Cümlenin sesi: cinsiyet modu açıksa tahmin edilen cinsiyetin sesi (favori öncelikli), değilse konuşmacı sırası.
   voiceFor(s) {
     if (this._spkOn()) {
       const { gender, id } = this._spkPredict(s);
-      return chooseVoice(settings, { speaker: s.speaker, gender, alt: id != null ? this.spk.clusters.altOf(id) : 0 });
+      return chooseVoice(this._eff(), { speaker: s.speaker, gender, alt: id != null ? this.spk.clusters.altOf(id) : 0 });
     }
     const G = this.genders;
-    const gender = settings.genderVoices && settings.voice !== 'system' ? predictGender(s, {
+    const gender = this._genderOn() ? predictGender(s, {
       ...G, fallback: voiceGender(settings, settings.voice || DEFAULT_VOICE),
     }) : null;
     // sırayla modunda aynı cinsiyetten iki konuşmacı: komşu sıra da bu cinsiyettense ikinci ses
     const turn = s.speaker || 0;
     const neighbour = G.turns.get(turn - 1) ?? G.turns.get(turn + 1);
     const alt = gender && neighbour === gender ? turn % 2 : 0;
-    return chooseVoice(settings, { speaker: s.speaker, gender, alt });
+    return chooseVoice(this._eff(), { speaker: s.speaker, gender, alt });
   }
 
   // Bilgisi olan cümlenin konuşmanı: { gender, id } (id: küme) ya da null.
@@ -657,9 +675,9 @@ class Session {
   // İlk ses hazır olunca diğer cinsiyetin sesini arka planda yükle: konuşan ilk kez değiştiğinde model yüklenirken
   // dublaj takılmasın (motor en çok iki modeli bellekte tutar; Supertonic sesleri tek pakettir).
   _prewarmVoices() {
-    if (this._prewarmed || !settings.genderVoices || settings.voice === 'system') return;
+    if (this._prewarmed || !this._genderOn()) return;
     this._prewarmed = true;
-    const primary = chooseVoice(settings, { gender: voiceGender(settings, settings.voice || DEFAULT_VOICE) });
+    const primary = chooseVoice(this._eff(), { gender: voiceGender(settings, settings.voice || DEFAULT_VOICE) });
     for (const g of ['female', 'male']) {
       const v = genderVoice(settings, g);
       if (v && v !== primary) sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: v, speed: 1, tone: toneFor(settings, v), tag: this.tag }).catch(() => {});
@@ -756,7 +774,7 @@ class Session {
   }
 
   _samplePitch() {
-    if (!settings.genderVoices || settings.voice === 'system' || this.inAd || this._spkOn()) return;
+    if (!this._genderOn() || this.inAd || this._spkOn()) return;
     const v = this.video;
     if (!v || v.paused || v.seeking) return;
     const an = this._analyser || (this._analyser = videoAnalyser(v));
@@ -770,7 +788,7 @@ class Session {
   // (gender.js turnGender). Çalan cümlede ilk ≈ 0.5 sn'lik konuşma belirgin bir cinsiyet gösterir ve beklenenden
   // farklıysa karar hemen verilir (erken karar); bitişteki tam ölçüm yine yapılır.
   _measureGender(t) {
-    if (!settings.genderVoices || settings.voice === 'system' || this._spkOn()) return;
+    if (!this._genderOn() || this._spkOn()) return;
     const G = this.genders;
     let changed = false;
     for (const s of this.sentences) {

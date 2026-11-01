@@ -525,6 +525,7 @@ function renderSpeakerVoices() {
     return v ? `${shortName(v)}${favOf(id) ? ' ★' : ''}${v.cached || isMock() ? '' : ' (indirilmedi)'}` : '—';
   };
   $('genderNote').replaceChildren(...(first === 'system' ? ['Sistem sesinde kullanılmaz.']
+    : settings.genderVoices && settings.separation === 'off' ? ['Ses ayırma kapalı: tek ses kullanılır. Gerçek dublajı açınca kadın/erkek sesi devreye girer.']
     : settings.genderVoices ? ['Kadın: ', el('b', { textContent: name(genderVoice(s, 'female')) }), ' · Erkek: ', el('b', { textContent: name(genderVoice(s, 'male')) })]
       : []));
   // otomatik cinsiyetle birlikte sırayla seçeneği aynı cinsiyetten konuşmacıları ayırır (o cinsiyetin ikinci sesi);
