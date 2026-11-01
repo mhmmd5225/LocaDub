@@ -5,6 +5,7 @@ import { clearModels } from './engines/common/model-cache.js';
 import { encodePcmBase64, decodePcmBase64ToInt16 } from './common/pcm.js';
 import { normalizeTone } from './engines/tts/styles.js';
 import { restoreTexts, disposePunct } from './engines/mt/restore-engine.js';
+import { shouldUnload, IDLE_UNLOAD_MS, IDLE_CHECK_MS } from './common/idle.js';
 
 const PATHS = {
   real: { mt: './engines/mt/index.js', tts: './engines/tts/index.js' },
@@ -206,9 +207,41 @@ async function resetSpk() {
   spk.mode = null;
 }
 
+// ---- boşta kaynak bırakma (common/idle.js) ----
+let lastActive = Date.now();
+let activeJobs = 0;
+let idleMs = IDLE_UNLOAD_MS;
+const anyLoaded = () => state.mt.ready || state.mt.loading || state.tts.ready || state.tts.loading || !!spk.mode;
+
+let idleTimer = null;
+async function idleCheck() {
+  if (!shouldUnload({ now: Date.now(), lastActive, active: activeJobs, loaded: anyLoaded(), idleMs })) return;
+  lastActive = Date.now();
+  console.info('[offscreen] boşta: motorlar bellekten boşaltılıyor');
+  for (const engine of ['mt', 'tts']) await resetEngine(engine);
+  await resetSpk();
+  await disposePunct();
+}
+function armIdle() {
+  clearInterval(idleTimer);
+  idleTimer = setInterval(idleCheck, Math.min(IDLE_CHECK_MS, Math.max(250, idleMs / 2)));
+}
+armIdle();
+
 async function handle(msg) {
   const settings = msg.settings || {};
+  // durum / liste sorguları etkinlik sayılmaz (açılır pencere yoklaması motorları canlı tutmasın); canlı oturum keepalive gönderir
+  if (msg.type !== 'engine.status' && msg.type !== 'engine.list') lastActive = Date.now();
   switch (msg.type) {
+    case 'engine.keepalive':
+      return {};
+    case 'engine.idle': {
+      // yalnız test motorunda: boşta bırakma süresini kısaltır (e2e)
+      if (settings.engineMode !== 'mock') throw new EngineError('Yalnızca test motorunda', 'BAD_REQUEST');
+      idleMs = Math.max(500, Number(msg.ms) || IDLE_UNLOAD_MS);
+      armIdle();
+      return { idleMs };
+    }
     case 'engine.init': {
       const engine = msg.engine;
       if (engine !== 'mt' && engine !== 'tts' && engine !== 'spk') throw new EngineError('Bilinmeyen motor: ' + engine, 'BAD_REQUEST');
@@ -303,13 +336,16 @@ async function handle(msg) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || msg.target !== 'offscreen') return false;
+  // süren motor işi boşta bırakmayı engeller (uzun model yükleme / sentez sırasında motor boşaltılmasın)
+  const counted = msg.type === 'mt.translate' || msg.type === 'tts.synthesize' || msg.type === 'spk.embed' || msg.type === 'engine.init';
+  if (counted) activeJobs++;
   handle(msg).then(
     (result) => sendResponse({ ok: true, result }),
     (e) => {
       const aborted = e?.name === 'AbortError' || e?.code === 'ABORTED';
       sendResponse({ ok: false, error: e?.message || String(e), code: aborted ? 'ABORTED' : (e?.code || 'ERROR') });
     },
-  );
+  ).finally(() => { if (counted) { activeJobs--; lastActive = Date.now(); } });
   return true;
 });
 

@@ -30,6 +30,7 @@ const KEEP_BEHIND_SEC = 90;
 const KEEP_AHEAD_EXTRA_SEC = 120;
 const CACHE_VIDEOS = 5;
 const PERSIST_MS = 15000;
+const KEEPALIVE_MS = 60000; // oynarken motorları canlı tut (offscreen boşta bırakma: common/idle.js)
 const PITCH_MS = 50;
 const PEEK_SEC = 1.5; // konuşmacı tanıma: çalan cümlenin bu kadarı duyulunca en yakın kümeye bakılır
 
@@ -193,6 +194,7 @@ class Session {
     }
     // Çeviriler kalıcı önbelleğe yazılır (sekme kapanırsa da kaybolmasın).
     this._persistTimer = setInterval(() => this._persist(), PERSIST_MS);
+    this._keepTimer = setInterval(() => this._keepalive(), KEEPALIVE_MS);
     this._on(window, 'pagehide', () => this._persist());
     // çeviri ve seslendirme ayrı döngülerde: ilk cümlenin sesi hazırlanırken sonraki cümleler çevrilir
     this.loopTr();
@@ -247,6 +249,7 @@ class Session {
     clearInterval(this._tick);
     clearInterval(this._pitchTimer);
     clearInterval(this._persistTimer);
+    clearInterval(this._keepTimer);
     this._wakeUp();
     for (const [el, ev, fn] of this._listeners) el.removeEventListener(ev, fn);
     this._listeners = [];
@@ -288,6 +291,7 @@ class Session {
       // yoksa bekletme biter ama video duraklatılmış kalır ve kimse sürdürmez.
       if (this._hold.active && !this._hold.resuming && !v.paused) this._endHold();
       resumeAudio();
+      this._rewarm();
       if (this.audio.busy || this.sys.busy) {
         this.ducker.duck(settings.originalVolume);
         this.audio.resume();
@@ -430,6 +434,21 @@ class Session {
   }
 
   // Yeni çeviri varsa kalıcı önbelleğe yaz.
+  // Oynarken offscreen'e "canlıyım" de: motorlar yalnız dublaj kapalıyken / video uzun süre durmuşken boşaltılır.
+  _keepalive() {
+    if (!this.alive || !this.enginesReady || !this.video || this.video.paused) return;
+    sendBg({ type: 'engine.keepalive' });
+  }
+
+  // Uzun duraklamadan sonra oynatınca motorlar boşaltılmışsa ilk cümleden önce yeniden yükle (yüklüyse anında döner).
+  _rewarm() {
+    const now = performance.now();
+    if (!this.alive || !this.enginesReady || now - (this._rewarmAt || 0) < 20000) return;
+    this._rewarmAt = now;
+    sendBg({ type: 'engine.init', engine: 'mt' });
+    if (settings.voice !== 'system') sendBg({ type: 'engine.init', engine: 'tts' });
+  }
+
   _persist() {
     const n = this.sentences.reduce((k, s) => k + (s.tr != null ? 1 : 0), 0);
     if (!n || n === this._savedCount) return;

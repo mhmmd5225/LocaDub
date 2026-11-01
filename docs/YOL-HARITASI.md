@@ -66,6 +66,11 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 - Tanılamada `[Bellek]`: ana iş parçacığı uzun görevleri ve GPU hız sınırı beklemesi.
 - **Kullanıcıdan:** RTX 5060'ta Hız testi + bir videoda takılma kontrolü; raporu paylaşmak. Hâlâ takılırsa: `pacePlay`/`paceHold` değerleri (`SEP`), sayfa tarafı takılmaları (rapordaki uzun görevler).
 
+### T14. Diğer videolarda ve boştayken kaynak kullanımı — **yapıldı** (0.5.4)
+- Ses yakalama tamponu abone yokken 6 MB (`main-world.js`); motorlar 3 dk boşta kalınca boşaltılır, keepalive ve yeniden ısıtma (`idle.js`, `offscreen.js`, `app.js`).
+- Test: `idle.test.mjs`, `idle-unload.e2e.cjs` (keepalive erteler, boşalır, istek yeniden yükler).
+- Kalan: zamanlayıcılar (T6), cihazda ölçüm.
+
 ## FAZ 2 — Kararlılık (0.5.5)
 
 ### T6. Boşta CPU azaltma (S–M)
