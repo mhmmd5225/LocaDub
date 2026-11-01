@@ -47,8 +47,9 @@ Karşılaştırma: [docs/TTS-KIYAS.md](../docs/TTS-KIYAS.md).
 temizleme. **Seslendirme**: ses seçimi, konuşma hızı, dublaj ve orijinal ses seviyesi, konuşmacılara farklı ses.
 **AI Model**: çeviri motoru (Otomatik / OPUS-MT / Chrome çevirmeni), noktalama düzeltme. **Diğer**: Türkçe altyazı,
 sürüm denetimi, önceden hazırlama süresi, ilk cümleye kadar bekletme, sözlük, **Tanılama bilgisini kopyala** (sürümler, ayarlar, motorlar,
-indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), varsayılana
-döndürme. Motor/model hatası olursa menü çubuğunun altında bir şerit görünür. Test motoru yalnızca `options.html#gelistirici`
+indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), **Hız testi**
+(bu cihazda ses ayırmanın WebGPU/WASM hızı ve toplu boyutları, seslendirme ve çeviri hızı; sonuç rapora `[Hız testi]` olarak eklenir —
+`common/bench.js`), varsayılana döndürme. Motor/model hatası olursa menü çubuğunun altında bir şerit görünür. Test motoru yalnızca `options.html#gelistirici`
 ya da `?dev=1` ile (veya motor zaten test modundaysa) "Diğer" menüsünde görünür.
 
 Ayarlar (`chrome.storage.local`):

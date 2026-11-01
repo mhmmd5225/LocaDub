@@ -15,7 +15,7 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 
 ## FAZ 1 — Ölç ve görünür kıl (0.5.3)
 
-### T1. "Hız testi" düğmesi (M)
+### T1. "Hız testi" düğmesi (M) — **yapıldı** (Diğer sekmesi → Tanılama; `common/bench.js`)
 - **Amaç:** M4/RTX'te gerçek WebGPU hızlarını ölçmek; `batch` seçimi için veri.
 - **Dosyalar:** `extension/options/options.{html,js,css}` (AI Model sekmesi), `extension/background.js` (mesaj),
   `extension/offscreen.js` / `extension/sep/host.js` (ayırma işçisi sınaması), yeni `extension/common/bench.js` (saf yardımcılar).

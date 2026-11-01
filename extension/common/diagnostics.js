@@ -57,7 +57,7 @@ export function separationLines(sep) {
 /**
  * @param {{ version:string, browser:string, platform:string, settings:object, status?:object,
  *           models?:{ name:string, sizeMB:number }[], errors?:object[], glossary?:{ mt:number, tts:number },
- *           timings?:{ at:number, line:string }[], separation?:object|null,
+ *           timings?:{ at:number, line:string }[], separation?:object|null, bench?:string[], benchAt?:number,
  *           now?:number }} d
  */
 export function buildReport(d) {
@@ -77,6 +77,7 @@ export function buildReport(d) {
     L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU: ${!!st.webgpu} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
+  if (d.bench?.length) L.push('', `[Hız testi${d.benchAt != null ? ` (${iso(d.benchAt)})` : ''}]`, ...d.bench.map((l) => scrub(String(l))));
   L.push('', '[İndirilen modeller]');
   if (!d.models?.length) L.push('yok');
   for (const m of d.models || []) L.push(`${m.name}: ${m.sizeMB.toFixed(1)} MB`);

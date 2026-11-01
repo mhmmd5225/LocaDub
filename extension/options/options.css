@@ -310,3 +310,11 @@ dialog p { margin: 0 0 6px; }
   .slider-row { grid-template-columns: 1fr 50px; }
   .slider-row label { grid-column: 1 / -1; }
 }
+
+/* Hız testi sonucu */
+.benchout {
+  margin: 10px 0 0; padding: 10px 12px; max-height: 220px; overflow: auto; white-space: pre-wrap;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--ld-radius-s);
+  font: 12px/1.5 var(--ld-mono); color: var(--fg);
+}
+#benchBlock .diagrow { margin-top: 8px; }
