@@ -1,7 +1,7 @@
 // common/diagnostics.js: hata tamponu, gizlilik süzgeci ve rapor.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_ERRORS, buildReport, pushError, scrub, separationLines } from '../../extension/common/diagnostics.js';
+import { MAX_ERRORS, buildReport, pushError, scrub, separationLines, memoryLines } from '../../extension/common/diagnostics.js';
 
 test('scrub: YouTube adresleri ve video kimlikleri silinir, model adresleri kalır', () => {
   assert.equal(scrub('fetch https://www.youtube.com/api/timedtext?v=dQw4w9WgXcQ&pot=x failed'), 'fetch <youtube-adresi> failed');
@@ -65,4 +65,21 @@ test('separationLines: sekme yok / kapalı / eksik alanlar / hata', () => {
   assert.equal(l[2], 'son hata: yok');
   const e = separationLines({ status: 'error', backend: 'webgpu', model: 'm', holds: 0, holdMs: 0, lastError: 'Model yüklenemedi https://www.youtube.com/watch?v=abc' });
   assert.equal(e[2], 'bekleme: 0 kez, toplam 0 sn · son hata: Model yüklenemedi <youtube-adresi>');
+});
+
+test('memoryLines: sekme yok / ayırma kapalı (yalnız cümle sesi) / ayırma açık (paket ve PCM)', () => {
+  assert.deepEqual(memoryLines(null), ['yok (açık YouTube sekmesi yok)']);
+  assert.deepEqual(memoryLines({ off: true }), ['yok (açık YouTube sekmesi yok)']);
+  assert.deepEqual(memoryLines({ off: true, memory: { sentences: 240, blobs: 14, audioSec: 52.34, heapMB: 118 } }),
+    ['JS yığını: 118 MB · cümle: 240 · cümle sesi: 14 blob, 52.3 sn']);
+  const full = memoryLines({ status: 'playing', memory: { sentences: 5, blobs: 0, audioSec: 0, heapMB: null, packetBytes: 1258291, packets: 2400, pcmBytes: 22649241, sepSec: 31.4, origSec: 31.4 } });
+  assert.equal(full[0], 'cümle: 5 · cümle sesi: 0 blob, 0 sn');
+  assert.equal(full[1], 'ayırma paketleri: 1.2 MB (2400 paket) · ayrılmış PCM: 31.4 sn · orijinal PCM: 31.4 sn · PCM belleği: 21.6 MB');
+});
+
+test('buildReport: [Bellek] bölümü ayırma cevabındaki memory alanından', () => {
+  const base = { version: '0.5.3', browser: 'Chrome', platform: 'Linux', settings: {}, now: 0 };
+  assert.match(buildReport(base), /\[Bellek\]\nyok \(açık YouTube sekmesi yok\)/);
+  const t = buildReport({ ...base, separation: { off: true, memory: { sentences: 3, blobs: 1, audioSec: 2 } } });
+  assert.match(t, /\[Ses ayırma\]\nkapalı\n\n\[Bellek\]\ncümle: 3 · cümle sesi: 1 blob, 2 sn/);
 });

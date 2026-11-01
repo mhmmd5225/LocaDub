@@ -20,7 +20,7 @@ const { launch } = require('./common.cjs');
     assert.match(text, /sözlük: 1 çeviri düzeltmesi/);
     assert.doesNotMatch(text, /gizli kural/);
     // açık YouTube sekmesi yok → ses ayırma bölümü yine de var
-    assert.match(text, /\[Motorlar\][^]*\[Ses ayırma\]\nyok \(açık YouTube sekmesi yok\)\n\n\[İndirilen modeller\]/);
+    assert.match(text, /\[Motorlar\][^]*\[Ses ayırma\]\nyok \(açık YouTube sekmesi yok\)\n\n\[Bellek\]\nyok \(açık YouTube sekmesi yok\)\n\n\[İndirilen modeller\]/);
     console.log(text.split('\n').slice(0, 3).join('\n'));
     console.log('not:', await opt.textContent('#diagNote'));
     console.log('ok — diagnostics');

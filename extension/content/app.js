@@ -194,6 +194,19 @@ class Session {
     if (this.timing[k] == null) this.timing[k] = Math.round(performance.now() - this.timing.t0);
   }
 
+  // [tanılama] bellek özeti: cümle sesi blob'ları ve süreleri + ayırma paketleri/PCM (SeparatedAudio.memoryInfo)
+  memoryInfo() {
+    let blobs = 0, audioSec = 0;
+    for (const s of this.sentences) {
+      if (s.audio?.url) { blobs++; audioSec += s.audio.duration || 0; }
+    }
+    return {
+      sentences: this.sentences.length, blobs, audioSec: Math.round(audioSec * 10) / 10,
+      heapMB: Math.round((performance.memory?.usedJSHeapSize || 0) / 1048576) || null,
+      ...(this.separation?.memoryInfo?.() || {}),
+    };
+  }
+
   _engineStatus() {
     const n = this.sentences.length;
     const wait = this._hold.active ? ' Video hazır olunca devam edecek.' : '';
@@ -208,8 +221,10 @@ class Session {
     const T = this.timing;
     const f = (k) => (T[k] != null ? `${(T[k] / 1000).toFixed(1)} sn` : '—');
     const held = T.heldMs ? `, video ${(T.heldMs / 1000).toFixed(1)} sn bekletildi` : '';
+    const d = (k, name) => (T[k] != null ? ` (${name} ${(T[k] / 1000).toFixed(1)} sn)` : '');
+    const sep = T.sepReady != null ? `, ayırma modeli ${f('sepReady')}` : '';
     const line = `aktif ${f('active')} (altyazı ${f('captions')}, çeviri motoru ${f('mt')}, ses motoru ${f('tts')}, ` +
-      `ilk çeviri ${f('firstTr')}, ilk ses ${f('firstAudio')}${held})`;
+      `ilk çeviri ${f('firstTr')}${d('trReqMs', 'istek')}, ilk ses ${f('firstAudio')}${d('synthMs', 'sentez')}${sep}${held})`;
     console.info(LOG, 'hazırlık:', line);
     sendBg({ type: 'diag.timing', line });
   }
@@ -297,6 +312,7 @@ class Session {
 
   _onSepState(st) {
     if (st.status === 'error' && st.message) this._sepLastError = st.message; // [tanılama]
+    if (this.timing && st.status && st.status !== 'off' && st.status !== 'loading-model' && st.status !== 'error') this._mark('sepReady');
     const g = this._genderOn();
     if (g !== this._genderPrev) { // otomatik kadın/erkek kipi açıldı ya da kapandı: çalınmamış cümleler yeniden hazırlanır
       const first = this._genderPrev === undefined;
@@ -534,6 +550,7 @@ class Session {
     const batch = needTr.slice(0, trBatchSize(S[needTr[0]], t, { first: !this.firstBatchDone }));
     const gen = this.trGen;
     for (const i of batch) S[i].trPending = true;
+    const tReq = performance.now();
     const res = await sendBg({
       type: 'mt.translate', sentences: batch.map((i) => S[i].text), tag: this.tag,
       restore: this.trackKind === 'asr', // otomatik altyazı: çeviri öncesi noktalama (ayar ve model açıksa)
@@ -550,6 +567,7 @@ class Session {
     }
     batch.forEach((i, k) => { S[i].tr = String(res.result[k] ?? '').trim(); });
     this.firstBatchDone = true;
+    if (this.timing.trReqMs == null) this.timing.trReqMs = Math.round(performance.now() - tReq); // ilk çeviri isteğinin süresi
     this._mark('firstTr');
     this._wakeUp(); // seslendirme döngüsü yeni çeviriyi beklemesin
     return true;
@@ -560,7 +578,9 @@ class Session {
     const t = this.video.currentTime;
     const needAu = windowIndices(this.sentences, t, settings.lookaheadSec, (s) => s.tr && !s.audio && !s.auPending && !s.auFailed);
     if (needAu.length) {
+      const tSyn = performance.now();
       await this.synth(needAu[0]);
+      if (this.timing.synthMs == null) this.timing.synthMs = Math.round(performance.now() - tSyn); // ilk sentezin süresi
       this._mark('firstAudio');
       this._prewarmVoices();
       return true;
@@ -1158,7 +1178,8 @@ export async function start() {
     if (msg?.type === 'diag.separation') {
       const sp = session?.separation;
       const { cachedRanges, message, ...st } = sp?.state || {};
-      respond(sp ? { ...st, lastError: sp.error?.message || (st.status === 'error' ? message : session._sepLastError) || '' } : { off: true });
+      const memory = session?.memoryInfo(); // ayırma kapalıyken de cümle sesi sayıları görünür
+      respond(sp ? { ...st, lastError: sp.error?.message || (st.status === 'error' ? message : session._sepLastError) || '', memory } : { off: true, memory });
     }
   });
   document.addEventListener('yt-navigate-finish', () => route());

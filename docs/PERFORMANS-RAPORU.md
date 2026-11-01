@@ -28,8 +28,8 @@ Bu rapor ölçülenleri, tahmin edilenleri ve koddan çıkan stabilite bulgular�
    Bir kısmı zararsız (`revokeObjectURL`), ama motor/ağ/ses yollarında hata görünmez; "Son hatalar" bölümü boş kalır.
 2. **Boşta CPU:** `app.js` her 100 ms tick, `separation.js` her 100 ms tick, `_samplePitch` her 50 ms (konuşmacı yolu açıkken erken döner ama
    zamanlayıcı sürer), 15 sn'de bir kalıcı yazma. Sekme gizliyken de aynı.
-3. **Bellek sınırları var ama ölçülmüyor:** MAIN-world kopya 32 MB/kaynak (≈ 30 dk opus); PacketStore 300 sn geri; ayrılmış PCM 15 sn geri
-   (44.1 kHz stereo float ≈ 0.35 MB/sn → 60 sn ≈ 21 MB); cümle sesleri 90 sn geri / 120 sn ileri. Raporda bellek bilgisi yok.
+3. **Bellek sınırları var ama ölçülmüyor:** MAIN-world kopya 32 MB/kaynak (≈ 30 dk opus); PacketStore 300 sn geri; ayrılmış **ve orijinal** PCM 15 sn geri
+   (konuşmacı tanıma için ikisi de tutulur; ölçüm, sahte ayırıcı: 67 sn PCM ≈ 26 MB → ≈ 0.38 MB/sn); cümle sesleri 90 sn geri / 120 sn ileri. Raporda bellek bilgisi yok.
 4. **Güncelleme denetimi bozuk:** eklenti `https://localdub.mhmmd.app/version.json`'a bakıyor; orası 0.2.1'de takılı (Netlify kredi / DNS).
    Kurulu eklentiler 0.5.x güncelleme şeridini göremez. Yedek adres yok.
 5. **Servis işçisi / offscreen yeniden başlaması:** belgelerde "ilk istek zaman aşımına uğrayabilir" notu var; otomatik test yok.

@@ -590,3 +590,14 @@ test('speechAt: orijinal − eşlik; aralığın tamamı yoksa null', async () =
   sa.orig.prune(0, 3500);
   assert.equal(sa.speechAt(3, 4), null, 'orijinal yetmiyor');
 });
+
+test('PacketStore.bytes: tutulan paketlerin toplam baytı; atılanlar düşer', () => {
+  const st = new PacketStore();
+  assert.equal(st.bytes, 0);
+  for (let i = 0; i < 10; i++) st.add({ t: i * 0.02, dur: 0.02, data: new Uint8Array(100) });
+  assert.equal(st.bytes, 1000);
+  st.prune(0.1);
+  assert.equal(st.bytes, 500);
+  st.clear();
+  assert.equal(st.bytes, 0);
+});

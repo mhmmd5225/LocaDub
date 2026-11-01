@@ -320,6 +320,19 @@ export class SeparatedAudio extends EventTarget {
     };
   }
 
+  /** Bellek özeti (tanılama): kodlanmış paketler, ayrılmış / orijinal PCM (bayt ve saniye). */
+  memoryInfo() {
+    let packetBytes = 0, packets = 0;
+    for (const src of this.sources.values()) { packetBytes += src.store.bytes; packets += src.store.size; }
+    const secOf = (tl) => (tl ? tl.rangesSec().reduce((n, [a, b]) => n + (b - a), 0) : 0);
+    return {
+      packetBytes, packets,
+      pcmBytes: (this.sep?.bytes || 0) + (this.orig?.bytes || 0),
+      sepSec: Math.round(secOf(this.sep) * 10) / 10,
+      origSec: Math.round(secOf(this.orig) * 10) / 10,
+    };
+  }
+
   /** Temiz konuşma (orijinal − eşlik) [t0, t1) için; sınıf başlığına bakın. */
   speechAt(t0, t1) {
     if (!this.sep || !this.orig || !(t1 > t0)) return null;

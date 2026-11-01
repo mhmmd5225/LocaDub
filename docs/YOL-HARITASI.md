@@ -37,7 +37,7 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 - **Kabul:** raporda `alan: mesaj (n kez)`; e2e'de enjekte edilen hata görünür.
 - **Test:** `errlog.test.mjs` (tekrar bastırma, 50 sınırı), `diagnostics.e2e`.
 
-### T3. Bellek ve zaman kırılımı (S)
+### T3. Bellek ve zaman kırılımı (S) — **yapıldı** (`[Bellek]` bölümü, başlangıç satırında istek/sentez/ayırma modeli süreleri)
 - **Dosyalar:** `content/separation.js` (paket baytı, PCM saniyesi, blob sayısı), `content/app.js` (cümle sesi / blob URL sayısı),
   `common/diagnostics.js` (`[Bellek]`: `performance.memory.usedJSHeapSize` varsa, paketler MB, PCM sn, blob adedi), `background.js` (`diag.separation` alanları).
 - **Zaman kırılımı:** başlangıç satırına `ses motoru yükleme`, `ilk çeviri`, `ilk sentez` ayrımı (`content/timing.js`).
@@ -91,7 +91,7 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 - **Kabul:** ikinci yüklemede deneme yapılmaz, kayıtlı değer kullanılır. **Test:** `sep.test.mjs`'te seçim mantığı (saf fonksiyon).
 
 ### T11. Geri sarmayı ucuzlatma (S)
-- `SEP.keepBehindSec` 15 → 60 (`content/sep-core.js`); bellek bedeli ≈ 21 MB. `[Bellek]`'te PCM saniyesi görünür.
+- `SEP.keepBehindSec` 15 → 60 (`content/sep-core.js`); bellek bedeli ≈ 2 × 21 MB = 42 MB (orijinal + ayrılmış PCM; T3 ölçümü ≈ 0.38 MB/sn). `[Bellek]`'te PCM saniyesi görünür.
 - **Kabul:** `separation.e2e`: 40 sn oynat, 30 sn geri sar → yeniden ayırma işi başlamaz (iş sayacı değişmez).
 
 ### T12. Başlangıç gecikmesini daralt (M) — T3 verisine bağlı

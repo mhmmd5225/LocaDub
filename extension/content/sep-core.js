@@ -61,6 +61,9 @@ export class PacketStore {
 
   get size() { return this.list.length; }
 
+  /** Tutulan kodlanmış paketlerin toplam baytı (bellek raporu). */
+  get bytes() { let n = 0; for (const p of this.list) n += p.data?.byteLength || 0; return n; }
+
   _lower(t) { // t'den küçük olmayan ilk paket
     let lo = 0, hi = this.list.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (this.list[m].t < t) lo = m + 1; else hi = m; }

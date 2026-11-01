@@ -54,6 +54,26 @@ export function separationLines(sep) {
   return [a.join(' · '), b.join(' · '), c.join(' · ')];
 }
 
+const mb = (b) => `${(b / 1048576).toFixed(1)} MB`;
+
+/**
+ * [Bellek] satırları. sep: diag.separation cevabı (kapalıyken de { off, memory }); memory: { sentences, blobs, audioSec, heapMB,
+ * packetBytes, packets, pcmBytes, sepSec, origSec } (ayırma alanları yalnız ayırma varken).
+ */
+export function memoryLines(sep) {
+  const m = sep?.memory;
+  if (!m) return ['yok (açık YouTube sekmesi yok)'];
+  const a = [];
+  if (num(m.heapMB) != null) a.push(`JS yığını: ${m.heapMB} MB`);
+  a.push(`cümle: ${m.sentences ?? 0}`, `cümle sesi: ${m.blobs ?? 0} blob, ${sn(m.audioSec || 0)} sn`);
+  const L = [a.join(' · ')];
+  if (num(m.packetBytes) != null) {
+    L.push([`ayırma paketleri: ${mb(m.packetBytes)} (${m.packets ?? 0} paket)`, `ayrılmış PCM: ${sn(m.sepSec || 0)} sn`,
+      `orijinal PCM: ${sn(m.origSec || 0)} sn`, `PCM belleği: ${mb(m.pcmBytes || 0)}`].join(' · '));
+  }
+  return L;
+}
+
 /**
  * @param {{ version:string, browser:string, platform:string, settings:object, status?:object,
  *           models?:{ name:string, sizeMB:number }[], errors?:object[], glossary?:{ mt:number, tts:number },
@@ -77,6 +97,7 @@ export function buildReport(d) {
     L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU: ${!!st.webgpu} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
+  L.push('', '[Bellek]', ...memoryLines(d.separation));
   if (d.bench?.length) L.push('', `[Hız testi${d.benchAt != null ? ` (${iso(d.benchAt)})` : ''}]`, ...d.bench.map((l) => scrub(String(l))));
   L.push('', '[İndirilen modeller]');
   if (!d.models?.length) L.push('yok');
