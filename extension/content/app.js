@@ -12,6 +12,7 @@ import { decodePcmBase64ToInt16, encodePcmBase64, int16ToWav, trimSilenceInt16 }
 import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
 import { pageVideo, findPlayer, findVideo } from '../common/page.js';
+import { logError } from '../common/errlog.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -90,7 +91,8 @@ async function fetchText(url) {
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return '';
     return (await res.text()).trim();
-  } catch {
+  } catch (e) {
+    logError('altyazı indirme', e);
     return '';
   }
 }
@@ -194,6 +196,19 @@ class Session {
     if (this.timing[k] == null) this.timing[k] = Math.round(performance.now() - this.timing.t0);
   }
 
+  // [tanılama] bellek özeti: cümle sesi blob'ları ve süreleri + ayırma paketleri/PCM (SeparatedAudio.memoryInfo)
+  memoryInfo() {
+    let blobs = 0, audioSec = 0;
+    for (const s of this.sentences) {
+      if (s.audio?.url) { blobs++; audioSec += s.audio.duration || 0; }
+    }
+    return {
+      sentences: this.sentences.length, blobs, audioSec: Math.round(audioSec * 10) / 10,
+      heapMB: Math.round((performance.memory?.usedJSHeapSize || 0) / 1048576) || null,
+      ...(this.separation?.memoryInfo?.() || {}),
+    };
+  }
+
   _engineStatus() {
     const n = this.sentences.length;
     const wait = this._hold.active ? ' Video hazır olunca devam edecek.' : '';
@@ -208,8 +223,10 @@ class Session {
     const T = this.timing;
     const f = (k) => (T[k] != null ? `${(T[k] / 1000).toFixed(1)} sn` : '—');
     const held = T.heldMs ? `, video ${(T.heldMs / 1000).toFixed(1)} sn bekletildi` : '';
+    const d = (k, name) => (T[k] != null ? ` (${name} ${(T[k] / 1000).toFixed(1)} sn)` : '');
+    const sep = T.sepReady != null ? `, ayırma modeli ${f('sepReady')}` : '';
     const line = `aktif ${f('active')} (altyazı ${f('captions')}, çeviri motoru ${f('mt')}, ses motoru ${f('tts')}, ` +
-      `ilk çeviri ${f('firstTr')}, ilk ses ${f('firstAudio')}${held})`;
+      `ilk çeviri ${f('firstTr')}${d('trReqMs', 'istek')}, ilk ses ${f('firstAudio')}${d('synthMs', 'sentez')}${sep}${held})`;
     console.info(LOG, 'hazırlık:', line);
     sendBg({ type: 'diag.timing', line });
   }
@@ -256,8 +273,10 @@ class Session {
       this.ducker.release(0);
     });
     on(v, 'play', () => {
-      // bekletme sırasında kullanıcı oynatırsa bekletme biter (videoyu ikinci kez durdurmayız)
-      if (this._hold.active && !this._hold.resuming) this._endHold();
+      // bekletme sırasında kullanıcı oynatırsa bekletme biter (videoyu ikinci kez durdurmayız). Video işleyici çalışırken
+      // zaten duraklatılmışsa bu 'play' bizim bekletmemizin durdurduğu başlangıca aittir (olay gecikmeli gelir): yok sayılır,
+      // yoksa bekletme biter ama video duraklatılmış kalır ve kimse sürdürmez.
+      if (this._hold.active && !this._hold.resuming && !v.paused) this._endHold();
       resumeAudio();
       if (this.audio.busy || this.sys.busy) {
         this.ducker.duck(settings.originalVolume);
@@ -297,6 +316,7 @@ class Session {
 
   _onSepState(st) {
     if (st.status === 'error' && st.message) this._sepLastError = st.message; // [tanılama]
+    if (this.timing && st.status && st.status !== 'off' && st.status !== 'loading-model' && st.status !== 'error') this._mark('sepReady');
     const g = this._genderOn();
     if (g !== this._genderPrev) { // otomatik kadın/erkek kipi açıldı ya da kapandı: çalınmamış cümleler yeniden hazırlanır
       const first = this._genderPrev === undefined;
@@ -352,7 +372,7 @@ class Session {
     }
     let info = null;
     for (let i = 0; i < 40 && this.alive; i++) {
-      try { info = await callMain('get-player-response'); } catch { info = null; }
+      try { info = await callMain('get-player-response'); } catch (e) { info = null; logError('sayfa köprüsü', e); }
       if (info?.videoId === this.videoId) break;
       await sleep(250);
     }
@@ -379,13 +399,13 @@ class Session {
     for (let attempt = 0; !txt && attempt < 3 && this.alive; attempt++) {
       if (attempt) await sleep(1500);
       let cap = null;
-      try { cap = await callMain('get-timedtext-url', { videoId: this.videoId }); } catch { /* yoksay */ }
+      try { cap = await callMain('get-timedtext-url', { videoId: this.videoId }); } catch (e) { logError('sayfa köprüsü', e); }
       if (!cap || !cap.includes('pot=')) {
         try {
           cap = await callMain('trigger-captions', {
             videoId: this.videoId, languageCode: track.languageCode, kind: track.kind,
           }, 20000);
-        } catch { /* yoksay */ }
+        } catch (e) { logError('sayfa köprüsü', e); }
       }
       if (cap && this.alive) txt = await fetchText(sameOrigin(buildJson3Url(mergeTimedTextParams(track.baseUrl, cap), { tlang })));
     }
@@ -534,6 +554,7 @@ class Session {
     const batch = needTr.slice(0, trBatchSize(S[needTr[0]], t, { first: !this.firstBatchDone }));
     const gen = this.trGen;
     for (const i of batch) S[i].trPending = true;
+    const tReq = performance.now();
     const res = await sendBg({
       type: 'mt.translate', sentences: batch.map((i) => S[i].text), tag: this.tag,
       restore: this.trackKind === 'asr', // otomatik altyazı: çeviri öncesi noktalama (ayar ve model açıksa)
@@ -550,6 +571,7 @@ class Session {
     }
     batch.forEach((i, k) => { S[i].tr = String(res.result[k] ?? '').trim(); });
     this.firstBatchDone = true;
+    if (this.timing.trReqMs == null) this.timing.trReqMs = Math.round(performance.now() - tReq); // ilk çeviri isteğinin süresi
     this._mark('firstTr');
     this._wakeUp(); // seslendirme döngüsü yeni çeviriyi beklemesin
     return true;
@@ -560,7 +582,9 @@ class Session {
     const t = this.video.currentTime;
     const needAu = windowIndices(this.sentences, t, settings.lookaheadSec, (s) => s.tr && !s.audio && !s.auPending && !s.auFailed);
     if (needAu.length) {
+      const tSyn = performance.now();
       await this.synth(needAu[0]);
+      if (this.timing.synthMs == null) this.timing.synthMs = Math.round(performance.now() - tSyn); // ilk sentezin süresi
       this._mark('firstAudio');
       this._prewarmVoices();
       return true;
@@ -680,7 +704,8 @@ class Session {
     const primary = chooseVoice(this._eff(), { gender: voiceGender(settings, settings.voice || DEFAULT_VOICE) });
     for (const g of ['female', 'male']) {
       const v = genderVoice(settings, g);
-      if (v && v !== primary) sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: v, speed: 1, tone: toneFor(settings, v), tag: this.tag }).catch(() => {});
+      if (v && v !== primary) sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: v, speed: 1, tone: toneFor(settings, v), tag: this.tag })
+        .then((r) => { if (r && !r.ok && r.code !== 'ABORTED') logError('ses ısıtma', r.error); }).catch((e) => logError('ses ısıtma', e));
     }
   }
 
@@ -696,7 +721,7 @@ class Session {
         if (s.start > t + settings.lookaheadSec) break;
         if (s.spk || s.end < t - 1 || now - (s.spkTry || 0) < 1500) continue;
         let sp = null;
-        try { sp = sep.speechAt(s.start, s.end); } catch { sp = null; }
+        try { sp = sep.speechAt(s.start, s.end); } catch (e) { sp = null; logError('ayırma konuşma izi', e); }
         const pcm = sp && toMono16k(sp);
         if (!pcm) { s.spkTry = now; continue; }
         this._embed(s, pcm, 'ayırma');
@@ -1158,7 +1183,8 @@ export async function start() {
     if (msg?.type === 'diag.separation') {
       const sp = session?.separation;
       const { cachedRanges, message, ...st } = sp?.state || {};
-      respond(sp ? { ...st, lastError: sp.error?.message || (st.status === 'error' ? message : session._sepLastError) || '' } : { off: true });
+      const memory = session?.memoryInfo(); // ayırma kapalıyken de cümle sesi sayıları görünür
+      respond(sp ? { ...st, lastError: sp.error?.message || (st.status === 'error' ? message : session._sepLastError) || '', memory } : { off: true, memory });
     }
   });
   document.addEventListener('yt-navigate-finish', () => route());

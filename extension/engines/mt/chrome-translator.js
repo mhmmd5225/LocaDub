@@ -27,7 +27,7 @@ export async function availability() {
       globalThis.Translator.availability(LANGS),
       new Promise((resolve) => setTimeout(resolve, 4000, 'unavailable')),
     ]);
-  } catch {
+  } catch { // günlüğe yazılmaz: "kullanılamıyor" durumu arayüzde gösterilir
     return 'unavailable';
   }
 }

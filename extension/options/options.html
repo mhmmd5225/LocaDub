@@ -253,6 +253,17 @@
           <summary>Kopyalanacak bilgiyi göster</summary>
           <pre id="diagText"></pre>
         </details>
+        <details class="diag" id="benchBlock">
+          <summary>Hız testi</summary>
+          <small class="hint" id="benchHelp">Bu cihazda ses ayırma (WebGPU / işlemci, toplu boyutları), seslendirme ve çeviri hızını ölçer; GPU'da bir dakikadan kısa, işlemcide 2–3 dakika sürebilir.
+            Ses ayırma modeli indirilmemişse indirilir (67 MB, hafif model 30 MB). Sonuç Tanılama raporuna da eklenir.</small>
+          <div class="diagrow">
+            <button type="button" id="benchRun">Testi başlat</button>
+            <button type="button" id="benchCopy" hidden>Sonucu kopyala</button>
+            <span class="note" id="benchNote" role="status"></span>
+          </div>
+          <pre id="benchOut" class="benchout" hidden></pre>
+        </details>
       </div>
 
       <div class="group" id="mockRow" hidden>

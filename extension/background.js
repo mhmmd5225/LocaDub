@@ -1,7 +1,7 @@
 // Service worker: offscreen yönetimi, mesaj yönlendirme, ilerleme yayını, chrome.tts (sistem sesi).
 
 import { getSettings } from './common/settings.js';
-import { VERSION_URL } from './common/version.js';
+import { checkSources } from './common/version.js';
 import { pushError } from './common/diagnostics.js';
 
 const OFFSCREEN_URL = 'offscreen.html';
@@ -170,14 +170,17 @@ const UPDATE_PERIOD_MIN = 12 * 60;
 async function checkUpdate() {
   if (!(await getSettings()).checkUpdates) return null;
   try {
-    const res = await fetch(VERSION_URL, { cache: 'no-store', credentials: 'omit' });
-    if (!res.ok) return null;
-    const j = await res.json();
-    const latest = { version: String(j.version || ''), bytes: Number(j.bytes) || 0 };
+    // iki kaynak (asıl adres + GitHub Pages) paralel; en yeni sürüm ve onun indirme adresi kazanır
+    const latest = await checkSources(async (url) => {
+      const res = await fetch(url, { cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    });
+    if (!latest) return null; // iki kaynak da yanıt vermedi (çevrimdışı): sessizce geç
     await chrome.storage.local.set({ update: { latest, checkedAt: Date.now() } });
     return latest;
   } catch {
-    return null; // çevrimdışı: sessizce geç
+    return null; // sessiz: depolama yazılamadı
   }
 }
 

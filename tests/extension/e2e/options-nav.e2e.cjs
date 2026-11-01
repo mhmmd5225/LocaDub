@@ -215,6 +215,24 @@ const overflow = (page) => page.evaluate(() => {
     await page.waitForFunction(() => !/hazırlanıyor/i.test(document.getElementById('styleNote').textContent), null, { timeout: 15000 });
     assert.ok(!/çalınamadı/.test(await page.textContent('#styleNote')), await page.textContent('#styleNote'));
 
+    // Hız testi: test motorunda üç aşama da çalışır, sonuç görünür, kopyalama düğmesi açılır, rapora yazılır
+    await opt.evaluate(() => chrome.storage.local.set({ engineMode: 'mock', modelsApproved: true, voice: null, benchLast: null }));
+    await page.goto(url('', '#diger'));
+    await page.waitForSelector('#benchBlock');
+    assert.equal(await page.isVisible('#benchRun'), false, 'hız testi katlanmış gelir');
+    await page.click('#benchBlock summary');
+    await page.click('#benchRun');
+    await page.waitForSelector('#benchOut:not([hidden])', { timeout: 60000 });
+    const bench = await page.textContent('#benchOut');
+    assert.match(bench, /ses ayırma:/, bench);
+    assert.match(bench, /seslendirme:/, bench);
+    assert.match(bench, /çeviri: 8 cümle/, bench);
+    assert.equal(await page.isHidden('#benchCopy'), false);
+    assert.equal(await page.isDisabled('#benchRun'), false);
+    await page.waitForFunction(() => chrome.storage.local.get('benchLast').then((s) => s.benchLast?.lines?.length >= 3));
+    await page.click('.diag:not(#benchBlock) summary');
+    await page.waitForFunction(() => /\[Hız testi \(/.test(document.getElementById('diagText').textContent), null, { timeout: 15000 });
+
     // (4) konsolda hata yok
     assert.deepEqual(problems, [], 'konsol/pageerror: ' + problems.join(' | '));
     console.log('ok — options-nav');

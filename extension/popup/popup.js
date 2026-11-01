@@ -3,6 +3,8 @@
 import { getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
 import { DOWNLOAD_URL, INSTALL_URL, updateFrom } from '../common/version.js';
 
+let shownUpdate = null; // renderUpdate'in gösterdiği güncelleme (indirme / kurulum bağlantıları kaynağa göre)
+
 const $ = (id) => document.getElementById(id);
 let settings = await getSettings();
 let lists = null; // engine.list sonucu (model adları için)
@@ -30,12 +32,13 @@ async function renderUpdate() {
   const { update, updateDismissed } = await chrome.storage.local.get(['update', 'updateDismissed']);
   const u = settings.checkUpdates ? updateFrom(update?.latest, chrome.runtime.getManifest().version) : null;
   $('update').hidden = !u || updateDismissed === u.version;
+  shownUpdate = u;
   if (u) $('updateTitle').textContent = `Yeni sürüm: LocaDub ${u.version}${u.sizeMB ? ` (${u.sizeMB} MB)` : ''}`;
   return update;
 }
 
-$('updateDownload').addEventListener('click', () => chrome.tabs.create({ url: DOWNLOAD_URL }));
-$('updateHow').addEventListener('click', () => chrome.tabs.create({ url: INSTALL_URL }));
+$('updateDownload').addEventListener('click', () => chrome.tabs.create({ url: shownUpdate?.downloadUrl || DOWNLOAD_URL }));
+$('updateHow').addEventListener('click', () => chrome.tabs.create({ url: shownUpdate?.installUrl || INSTALL_URL }));
 $('updateLater').addEventListener('click', async () => {
   const { update } = await chrome.storage.local.get('update');
   await chrome.storage.local.set({ updateDismissed: update?.latest?.version || null });
@@ -148,7 +151,7 @@ async function loadSystemVoices() {
   try {
     const all = await chrome.tts.getVoices();
     systemVoices = all.filter((v) => v.lang && /^tr\b/i.test(v.lang)).map((v) => ({ voiceName: v.voiceName, remote: !!v.remote }));
-  } catch {
+  } catch { // günlüğe yazılmaz: liste boş görünür (beklenen)
     systemVoices = [];
   }
 }

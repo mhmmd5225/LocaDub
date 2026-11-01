@@ -46,7 +46,7 @@ async function probeOk(page, after, what) {
 }
 
 (async () => {
-  const { ctx } = await launch({ videos, mse: true, settings: { prebufferSec: 5, holdStart: false } });
+  const { ctx, opt } = await launch({ videos, mse: true, settings: { prebufferSec: 5, holdStart: false } });
   try {
     const page = await ctx.newPage();
     const logs = [];
@@ -107,6 +107,13 @@ async function probeOk(page, after, what) {
     if (process.env.VERBOSE) console.log(logs.join('\n'));
     assert.equal(s4.streaming, true, 'akış kipi değil');
     for (const k of ['etaSec', 'needSec', 'holds', 'holdMs', 'batch', 'chunkSec', 'streaming']) assert.ok(k in s4, 'durum alanı yok: ' + k);
+    // tanılama: bellek özeti (paketler, PCM, cümle sesi) açık YouTube sekmesinden gelir
+    const diag = await opt.evaluate(() => chrome.runtime.sendMessage({ type: 'diag.separation' }));
+    const mem = diag?.result?.memory;
+    assert.ok(diag?.ok && mem, 'bellek özeti yok: ' + JSON.stringify(diag));
+    assert.ok(mem.packetBytes > 0 && mem.packets > 0, 'paket baytı yok: ' + JSON.stringify(mem));
+    assert.ok(mem.pcmBytes > 0 && mem.sepSec > 0 && mem.origSec > 0, 'PCM sayacı yok: ' + JSON.stringify(mem));
+    assert.ok(mem.sentences >= 0 && mem.blobs >= 0, JSON.stringify(mem));
     console.log('ok — separation', JSON.stringify(p4), 'yeniden eşitleme', s4.resyncs, 'rtf', s4.rtf);
   } finally {
     await ctx.close();

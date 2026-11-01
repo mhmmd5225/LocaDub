@@ -23,6 +23,7 @@
 
 import { audioContext, videoGraph } from './player.js';
 import { callMain } from './bridge.js';
+import { logError } from '../common/errlog.js';
 import { createDemuxer } from './sep-demux.js';
 import {
   SEP, PacketStore, PcmTimeline, HoldGate, DriftMeter, planNext, runJob, aheadOf, committedEnd, rangeAt, windowFor, bestLag,
@@ -188,7 +189,7 @@ function planes(ad) {
       ad.copyTo(a, { planeIndex: c, format: 'f32-planar' });
       out.push(a);
     }
-  } catch {
+  } catch { // günlüğe yazılmaz: beklenen yedek yol (planar kopya desteklenmiyorsa ara değerlemeli kopya)
     out.length = 0;
     const inter = new Float32Array(n * ch);
     ad.copyTo(inter, { planeIndex: 0, format: 'f32' });
@@ -320,6 +321,19 @@ export class SeparatedAudio extends EventTarget {
     };
   }
 
+  /** Bellek özeti (tanılama): kodlanmış paketler, ayrılmış / orijinal PCM (bayt ve saniye). */
+  memoryInfo() {
+    let packetBytes = 0, packets = 0;
+    for (const src of this.sources.values()) { packetBytes += src.store.bytes; packets += src.store.size; }
+    const secOf = (tl) => (tl ? tl.rangesSec().reduce((n, [a, b]) => n + (b - a), 0) : 0);
+    return {
+      packetBytes, packets,
+      pcmBytes: (this.sep?.bytes || 0) + (this.orig?.bytes || 0),
+      sepSec: Math.round(secOf(this.sep) * 10) / 10,
+      origSec: Math.round(secOf(this.orig) * 10) / 10,
+    };
+  }
+
   /** Temiz konuşma (orijinal − eşlik) [t0, t1) için; sınıf başlığına bakın. */
   speechAt(t0, t1) {
     if (!this.sep || !this.orig || !(t1 > t0)) return null;
@@ -346,7 +360,7 @@ export class SeparatedAudio extends EventTarget {
       // bekletme sırasında kullanıcı oynattı: bekletme biter, ayırma yeniden yetişene dek video durdurulmaz
       if (this._hold.active && !this._hold.resuming) { this.gate.userOverride(); this._hold.ours = false; this._releaseHold(); }
     });
-    callMain('sep-subscribe').catch(() => {});
+    callMain('sep-subscribe').catch((e) => logError('ses yakalama (köprü)', e));
     const h = sepHost();
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
@@ -355,6 +369,7 @@ export class SeparatedAudio extends EventTarget {
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
+        if (info.fallbackReason) logError('ayırma (WebGPU)', info.fallbackReason); // sessiz yedeğe düşme görünür olsun
         this.model = info.model || null;
         if (Number.isFinite(info.contextSec)) this.ctxSec = Math.min(3, Math.max(0, info.contextSec));
         this.batch = Math.max(1, Number(info.batch) || 1);

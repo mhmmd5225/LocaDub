@@ -67,6 +67,7 @@ export function createSeparator(opts = {}) {
   let ort = opts.ort || null;
   let session = opts.session || null;
   let backend = session ? opts.backend || 'custom' : null;
+  let fallbackReason = null; // WebGPU kurulamayıp yedeğe düşüldüyse nedeni (tanılama: worker 'loaded' → içerik betiği)
   let loading = null;
   let queue = Promise.resolve();
   let stream = null;
@@ -135,11 +136,12 @@ export function createSeparator(opts = {}) {
           if (!wantBatch && DEFAULT_BATCH.webgpu > 1) {
             // toplu çalıştırma GPU belleğine sığmadıysa tek pencereyle (çıktı aynı, yalnızca daha yavaş)
             console.warn('[sep] WebGPU toplu çalıştırma kurulamadı, batch 1 deneniyor', e);
-            try { await open(be, 1); ok = true; } catch { session = null; }
+            try { await open(be, 1); ok = true; fallbackReason = `WebGPU toplu çalıştırma kurulamadı (batch 1 kullanılıyor): ${String(e?.message || e).slice(0, 160)}`; } catch { session = null; }
           }
           if (!ok) {
             console.warn('[sep] WebGPU oturumu kurulamadı, WASM deneniyor', e);
             be = 'wasm';
+            fallbackReason = `WebGPU kurulamadı, işlemci (WASM) kullanılıyor: ${String(e?.message || e).slice(0, 160)}`;
             if (autoModel) { model = sepModelById(WASM_SEP_MODEL); bytes = await modelBytes(); }
             await open(be, wantBatch || DEFAULT_BATCH.wasm);
           }
@@ -415,6 +417,7 @@ export function createSeparator(opts = {}) {
   return {
     get model() { return model; },
     get backend() { return backend; },
+    get fallbackReason() { return fallbackReason; },
     get batch() { return batch; },
     get overlap() { return overlap; },
     contextSec: CONTEXT_SEC,

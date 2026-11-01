@@ -4,7 +4,7 @@
 //       model: models.js kimliği ya da 'auto' (varsayılan): WebGPU'da kim-vocal-2, WASM'da mdxnet-lite
 //       batch: bir model çalıştırmasındaki pencere (yoksa WebGPU 4, WASM 1; çıktıyı değiştirmez)
 //   ← { type:'progress', id, loaded, total }*   (yalnızca indirme sırasında)
-//   ← { type:'loaded', id, backend, model, contextSec, chunkSec, stepSec, batch, overlap, streaming:true }
+//   ← { type:'loaded', id, backend, model, contextSec, chunkSec, stepSec, batch, overlap, streaming:true, fallbackReason }
 //       chunkSec: model penceresi (5.92 sn), stepSec: akış ızgarasının adımı  |  { type:'error', id, message }
 //   → { type:'process', id, left, right?, sampleRate, startSample?, final?, reset? }   (buffer'ları transfer edin)
 //       startSample verilirse akış kipi (separator.js başı): yalnızca kesinleşen aralık döner
@@ -76,7 +76,7 @@ self.onmessage = (ev) => {
         const s = await load(msg);
         self.postMessage({
           type: 'loaded', id, backend: s.backend, model: s.model.id, contextSec: s.contextSec, chunkSec: s.chunkSec,
-          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true,
+          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null,
         });
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');

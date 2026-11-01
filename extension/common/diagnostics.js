@@ -1,7 +1,7 @@
 // Tanılama: son hatalar (halka tampon) ve kullanıcının sorun bildirirken kopyalayacağı rapor (saf; node testleriyle sınanır).
 // Gizlilik: rapora video kimliği, YouTube adresi, altyazı ya da çeviri metni girmez; sözlükten yalnızca kural sayısı.
 
-export const MAX_ERRORS = 10;
+export const MAX_ERRORS = 50;
 
 // YouTube adreslerini ve video kimliklerini siler; model (HuggingFace) adresleri kalır.
 export function scrub(text) {
@@ -11,15 +11,20 @@ export function scrub(text) {
     .slice(0, 500);
 }
 
-/** Yeni hatayı ekler (ardışık aynı hata sayılır), en fazla MAX_ERRORS kayıt döner. */
+/**
+ * Yeni hatayı ekler: aynı (kaynak, ileti) daha önce varsa (ardışık olmasa da) tek kayıtta sayılır ve en sona alınır;
+ * en fazla MAX_ERRORS kayıt döner.
+ */
 export function pushError(list, { source, message, at = Date.now() }) {
   const msg = scrub(message);
+  const src = String(source || '?');
   const out = Array.isArray(list) ? list.slice() : [];
-  const last = out[out.length - 1];
-  if (last && last.source === source && last.message === msg) {
-    out[out.length - 1] = { ...last, at, count: (last.count || 1) + 1 };
+  const i = out.findIndex((e) => e.source === src && e.message === msg);
+  if (i >= 0) {
+    const [prev] = out.splice(i, 1);
+    out.push({ ...prev, at, count: (prev.count || 1) + 1 });
   } else {
-    out.push({ at, source: String(source || '?'), message: msg });
+    out.push({ at, source: src, message: msg });
   }
   return out.slice(-MAX_ERRORS);
 }
@@ -54,10 +59,30 @@ export function separationLines(sep) {
   return [a.join(' · '), b.join(' · '), c.join(' · ')];
 }
 
+const mb = (b) => `${(b / 1048576).toFixed(1)} MB`;
+
+/**
+ * [Bellek] satırları. sep: diag.separation cevabı (kapalıyken de { off, memory }); memory: { sentences, blobs, audioSec, heapMB,
+ * packetBytes, packets, pcmBytes, sepSec, origSec } (ayırma alanları yalnız ayırma varken).
+ */
+export function memoryLines(sep) {
+  const m = sep?.memory;
+  if (!m) return ['yok (açık YouTube sekmesi yok)'];
+  const a = [];
+  if (num(m.heapMB) != null) a.push(`JS yığını: ${m.heapMB} MB`);
+  a.push(`cümle: ${m.sentences ?? 0}`, `cümle sesi: ${m.blobs ?? 0} blob, ${sn(m.audioSec || 0)} sn`);
+  const L = [a.join(' · ')];
+  if (num(m.packetBytes) != null) {
+    L.push([`ayırma paketleri: ${mb(m.packetBytes)} (${m.packets ?? 0} paket)`, `ayrılmış PCM: ${sn(m.sepSec || 0)} sn`,
+      `orijinal PCM: ${sn(m.origSec || 0)} sn`, `PCM belleği: ${mb(m.pcmBytes || 0)}`].join(' · '));
+  }
+  return L;
+}
+
 /**
  * @param {{ version:string, browser:string, platform:string, settings:object, status?:object,
  *           models?:{ name:string, sizeMB:number }[], errors?:object[], glossary?:{ mt:number, tts:number },
- *           timings?:{ at:number, line:string }[], separation?:object|null,
+ *           timings?:{ at:number, line:string }[], separation?:object|null, bench?:string[], benchAt?:number,
  *           now?:number }} d
  */
 export function buildReport(d) {
@@ -77,6 +102,8 @@ export function buildReport(d) {
     L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU: ${!!st.webgpu} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
+  L.push('', '[Bellek]', ...memoryLines(d.separation));
+  if (d.bench?.length) L.push('', `[Hız testi${d.benchAt != null ? ` (${iso(d.benchAt)})` : ''}]`, ...d.bench.map((l) => scrub(String(l))));
   L.push('', '[İndirilen modeller]');
   if (!d.models?.length) L.push('yok');
   for (const m of d.models || []) L.push(`${m.name}: ${m.sizeMB.toFixed(1)} MB`);

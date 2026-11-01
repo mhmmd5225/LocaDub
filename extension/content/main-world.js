@@ -4,6 +4,7 @@
 // - gerekirse altyazı modülünü kısa süre açıp belirteçli URL ürettirme
 (() => {
   'use strict';
+  // Bu dosyadaki sessiz `catch`'ler bilerek: sayfa dünyası kancaları sayfayı asla bozmamalı; eklenti API'si de yok (hata günlüğü yok).
   if (window.__ytTrDubMain) return;
   window.__ytTrDubMain = true;
 

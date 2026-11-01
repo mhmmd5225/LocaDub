@@ -20,7 +20,7 @@ const videos = { [VID]: [
     const errors = [];
     page.on('console', (m) => { if (/hatası|error/i.test(m.text())) errors.push(m.text()); });
     await page.goto(`https://www.youtube.com/watch?v=${VID}`);
-    await page.evaluate(() => document.querySelector('video').play());
+    await page.evaluate(() => document.querySelector('video').play().catch(() => {})); // bekletme play()'i kesebilir
     await page.waitForFunction(() => /\[TR\] Then/.test(document.querySelector('.yt-tr-dub-sub')?.textContent || ''), null, { timeout: 40000 });
     await page.close();
     await opt.waitForTimeout(500);

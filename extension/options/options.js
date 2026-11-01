@@ -10,6 +10,8 @@ import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 import { parseGlossary } from '../common/glossary.js';
 import { buildReport } from '../common/diagnostics.js';
+import { runBench, formatBench } from '../common/bench.js';
+import { createSepClient } from '../engines/sep/client.js';
 
 const $ = (id) => document.getElementById(id);
 let settings = await getSettings();
@@ -721,7 +723,7 @@ async function loadSystemVoices() {
     const voices = await chrome.tts.getVoices();
     return voices.filter((v) => v.lang && /^tr\b/i.test(v.lang)).map((v) => ({ voiceName: v.voiceName, remote: !!v.remote }));
   } catch {
-    return [];
+    return []; // günlüğe yazılmaz: sistem sesi listesi yok = liste boş görünür (beklenen)
   }
 }
 
@@ -824,8 +826,9 @@ async function browserInfo() {
 }
 
 async function diagnosticsReport() {
-  const [status, errors, timings, info, sep] = await Promise.all([
+  const [status, errors, timings, info, sep, benchSaved] = await Promise.all([
     bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), bg({ type: 'diag.timings' }), browserInfo(), bg({ type: 'diag.separation' }),
+    chrome.storage.local.get('benchLast').then((o) => o.benchLast).catch(() => null),
   ]);
   const models = [];
   const seen = new Set();
@@ -842,7 +845,7 @@ async function diagnosticsReport() {
   return buildReport({
     version: chrome.runtime.getManifest().version, ...info, settings,
     status: status.ok ? status.result : null, separation: sep.ok ? sep.result : null, models, errors: errors.ok ? errors.result : [],
-    timings: timings.ok ? timings.result : [],
+    timings: timings.ok ? timings.result : [], bench: benchSaved?.lines, benchAt: benchSaved?.at,
     glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
   });
 }
@@ -853,13 +856,75 @@ $('copyDiag').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(text);
     $('diagNote').textContent = 'Kopyalandı.';
-  } catch {
+  } catch { // günlüğe yazılmaz: kendi arayüz bildirimi var
     $('diagNote').textContent = 'Kopyalanamadı; aşağıdaki metni elle seçip kopyalayın.';
     document.querySelector('.diag').open = true;
   }
 });
 document.querySelector('.diag').addEventListener('toggle', async (e) => {
   if (e.target.open) $('diagText').textContent = await diagnosticsReport();
+});
+
+// ---------- Hız testi ----------
+// common/bench.js: ayırma (bu sayfada işçi olarak, WebGPU erişimi var), seslendirme ve çeviri arka plan motorlarından.
+
+let benchRunning = false;
+let benchText = '';
+
+async function startBench() {
+  if (benchRunning) return;
+  benchRunning = true;
+  const btn = $('benchRun');
+  btn.disabled = true;
+  $('benchCopy').hidden = true;
+  $('benchOut').hidden = true;
+  const note = (t) => { $('benchNote').textContent = t; };
+  try {
+    const voice = effectiveVoiceId();
+    const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
+    const result = await runBench({
+      sep: { createClient: () => createSepClient({ mock: isMock() }) },
+      tts: {
+        synth: async (text) => {
+          if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };
+          const t0 = performance.now();
+          const res = await bg({ type: 'tts.synthesize', text, voice, speed: 1, tone, tag: 'bench' });
+          if (!res.ok) throw new Error(res.error || 'Seslendirilemedi');
+          const { samples, sampleRate } = res.result;
+          return { ms: performance.now() - t0, audioSec: samples / sampleRate };
+        },
+      },
+      mt: {
+        translate: async (sentences) => {
+          const res = await bg({ type: 'mt.translate', sentences, tag: 'bench' });
+          if (!res.ok) throw new Error(res.error || 'Çevrilemedi');
+        },
+      },
+      onStep: note,
+    });
+    const lines = formatBench(result);
+    benchText = lines.join('\n');
+    $('benchOut').textContent = benchText;
+    $('benchOut').hidden = false;
+    $('benchCopy').hidden = false;
+    note('Bitti.');
+    chrome.storage.local.set({ benchLast: { at: result.at, lines } }).catch(() => {});
+  } catch (e) {
+    note(`Hız testi başarısız: ${e?.message || e}`);
+  } finally {
+    benchRunning = false;
+    btn.disabled = false;
+  }
+}
+
+$('benchRun').addEventListener('click', startBench);
+$('benchCopy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(benchText);
+    $('benchNote').textContent = 'Kopyalandı.';
+  } catch { // günlüğe yazılmaz: kendi arayüz bildirimi var
+    $('benchNote').textContent = 'Kopyalanamadı; metni elle seçip kopyalayın.';
+  }
 });
 
 // ---------- Başlat ----------

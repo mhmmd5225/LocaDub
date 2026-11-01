@@ -47,8 +47,9 @@ Karşılaştırma: [docs/TTS-KIYAS.md](../docs/TTS-KIYAS.md).
 temizleme. **Seslendirme**: ses seçimi, konuşma hızı, dublaj ve orijinal ses seviyesi, konuşmacılara farklı ses.
 **AI Model**: çeviri motoru (Otomatik / OPUS-MT / Chrome çevirmeni), noktalama düzeltme. **Diğer**: Türkçe altyazı,
 sürüm denetimi, önceden hazırlama süresi, ilk cümleye kadar bekletme, sözlük, **Tanılama bilgisini kopyala** (sürümler, ayarlar, motorlar,
-indirilen modeller ve son 10 hata; video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), varsayılana
-döndürme. Motor/model hatası olursa menü çubuğunun altında bir şerit görünür. Test motoru yalnızca `options.html#gelistirici`
+indirilen modeller ve son 50 hata (aynı hata tek satırda sayılır; `common/errlog.js`); video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), **Hız testi**
+(bu cihazda ses ayırmanın WebGPU/WASM hızı ve toplu boyutları, seslendirme ve çeviri hızı; sonuç rapora `[Hız testi]` olarak eklenir —
+`common/bench.js`), varsayılana döndürme. Motor/model hatası olursa menü çubuğunun altında bir şerit görünür. Test motoru yalnızca `options.html#gelistirici`
 ya da `?dev=1` ile (veya motor zaten test modundaysa) "Diğer" menüsünde görünür.
 
 Ayarlar (`chrome.storage.local`):
@@ -71,7 +72,7 @@ Ayarlar (`chrome.storage.local`):
 | Türkçe altyazı | Oynatıcı üzerinde overlay |
 | Önceden hazırlama | Videonun ne kadar ilerisinin önceden çevrilip seslendirileceği (10–120 sn) |
 | İlk cümle hazır olana kadar videoyu beklet | Varsayılan açık (`holdStart`). Dublaj açılınca video, yakındaki (8 sn) ilk cümlenin sesi hazır olana kadar duraklatılır, sonra kendiliğinden sürer (en fazla 25 sn; Oynat'a basınca beklemeden devam eder, reklamda bekletilmez). Böylece motorlar yüklenirken baştaki cümleler atlanmaz |
-| Yeni sürümleri denetle | Günde iki kez `https://localdub.mhmmd.app/version.json` okunur (yalnızca bu dosya); kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
+| Yeni sürümleri denetle | Günde iki kez iki adresteki `version.json` okunur (yalnızca bu dosya): `https://localdub.mhmmd.app/` ve yedek olarak GitHub Pages `https://mhmmd5225.github.io/LocaDub/` (asıl adres eskide kalsa da şerit çalışsın; `common/version.js`). En yeni sürümü veren adres kazanır, İndir / Nasıl? bağlantıları o adrestir. Kurulu sürümden yeniyse açılır pencerede "Yeni sürüm" şeridi (İndir / Nasıl? / Sonra) |
 | Otomatik altyazıda noktalama | İsteğe bağlı model (Ayarlar → İndirme, 210 MB, HuggingFace): YouTube'un otomatik (küçük harfli, noktasız) altyazısına çeviriden önce noktalama ve büyük harf ekler; kıyasta chrF 51.1 → 53.1 (`engines/mt/punct.js`, `restore-engine.js`; `docs/MT-KIYAS.md`). Elle yazılmış altyazıya dokunmaz; indirme bitince kendiliğinden açılır |
 | Gerçek dublaj (ses ayırma) | Varsayılan Otomatik (`separation: 'auto' \| 'off'`). Orijinal sesten konuşma bir ayırma modeliyle çıkarılır; video boyunca yalnızca müzik + efekt çalar, Türkçe dublaj üstüne. Ayrıntı: aşağıda "Gerçek dublaj". Açıkken "Orijinal ses" (ducking) ayarı etkisizdir: konuşma zaten yoktur, müzik kısılmaz |
 | Ön tampon | `prebufferSec` (5–60, varsayılan 20): dublaj başlarken video en çok bu kadar saniye bekletilir ve bu kadar saniyelik ses önceden ayrılır |
@@ -206,6 +207,13 @@ xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punc
 
 **Sürüm yayınlama:** `manifest.json` → `version` artırılıp `main`'e birleştirilince site yeni ZIP'i ve
 `version.json`'ı yayınlar; kurulu eklentiler 12 saat içinde şeridi gösterir.
+
+## Belgeler
+
+- Ses ayırma (gerçek dublaj): [docs/SES-AYIRMA.md](../docs/SES-AYIRMA.md)
+- Konuşmacı tanıma ile kadın/erkek sesi (ölçüm): [docs/KONUSMACI-TANIMA.md](../docs/KONUSMACI-TANIMA.md)
+- Performans ve stabilite raporu: [docs/PERFORMANS-RAPORU.md](../docs/PERFORMANS-RAPORU.md)
+- Yol haritası: [docs/YOL-HARITASI.md](../docs/YOL-HARITASI.md)
 
 ## Bilinen sınırlamalar
 

@@ -18,7 +18,7 @@ const RETRY_MS = 60000;
 export async function isPunctDownloaded() {
   try {
     return (await Promise.all(PUNCT_MODEL.files.map((f) => isCached(punctUrl(f.name))))).every(Boolean);
-  } catch {
+  } catch { // günlüğe yazılmaz: "indirilmemiş" sayılır
     return false;
   }
 }
