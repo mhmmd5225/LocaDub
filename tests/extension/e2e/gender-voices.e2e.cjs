@@ -15,7 +15,7 @@ const videos = { [VID]: CLIPS.map((c, i) => ({ t: i * 3000 + 200, d: 2600, text:
 async function separationOff() {
   const { ctx } = await launch({
     videos, mse: clipsMse(CLIPS),
-    settings: { voice: 'mock-beep', holdStart: false, separation: 'off', genderVoices: true, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-silent' } },
+    settings: { voice: 'mock-beep', holdStart: false, separation: 'off', genderVoices: true, matchVoices: false, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-silent' } },
   });
   try {
     const page = await ctx.newPage();
@@ -37,7 +37,7 @@ async function separationOff() {
   await separationOff();
   const { ctx } = await launch({
     videos, mse: clipsMse(CLIPS),
-    settings: { voice: 'mock-beep', holdStart: false, prebufferSec: 5, genderVoices: true, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-silent' } },
+    settings: { voice: 'mock-beep', holdStart: false, prebufferSec: 5, genderVoices: true, matchVoices: false, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-silent' } },
   });
   try {
     const page = await ctx.newPage();

@@ -18,6 +18,8 @@ export const DEFAULTS = Object.freeze({
   voiceBlend: null,        // ses karıştırma (yalnızca Supertonic): { with: 'F1'…'M5', amount: 0…0.9 } | null
   genderVoices: true,      // konuşanın cinsiyetine göre kadın / erkek sesi (konuşmacı tanıma, content/gender.js + engines/spk);
                            // yalnız ses ayırma çalışırken etkindir (temiz konuşmada isabet yeterli), ayırma yokken tek ses
+  matchVoices: true,       // konuşmacıya benzeyen ses: her konuşmacıya perdesine en yakın indirilmiş ses (+ küçük perde ayarı,
+                           // common/voice-match.js); yalnız konuşmacı tanıma çalışırken, favori seslerin yerine
   favFemale: null,         // favori kadın sesi ve tonu: { voice, style, pitch } | null (otomatik seçimde öncelikli)
   favMale: null,           // favori erkek sesi ve tonu
   glossaryMt: '',          // çeviri düzeltmeleri ("yanlış => doğru" satırları, common/glossary.js)
@@ -70,6 +72,7 @@ export function normalizeSettings(raw = {}) {
   s.quality = normalizeQuality(s.quality);
   s.voiceBlend = normalizeBlend(s.voiceBlend);
   s.genderVoices = !!s.genderVoices;
+  s.matchVoices = !!s.matchVoices;
   s.favFemale = normalizeFavorite(s.favFemale, 'female');
   s.favMale = normalizeFavorite(s.favMale, 'male');
   s.speakerCount = clamp(Math.round(Number(s.speakerCount)) || 2, ...LIMITS.speakerCount);

@@ -15,6 +15,7 @@ export const VOICES = [
     id: 'antalia-mini',
     label: 'Antalia Mini (erkek, hızlı)',
     gender: 'male',
+    f0: 132, // ortanca perde, Hz (tools/voice-match.mjs; konuşmacıya benzeyen ses)
     license: 'Apache-2.0',
     model: 'antalia',
     sampleRate: 48000,
@@ -33,6 +34,7 @@ export const VOICES = [
     id: 'ahenk-cep',
     label: 'Ahenk Cep (kadın)',
     gender: 'female',
+    f0: 222, // ortanca perde, Hz (tools/voice-match.mjs; konuşmacıya benzeyen ses)
     license: 'CC-BY-4.0',
     model: 'ahenk',
     sampleRate: 48000,
@@ -53,6 +55,7 @@ export const VOICES = [
     id: 'ema-lightning',
     label: 'EMA Lightning (kadın)',
     gender: 'female',
+    f0: 249, // ortanca perde, Hz (tools/voice-match.mjs; konuşmacıya benzeyen ses)
     license: 'Apache-2.0',
     model: 'ema',
     sampleRate: 48000,
@@ -77,6 +80,8 @@ const SUPERTONIC_FP32 = 'https://huggingface.co/Supertone/supertonic-3/resolve/3
  * (published: https://huggingface.co/teknikkent/supertonic-3-int8); null falls back to the official fp32 files.
  */
 export const SUPERTONIC_INT8 = { repo: 'teknikkent/supertonic-3-int8', rev: '605d35c25d57eca4749939b85f16a24aa83e4561' };
+// hazır seslerin ortanca perdesi, Hz (tools/voice-match.mjs; konuşmacıya benzeyen ses)
+const SUPERTONIC_F0 = { F1: 187, F2: 210, F3: 176, F4: 198, F5: 166, M1: 140, M2: 93, M3: 111, M4: 118, M5: 88 };
 const SUPERTONIC_STYLES = {
   F1: 292046, F2: 292423, F3: 290794, F4: 291808, F5: 291479,
   M1: 291748, M2: 292055, M3: 290198, M4: 291522, M5: 291469,
@@ -124,6 +129,7 @@ for (const preset of Object.keys(SUPERTONIC_STYLES)) {
     id: `supertonic-3:${preset}`,
     label: `Supertonic ${female ? 'Kadın' : 'Erkek'} ${preset[1]}`,
     gender: female ? 'female' : 'male',
+    f0: SUPERTONIC_F0[preset],
     pack: SUPERTONIC_PACK.id,
     preset,
     license, model, sampleRate, homepage, attribution, experimental, threads, legacyPrefixes, files,
