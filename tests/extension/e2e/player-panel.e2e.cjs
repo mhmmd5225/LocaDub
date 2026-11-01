@@ -87,7 +87,7 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
   fs.mkdirSync(OUT, { recursive: true });
   const { ctx, opt } = await launch({
     videos, mse: clipsMse(CLIPS),
-    settings: { voice: 'mock-beep', holdStart: false, prebufferSec: 5, genderVoices: true, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-beep' } },
+    settings: { voice: 'mock-beep', holdStart: false, prebufferSec: 5, genderVoices: true, matchVoices: false, favMale: { voice: 'mock-beep' }, favFemale: { voice: 'mock-beep' } },
   });
   const problems = [];
   try {
