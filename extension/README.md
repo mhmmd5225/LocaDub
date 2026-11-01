@@ -207,6 +207,13 @@ xvfb-run -a node tests/extension/e2e/asr-punct.e2e.cjs   # tests/mt/.models/punc
 **Sürüm yayınlama:** `manifest.json` → `version` artırılıp `main`'e birleştirilince site yeni ZIP'i ve
 `version.json`'ı yayınlar; kurulu eklentiler 12 saat içinde şeridi gösterir.
 
+## Belgeler
+
+- Ses ayırma (gerçek dublaj): [docs/SES-AYIRMA.md](../docs/SES-AYIRMA.md)
+- Konuşmacı tanıma ile kadın/erkek sesi (ölçüm): [docs/KONUSMACI-TANIMA.md](../docs/KONUSMACI-TANIMA.md)
+- Performans ve stabilite raporu: [docs/PERFORMANS-RAPORU.md](../docs/PERFORMANS-RAPORU.md)
+- Yol haritası: [docs/YOL-HARITASI.md](../docs/YOL-HARITASI.md)
+
 ## Bilinen sınırlamalar
 
 - Desteklenen sayfalar: `www.youtube.com/watch`, Shorts (`/shorts/…`; TR düğmesi oynatıcının sağ üstünde yüzer) ve
