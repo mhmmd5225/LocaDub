@@ -49,8 +49,13 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
   indirme bağlantısı büyük sürümün geldiği adresin `LocaDub.zip`'i.
 - **Kabul:** ilk adres 0.2.1, ikincisi 0.5.2 verirse şerit 0.5.2; ikisi de yoksa sessiz. **Test:** e2e iki yanıt senaryosu + sürüm karşılaştırma birim testi.
 
-### T5. `speaker-voices` e2e kararsızlığı (S)
-- 10 kez art arda çalıştır, zaman aşımına düşen adımı bul, sabit beklemeyi koşul beklemesine çevir. **Kabul:** 10/10 geçer.
+### T5. `speaker-voices` e2e kararsızlığı (S) — **yapıldı** (kök neden gerçek bir hataydı)
+- Yük altında (6 paralel) %17 hata yeniden üretildi. Neden: başlangıç bekletmesi videoyu durdurduktan sonra gecikmeli gelen `play` olayı
+  "kullanıcı oynattı" sayılıp bekletmeyi bitiriyor, video duraklatılmış kalıyordu (kullanıcı da başta oynat/duraklat yarışında takılabilirdi).
+  Düzeltme: `content/app.js` `play` işleyicisi, video zaten duraklatılmışsa olayı yok sayar. Regresyon: `hold-start.e2e` gecikmeli `play` senaryosu
+  (düzeltmesiz kırılır). Sonuç: 24/24 geçti (önce 10/12).
+
+**Faz 1 tamam → sürüm 0.5.3.**
 
 ## FAZ 2 — Kararlılık (0.5.4)
 

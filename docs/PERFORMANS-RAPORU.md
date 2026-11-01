@@ -33,7 +33,8 @@ Bu rapor ölçülenleri, tahmin edilenleri ve koddan çıkan stabilite bulgular�
 4. **Güncelleme denetimi bozuk:** eklenti `https://localdub.mhmmd.app/version.json`'a bakıyor; orası 0.2.1'de takılı (Netlify kredi / DNS).
    Kurulu eklentiler 0.5.x güncelleme şeridini göremez. Yedek adres yok.
 5. **Servis işçisi / offscreen yeniden başlaması:** belgelerde "ilk istek zaman aşımına uğrayabilir" notu var; otomatik test yok.
-6. **Kararsız test:** `speaker-voices` e2e'si bir tam çalıştırmada bir kez zaman aşımına düştü; kök neden bulunmadı.
+6. **Kararsız test → gerçek hata (0.5.3'te düzeltildi):** `speaker-voices` e2e'si yük altında takılıyordu; neden, başlangıç bekletmesinden sonra
+   gelen gecikmeli `play` olayının bekletmeyi bitirip videoyu duraklatılmış bırakmasıydı (kullanıcı için de geçerli).
 7. **Soak testi yok:** art arda seek, reklam, SPA gezinmesi, oynatma hızı değişimi dizilerinde bellek/olay sızıntısı otomatik denenmiyor.
 8. **Bilinen sınırlar:** reklam sonrası ayırma baştan; 1x dışı hızda ayırma kapalı; DRM / canlı yayın desteklenmiyor; sentetik seslerde
    konuşmacı tutarlılığı %89; ayırma kapalıyken otomatik kadın/erkek kapalı.

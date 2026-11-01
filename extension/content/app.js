@@ -273,8 +273,10 @@ class Session {
       this.ducker.release(0);
     });
     on(v, 'play', () => {
-      // bekletme sırasında kullanıcı oynatırsa bekletme biter (videoyu ikinci kez durdurmayız)
-      if (this._hold.active && !this._hold.resuming) this._endHold();
+      // bekletme sırasında kullanıcı oynatırsa bekletme biter (videoyu ikinci kez durdurmayız). Video işleyici çalışırken
+      // zaten duraklatılmışsa bu 'play' bizim bekletmemizin durdurduğu başlangıca aittir (olay gecikmeli gelir): yok sayılır,
+      // yoksa bekletme biter ama video duraklatılmış kalır ve kimse sürdürmez.
+      if (this._hold.active && !this._hold.resuming && !v.paused) this._endHold();
       resumeAudio();
       if (this.audio.busy || this.sys.busy) {
         this.ducker.duck(settings.originalVolume);
