@@ -40,7 +40,8 @@ const MSE_SCRIPT = `(async () => {
   await Promise.all([feed('video/webm; codecs="vp8"', '/__test/mse-video', 200003), feed('audio/webm; codecs="opus"', '/__test/mse-audio', 40009)]);
   ms.endOfStream();
 })();`;
-const CONTROLS = '<div class="ytp-chrome-bottom" style="position:absolute;bottom:0;right:0"><div class="ytp-right-controls"></div></div>';
+const CONTROLS = '<div class="ytp-progress-bar" style="position:absolute;left:0;right:0;bottom:40px;height:5px;background:#444"></div>' +
+  '<div class="ytp-chrome-bottom" style="position:absolute;bottom:0;right:0"><div class="ytp-right-controls"></div></div>';
 
 function page(kind, videoId, asr, mse) {
   const pr = JSON.stringify(playerResponse(videoId, 'https://www.youtube.com', asr));

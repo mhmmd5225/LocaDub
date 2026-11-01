@@ -117,7 +117,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visi
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
 .bar-info { display: flex; align-items: baseline; gap: 10px; }
 .bar-act { display: flex; align-items: center; gap: 12px; }
-.models { display: flex; flex-direction: column; gap: 8px; }
+.bar-act button { white-space: nowrap; }
+.models { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 290px); overflow-y: auto; padding-right: 2px; scrollbar-gutter: stable; } /* çok satırlı liste kendi içinde kayar; sayfa taşmaz */
 .rows { display: contents; }
 .model {
   position: relative; overflow: hidden;

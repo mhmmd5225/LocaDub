@@ -22,6 +22,8 @@ Derleme adımı yoktur: düz ES module JavaScript.
    basın. Düğme durumu gösterir: Dublaj kapalı / Hazırlanıyor / Dublaj aktif / Dikkat / Hata.
 
 **Oynatıcı paneli** (`content/panel.js`, `panel.css`; tasarım belirteçleri `common/theme.css`): TR düğmesinin yanında,
+
+**Çubukta dublaj işaretleri** (`content/progressmarks.js`): oynatıcının ilerleme çubuğunun hemen üstünde ince şerit; seslendirilmiş bölümler yeşil (bellekten atılmış olsa da "bir kez dublajı yapıldı" sayılır), çevrilmiş ama henüz seslendirilmemiş bölümler soluk. İleri geri sararken hangi bölümlerin hazır olduğu görülür; şerit tıklamaları engellemez, YouTube denetimleriyle birlikte gizlenir.
 kontrol çubuğunun hemen üstündeki hap (Shorts'ta yüzen TR düğmesinin altında; dublaj kapalıyken yok) canlı durumu
 gösterir — hazırlık aşaması, video bekletilirken ince ilerleme çubuğu, bir dublaj
 cümlesi çalarken **şu an konuşan ses** (ad + kadın/erkek rengi + dublaj sesinden seviye dalgası) ve videodan ölçülen
@@ -45,7 +47,7 @@ Karşılaştırma: [docs/TTS-KIYAS.md](../docs/TTS-KIYAS.md).
 `#modeller`, `#ses`, `#genel`, `#sozluk`, `#depolama`, `#durum` bağlantıları eşlenir; sol/sağ ok tuşlarıyla gezilir).
 **İndirme**: OPUS-MT, Antalia, Ahenk ve noktalama modeli için İndir / Sil, toplu indirme, model ve çeviri önbelleğini
 temizleme. **Seslendirme**: ses seçimi, konuşma hızı, dublaj ve orijinal ses seviyesi, konuşmacılara farklı ses.
-**AI Model**: çeviri motoru (Otomatik / OPUS-MT / Chrome çevirmeni), noktalama düzeltme. **Diğer**: Türkçe altyazı,
+**İndirme**: tüm modeller tek listede (çeviri, sesler, konuşmacı tanıma, noktalama, ses ayırma); **Tümünü indir** eksik her modeli sırayla indirir (biri başarısız olsa da diğerleri sürer, sonda özet; sesler ve konuşmacı modeli yalnız indirilir, belleğe/GPU'ya yüklenmez), **Yalnız seçili olanları indir** kullanılanları indirir. **AI Model**: çeviri motoru (Otomatik / OPUS-MT / Chrome çevirmeni), noktalama düzeltme. **Diğer**: Türkçe altyazı,
 sürüm denetimi, önceden hazırlama süresi, ilk cümleye kadar bekletme, sözlük, **Tanılama bilgisini kopyala** (sürümler, ayarlar, motorlar,
 indirilen modeller ve son 50 hata (aynı hata tek satırda sayılır; `common/errlog.js`); video adresi, altyazı ve çeviri metni girmez — `common/diagnostics.js`), **Hız testi**
 (bu cihazda ses ayırmanın WebGPU/WASM hızı ve toplu boyutları, seslendirme ve çeviri hızı; sonuç rapora `[Hız testi]` olarak eklenir —

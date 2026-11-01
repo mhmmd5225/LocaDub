@@ -4,7 +4,9 @@
 import { DEFAULTS, getSettings, setSettings, onSettingsChanged, speakerVoice, voicesInUse, genderVoice } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav } from '../common/pcm.js';
 import { BLEND_MAX } from '../engines/tts/styles.js';
-import { SEP_MODELS } from '../engines/sep/models.js';
+import { SEP_MODELS, sepModelById, DEFAULT_SEP_MODEL, WASM_SEP_MODEL } from '../engines/sep/models.js';
+import { VOICES } from '../engines/tts/voices.js';
+import { spkModelById } from '../engines/spk/models.js';
 import { listCached, deleteByPrefix, fetchModel } from '../engines/common/model-cache.js';
 import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
@@ -19,7 +21,10 @@ let lists = { backends: [], voices: [], errors: {} };
 let systemVoices = [];
 let cached = []; // [{ url, size }]
 // Kartlarda gösterilen indirme: motor → { id, loaded, total, error }
-const downloads = { mt: null, tts: null, punct: null, spk: null };
+const downloads = { mt: null, tts: null, punct: null, spk: null, sep: null };
+let bulk = null; // "Tümünü indir" sürerken { i, n, label }
+const failedDl = new Map(); // "motor:id" → toplu indirmede başarısız olan modelin hatası (satırda görünür; sonraki indirme motor kaydını ezse de)
+let bulkSummary = ''; // son toplu indirmenin sonucu (bir sonrakine kadar görünür)
 
 // Chrome Translator dil paketi kullanıcı etkileşimi ister: modülü önceden yükle, tıklamada doğrudan çağır.
 let chromeTranslatorMod = null;
@@ -295,6 +300,7 @@ const downloadHint = () => [el('a', { href: '#indirme', textContent: 'İndirme m
 // Kompakt model satırı: ad + rozetler | boyut | İndir / Sil.
 function modelRow({ engine, id, name, kind, prefix, downloaded, sizeMB, inUse, canDownload = true, title }) {
   const dl = downloads[engine]?.id === id ? downloads[engine] : null;
+  const savedErr = !dl ? failedDl.get(`${engine}:${id}`) : null;
   const have = cachedBytes(prefix);
   const busy = !!dl && !dl.error;
   const actions = [];
@@ -315,10 +321,26 @@ function modelRow({ engine, id, name, kind, prefix, downloaded, sizeMB, inUse, c
       : `${fmtMB(sizeMB)} indirme`;
   return el('div', { class: 'model' + (inUse ? ' in-use' : ''), title: title || undefined },
     el('div', { class: 'name' }, name, el('span', { class: 'kind', textContent: kind }), ...stateChips({ downloaded, partialBytes: have, inUse, dl, canDownload })),
-    el('div', { class: 'meta' + (dl?.error ? ' err' : ''), textContent: dl?.error ? dl.error : sizeText, title: dl?.error || undefined }),
+    el('div', { class: 'meta' + (dl?.error || savedErr ? ' err' : ''), textContent: dl?.error || savedErr || sizeText, title: dl?.error || savedErr || undefined }),
     el('div', { class: 'actions' }, ...actions),
     progressBar(dl),
   );
+}
+
+// Ses ayırma modelleri: uygulamanın kullandığı ikisi (GPU / işlemci); indirme bu sayfadan doğrudan (ortak önbellek, noktalama gibi).
+const sepListed = () => [DEFAULT_SEP_MODEL, WASM_SEP_MODEL].map((id) => sepModelById(id)).filter(Boolean);
+const sepName = (m) => (m.id === WASM_SEP_MODEL ? 'Ses ayırma — Hafif model' : `Ses ayırma — ${m.label.replace(/\s*\(.*\)\s*$/, '')}`);
+const sepDownloaded = (m) => cachedBytes(m.url) >= m.bytes;
+
+async function downloadSep(id) {
+  const m = sepModelById(id);
+  try {
+    await fetchModel(m.url, { onProgress: (p) => { downloads.sep = { id, loaded: p.loaded, total: p.total || m.bytes }; renderDownloads(); } });
+    downloads.sep = null;
+  } catch (e) {
+    downloads.sep = { id, error: e?.message || String(e) };
+  }
+  await refreshModels();
 }
 
 // Noktalama modeli: iki dosya da önbellekte mi; indirme bitince düzeltme kendiliğinden açılır.
@@ -366,6 +388,15 @@ function renderDownloads() {
       engine: 'spk', id: sp.id, name: 'Konuşmacı tanıma', kind: 'konuşmacı', prefix: sp.cachePrefix,
       downloaded: !!sp.cached || mock, canDownload: !mock, sizeMB: sp.sizeMB, inUse: spkInUse(),
       title: sp.license ? `Lisans: ${sp.license}` : undefined,
+    }));
+  }
+  // ses ayırma modelleri (gerçek dublaj): GPU'da varsayılan, işlemcide hafif model; yoksa ilk kullanımda indirilir
+  for (const m of sepListed()) {
+    rows.push(modelRow({
+      engine: 'sep', id: m.id, name: sepName(m), kind: m.id === DEFAULT_SEP_MODEL ? 'ses ayırma · GPU' : 'ses ayırma · işlemci',
+      prefix: m.url, downloaded: sepDownloaded(m) || mock, canDownload: !mock, sizeMB: m.bytes / 1e6,
+      inUse: m.id === DEFAULT_SEP_MODEL && settings.separation !== 'off',
+      title: 'Orijinal sesten konuşmayı ayırır (müzik ve efektler kalır) · MIT (UVR MDX-Net)',
     }));
   }
   $('modelRows').replaceChildren(...rows);
@@ -629,15 +660,72 @@ function missingSelected() {
   return out;
 }
 
+// Eksik olan her model (seçili olsun olmasın), indirme sırasıyla: çeviri, sesler, konuşmacı, noktalama, ses ayırma.
+function allMissing() {
+  if (settings.engineMode === 'mock') return [];
+  const out = [];
+  for (const b of lists.backends.filter((x) => x.id !== 'chrome-translator')) {
+    if (!b.downloaded) out.push({ engine: 'mt', id: b.id, label: shortName(b), mb: b.sizeMB - bytesMB(cachedBytes(b.cachePrefix)) });
+  }
+  const packs = new Set();
+  for (const v of lists.voices.filter((x) => !x.system)) {
+    if (v.cached || (v.pack && packs.has(v.pack))) continue;
+    if (v.pack) packs.add(v.pack);
+    out.push({ engine: 'tts', id: v.id, label: v.pack ? PACK_NAMES[v.pack] || v.pack : shortName(v), mb: v.sizeMB - bytesMB(cachedBytes(v.cachePrefix)) });
+  }
+  const sp = lists.speaker;
+  if (sp && !sp.cached) out.push({ engine: 'spk', id: sp.id, label: 'Konuşmacı tanıma', mb: sp.sizeMB - bytesMB(cachedBytes(sp.cachePrefix)) });
+  if (!punctDownloaded()) out.push({ engine: 'punct', id: 'punct-en', label: 'Noktalama modeli', mb: punctBytes() / 1e6 - bytesMB(cachedBytes(PUNCT_MODEL.repo)) });
+  for (const m of sepListed()) if (!sepDownloaded(m)) out.push({ engine: 'sep', id: m.id, label: sepName(m), mb: m.bytes / 1e6 - bytesMB(cachedBytes(m.url)) });
+  return out;
+}
+
 function renderPrepare() {
   const miss = settings.engineMode === 'mock' ? [] : missingSelected();
-  const busy = ['mt', 'tts', 'spk'].some((e) => downloads[e] && !downloads[e].error);
-  $('prepareBox').hidden = !miss.length && settings.modelsApproved;
+  const all = allMissing();
+  const busy = !!bulk || ['mt', 'tts', 'spk', 'punct', 'sep'].some((e) => downloads[e] && !downloads[e].error);
   const mb = miss.reduce((n, m) => n + Math.max(0, m.mb), 0);
+  const allMb = all.reduce((n, m) => n + Math.max(0, m.mb), 0);
+  // "Tümünü indir" eksik her şeyi indirir; seçili olanlar zaten hepsiyse ikinci düğme gösterilmez
+  $('downloadAll').hidden = !all.length;
+  $('downloadAll').disabled = busy;
+  $('downloadAll').textContent = bulk ? `İndiriliyor ${bulk.i}/${bulk.n}…` : `Tümünü indir (≈ ${fmtMB(allMb)})`;
+  const selectedIsAll = miss.length > 0 && miss.length === all.length;
+  const needsApproval = !miss.length && !settings.modelsApproved;
+  $('prepareSelected').hidden = (!miss.length && !needsApproval) || selectedIsAll;
+  $('prepareBox').hidden = $('downloadAll').hidden && $('prepareSelected').hidden && !bulk && !bulkSummary;
   $('prepareSelected').disabled = busy;
-  $('prepareSelected').textContent = miss.length ? `Seçili modelleri indir (≈ ${fmtMB(mb)})` : 'Dublaj için modelleri onayla';
-  $('prepareNote').textContent = miss.length ? miss.map((m) => m.label.replace(/\s*\(.*\)\s*$/, '')).join(' + ') : '';
+  $('prepareSelected').textContent = miss.length ? `Yalnız seçili olanları indir (≈ ${fmtMB(mb)})` : 'Dublaj için modelleri onayla';
+  $('prepareNote').textContent = bulk ? `${bulk.label}` : bulkSummary || (all.length ? `${all.length} model indirilmedi` : '');
+  $('prepareNote').title = !bulk && !bulkSummary && all.length ? all.map((m) => m.label).join(' + ') : '';
 }
+
+// "Tümünü indir": eksik tüm modeller sırayla; biri başarısız olursa diğerleri sürer, sonda özet verilir.
+$('downloadAll').addEventListener('click', async () => {
+  if (bulk) return;
+  const todo = allMissing();
+  if (!todo.length) return;
+  const mb = todo.reduce((n, m) => n + Math.max(0, m.mb), 0);
+  if (mb > 1 && !(await confirmBox(`${todo.length} model, yaklaşık ${fmtMB(mb)} bir kez indirilecek ve tarayıcıda saklanacak. Sonrasında internetsiz çalışır.`, 'Tümünü indir'))) return;
+  await setSettings({ modelsApproved: true });
+  bulk = { i: 0, n: todo.length, label: '' };
+  bulkSummary = '';
+  const failed = [];
+  for (const m of todo) {
+    bulk.i++;
+    bulk.label = `${m.label} (${bulk.i}/${bulk.n})`;
+    renderPrepare();
+    await downloadModel(m.engine, m.id, 0);
+    if (downloads[m.engine]?.error) {
+      failed.push(`${m.label}: ${downloads[m.engine].error}`);
+      failedDl.set(`${m.engine}:${m.id}`, downloads[m.engine].error);
+    }
+  }
+  const done = todo.length - failed.length;
+  bulk = null;
+  bulkSummary = failed.length ? `${done}/${todo.length} model indirildi. Hata: ${failed.join(' · ')}` : `${todo.length} modelin hepsi indirildi.`;
+  await refreshModels();
+});
 
 $('prepareSelected').addEventListener('click', async () => {
   const miss = missingSelected();
@@ -655,15 +743,36 @@ async function downloadModel(engine, id, remainingMB) {
     const ok = await confirmBox(`Yaklaşık ${fmtMB(mb)} bir kez indirilecek ve tarayıcıda saklanacak. Sonrasında internetsiz çalışır.`, 'İndir');
     if (!ok) return;
   }
+  failedDl.delete(`${engine}:${id}`);
   downloads[engine] = { id, loaded: 0, total: 0 };
   renderDownloads();
   if (engine === 'punct') return downloadPunct(id);
+  if (engine === 'sep') return downloadSep(id);
+  // Toplu indirmede ses ve konuşmacı modelleri yalnız indirilir (motor başlatılıp model belleğe / GPU'ya yüklenmez)
+  if (bulk && engine === 'tts') return downloadFiles('tts', id, (VOICES.find((x) => x.id === id) || {}).files || []);
+  if (bulk && engine === 'spk') return downloadFiles('spk', id, [spkModelById(id)].filter(Boolean).map((m) => ({ url: m.url, bytes: m.bytes })));
   await setSettings({ modelsApproved: true });
   const options = engine === 'mt' ? { backend: id } : { voice: id };
   const res = await bg({ type: 'engine.init', engine, options, userInitiated: true });
   downloads[engine] = res.ok ? null : { id, error: res.error };
   await refreshModels();
   renderStatus();
+}
+
+// Dosya listesini ortak model önbelleğine sırayla indirir (motor başlatmadan); ilerleme ve hata satırda görünür.
+async function downloadFiles(engine, id, files) {
+  const total = files.reduce((n, f) => n + (f.bytes || 0), 0);
+  let base = 0;
+  try {
+    for (const f of files) {
+      await fetchModel(f.url, { onProgress: (p) => { downloads[engine] = { id, loaded: base + p.loaded, total: total || p.total }; renderDownloads(); } });
+      base += f.bytes || 0;
+    }
+    downloads[engine] = null;
+  } catch (e) {
+    downloads[engine] = { id, error: e?.message || String(e) };
+  }
+  await refreshModels();
 }
 
 // Noktalama modeli doğrudan bu sayfadan indirilir (ortak önbellek); bitince düzeltme açılır.
@@ -686,11 +795,11 @@ async function downloadPunct(id) {
 async function deleteModel(engine, id, name, prefix, inUse) {
   const extra = inUse ? ' Bu model şu an kullanılıyor; dublaj için yeniden indirmeniz gerekecek.' : '';
   if (!(await confirmBox(`"${name}" bilgisayardan silinecek.${extra}`, 'Sil'))) return;
-  await bg({ type: 'engine.reset', engine });
+  if (engine !== 'sep') await bg({ type: 'engine.reset', engine }); // ses ayırma modeli sayfa içinden okunur, motor yok
   await deleteByPrefix(prefix);
   // Kullanılan model silindiyse dublaj sormadan yeniden indirmesin.
   if (engine === 'punct') await setSettings({ fixAsrPunct: false });
-  else if (inUse) await setSettings({ modelsApproved: false });
+  else if (inUse && engine !== 'sep') await setSettings({ modelsApproved: false });
   await refreshModels();
   renderStatus();
 }
