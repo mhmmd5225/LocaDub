@@ -14,6 +14,7 @@ import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
 import { pageVideo, findPlayer, findVideo } from '../common/page.js';
 import { logError } from '../common/errlog.js';
 import { ProgressMarks } from './progressmarks.js';
+import { VoiceAssigner } from '../common/voice-match.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -68,7 +69,7 @@ function audioKey(s) {
     `|${s.glossaryMt}|${s.glossaryTts}` +
     // üslup/perde/kalite/karıştırma sistem sesinde etkisizdir; yalnızca motor sesinde üretilmiş sesleri geçersiz kılar
     (s.voice === 'system' ? '' : `|${s.style}|${s.pitch}|${s.quality}|${s.voiceBlend ? `${s.voiceBlend.with}:${s.voiceBlend.amount}` : ''}` +
-      `|${s.genderVoices ? 'g' : ''}|${JSON.stringify(s.favFemale)}|${JSON.stringify(s.favMale)}`);
+      `|${s.genderVoices ? 'g' : ''}${s.matchVoices ? 'm' : ''}|${JSON.stringify(s.favFemale)}|${JSON.stringify(s.favMale)}`);
 }
 
 
@@ -135,6 +136,9 @@ class Session {
     this.genders = { turns: new Map(), recent: new Map(), last: null, fallback: null };
     // konuşmacı tanıma (engines/spk): kümeler videonun sonuna kadar (sarmada da) korunur
     this.spk = { clusters: new SpeakerClusters(), capture: null, busy: false, off: false, fails: 0 };
+    // konuşmacıya benzeyen ses (common/voice-match.js): küme → { voice, pitch }; aday sesler indirilmiş olanlar
+    this.match = new VoiceAssigner();
+    this._matchPool = null; // null: henüz sorulmadı; Promise: soruluyor
     this._listeners = [];
     this._lastErrAt = 0;
     this._trKey = trKey(settings);
@@ -633,7 +637,10 @@ class Session {
     const slot = slotSec(S, i);
     const text = spokenText(s);
     const voice = this.voiceFor(s);
-    const tone = toneFor(settings, voice);
+    const key = this._voiceKey(s);
+    const m = this._match(s);
+    let tone = toneFor(settings, voice);
+    if (m?.pitch && m.voice === voice) tone = { ...tone, pitch: tone.pitch + m.pitch };
     // üslubun hız çarpanı temel hıza katılır (sığdırma hesabı bunu bilir); favori sesin üslubu kendi tonundan
     const speed = chooseSynthSpeed(text, slot, { base: settings.ttsSpeed * (voice === 'system' ? 1 : styleSpeed(tone.style)) });
     s.auPending = true;
@@ -641,7 +648,7 @@ class Session {
     s.auPending = false;
     if (!this.alive || gen !== this.audioGen) return;
     // sentez sürerken konuşanın cinsiyeti değiştiyse bu ses atılır, döngü doğru sesle yeniden üretir
-    if (res.ok && this.voiceFor(s) !== voice) return;
+    if (res.ok && this._voiceKey(s) !== key) return;
     if (!res.ok) {
       if (res.code === 'ABORTED') return;
       s.auFail = (s.auFail || 0) + 1;
@@ -650,13 +657,13 @@ class Session {
     }
     const r = res.result || {};
     console.debug(LOG, `ses ${i}: ${voice}`);
-    if (r.system) { s.audio = { system: true, speed, voice }; return; }
-    if (!r.pcmBase64) { s.audio = { empty: true, voice }; return; }
+    if (r.system) { s.audio = { system: true, speed, voice, key }; return; }
+    if (!r.pcmBase64) { s.audio = { empty: true, voice, key }; return; }
     const sr = r.sampleRate || 22050;
     const i16 = trimSilenceInt16(decodePcmBase64ToInt16(r.pcmBase64), sr);
-    if (!i16.length) { s.audio = { empty: true, voice }; return; }
+    if (!i16.length) { s.audio = { empty: true, voice, key }; return; }
     const url = URL.createObjectURL(new Blob([int16ToWav(i16, sr)], { type: 'audio/wav' }));
-    s.audio = { url, duration: i16.length / sr, speed, voice };
+    s.audio = { url, duration: i16.length / sr, speed, voice, key };
   }
 
   // ---- konuşanın cinsiyeti (settings.genderVoices) ----
@@ -685,6 +692,8 @@ class Session {
   // Cümlenin sesi: cinsiyet modu açıksa tahmin edilen cinsiyetin sesi (favori öncelikli), değilse konuşmacı sırası.
   voiceFor(s) {
     if (this._spkOn()) {
+      const m = this._match(s);
+      if (m) return m.voice;
       const { gender, id } = this._spkPredict(s);
       return chooseVoice(this._eff(), { speaker: s.speaker, gender, alt: id != null ? this.spk.clusters.altOf(id) : 0 });
     }
@@ -697,6 +706,64 @@ class Session {
     const neighbour = G.turns.get(turn - 1) ?? G.turns.get(turn + 1);
     const alt = gender && neighbour === gender ? turn % 2 : 0;
     return chooseVoice(this._eff(), { speaker: s.speaker, gender, alt });
+  }
+
+  // Sesin kimliği + perde ayarı: hazırlanmış sesin hâlâ geçerli olup olmadığı bununla karşılaştırılır.
+  _voiceKey(s) {
+    const v = this.voiceFor(s);
+    const m = this._match(s);
+    return m && m.voice === v && m.pitch ? `${v}|${m.pitch}` : v;
+  }
+
+  // ---- konuşmacıya benzeyen ses (settings.matchVoices) ----
+  _matchOn() {
+    return !!settings.matchVoices && this._spkOn();
+  }
+
+  // Cümlenin konuşanına atanmış ses ({ voice, pitch }) ya da null (atama yok / özellik kapalı).
+  _match(s) {
+    if (!this._matchOn()) return null;
+    const { id, gender } = this._spkPredict(s);
+    const m = id == null ? null : this.match.get(this.spk.clusters.resolve(id));
+    return m && m.gender === gender ? m : null;
+  }
+
+  // Aday sesler: indirilmiş ve perdesi bilinen sesler (engines/tts/voices.js f0). Bir kez sorulur.
+  _loadMatchPool() {
+    if (this._matchPool) return;
+    this._matchPool = sendBg({ type: 'engine.list' }).then((res) => {
+      if (!this.alive) return;
+      const voices = (res.ok && res.result?.voices) || [];
+      this.match.setPool(voices.filter((v) => v.cached && v.f0));
+      console.debug(LOG, `benzeyen ses adayları: ${this.match.pool.map((v) => v.id).join(', ') || 'yok'}`);
+      this._assignMatches();
+    }, (e) => logError('ses eşleme', e));
+  }
+
+  // Yeterli perde kanıtı toplamış kümelere ses ata; yeni atama olduysa hazırlanmış sesleri yenile.
+  _assignMatches() {
+    if (!this._matchOn()) return;
+    if (!this._matchPool) { this._loadMatchPool(); return; }
+    const C = this.spk.clusters;
+    let changed = false;
+    for (const c of C.clusters.values()) {
+      const had = this.match.get(c.id);
+      if (had && had.gender === c.gender) continue;
+      // kümenin cinsiyet kararı döndü (yalnız güçlü kanıtla olur): o cinsiyetten yeniden seçilir
+      if (had) this.match.byId.delete(c.id);
+      // birleşmiş kümenin eski kimliğinin ataması varsa o korunur (konuşmacının sesi değişmesin)
+      const old = had ? null : [...C.alias.keys()].find((k) => C.resolve(k) === c.id && this.match.get(k)?.gender === c.gender);
+      if (old != null) { this.match.byId.set(c.id, this.match.get(old)); continue; }
+      const a = this.match.assign({ id: c.id, gender: c.gender, hz: C.medianHz(c), nf0: c.nf0 });
+      if (!a) continue;
+      changed = true;
+      console.info(LOG, `konuşmacı ${c.id} (${a.gender === 'female' ? 'kadın' : 'erkek'}, ${a.hz} Hz) → ${a.voice}` +
+        `${a.pitch ? ` ${a.pitch > 0 ? '+' : ''}${a.pitch} yarım ton` : ''}`);
+      // ses başka modelse arka planda yükle: ilk cümlesinde takılmasın
+      sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: a.voice, speed: 1, tone: toneFor(settings, a.voice), tag: this.tag })
+        .catch(() => { /* ısınma: hata önemsiz */ });
+    }
+    if (changed) this._regender(this.video?.currentTime ?? 0);
   }
 
   // Bilgisi olan cümlenin konuşmanı: { gender, id } (id: küme) ya da null.
@@ -813,6 +880,7 @@ class Session {
       s.spk = { src };
       if (vec) s.spk.id = C.assign(vec, { w: Math.min(r.voicedSec || 1, 4), ev: { f0: r.f0, score: r.score } });
       else s.spk.gender = sentenceGender(r);
+      if (vec) this._assignMatches();
     }
     const t = this.video.currentTime;
     const k = peek ? s.peek : s.spk;
@@ -887,7 +955,7 @@ class Session {
     let n = 0;
     for (const s of this.sentences) {
       if (s.start <= t || s.i === this.playingIdx || !s.audio?.voice) continue;
-      if (s.audio.voice === this.voiceFor(s)) continue;
+      if ((s.audio.key ?? s.audio.voice) === this._voiceKey(s)) continue;
       if (s.audio.url) URL.revokeObjectURL(s.audio.url);
       s.audio = null;
       n++;

@@ -138,6 +138,7 @@ export async function listVoices() {
       id: v.id,
       label: v.label,
       gender: v.gender,
+      ...(v.f0 ? { f0: v.f0 } : {}),
       sizeMB: Math.round((voiceBytes(v) / 1e6) * 10) / 10,
       license: v.license,
       available: typeof WebAssembly === 'object',

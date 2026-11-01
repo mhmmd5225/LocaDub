@@ -192,6 +192,7 @@ function renderTone() {
 $('speakerVoices').addEventListener('change', (e) => setSettings({ speakerVoices: e.target.checked }));
 for (const id of ['voice2', 'voice3', 'voice4']) $(id).addEventListener('change', (e) => setSettings({ [id]: e.target.value || null }));
 $('genderVoices').addEventListener('change', (e) => setSettings({ genderVoices: e.target.checked }));
+$('matchVoices').addEventListener('change', (e) => setSettings({ matchVoices: e.target.checked }));
 $('speakerCount').addEventListener('change', (e) => setSettings({ speakerCount: Number(e.target.value) }));
 
 let speakerOpened = false; // konuşmacı bloğu, anahtar açıksa ilk çizimde açılır
@@ -547,18 +548,31 @@ function renderModels() {
   });
 }
 
+// Konuşmacıya benzeyen ses: indirilmiş aday ses sayısı (cinsiyet başına en az iki gerekir; yoksa cinsiyet sesi kullanılır).
+function matchNote() {
+  const n = (g) => lists.voices.filter((v) => v.gender === g && v.f0 && (v.cached || isMock())).length;
+  const f = n('female');
+  const m = n('male');
+  const few = f < 2 || m < 2;
+  return `Benzeyen ses adayları: ${f} kadın, ${m} erkek (indirilmiş).` +
+    (few ? ' Bir cinsiyette ikiden az ses varsa o cinsiyette sabit ses kullanılır; Supertonic paketi 5 kadın + 5 erkek ses ekler.' : '');
+}
+
 // Konuşmacı sesleri (2.–4.): birinci sesten farklı, indirilebilir sesler. Seçilmemişse kendiliğinden seçilen gösterilir.
 function renderSpeakerVoices() {
   const first = effectiveVoiceId();
   const s = { ...settings, voice: first };
   $('genderVoices').checked = settings.genderVoices;
   $('genderVoices').disabled = first === 'system';
+  $('matchVoices').checked = settings.matchVoices;
+  $('matchVoices').disabled = first === 'system' || !settings.genderVoices;
   const name = (id) => {
     const v = lists.voices.find((x) => x.id === id);
     return v ? `${shortName(v)}${favOf(id) ? ' ★' : ''}${v.cached || isMock() ? '' : ' (indirilmedi)'}` : '—';
   };
   $('genderNote').replaceChildren(...(first === 'system' ? ['Sistem sesinde kullanılmaz.']
     : settings.genderVoices && settings.separation === 'off' ? ['Ses ayırma kapalı: tek ses kullanılır. Gerçek dublajı açınca kadın/erkek sesi devreye girer.']
+    : settings.genderVoices && settings.matchVoices ? [matchNote()]
     : settings.genderVoices ? ['Kadın: ', el('b', { textContent: name(genderVoice(s, 'female')) }), ' · Erkek: ', el('b', { textContent: name(genderVoice(s, 'male')) })]
       : []));
   // otomatik cinsiyetle birlikte sırayla seçeneği aynı cinsiyetten konuşmacıları ayırır (o cinsiyetin ikinci sesi);

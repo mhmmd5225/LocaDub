@@ -11,6 +11,11 @@ export async function listVoices() {
   return [
     { id: 'mock-beep', label: 'Sahte bip (test)', gender: 'unknown', sizeMB: 0, license: 'MIT', available: true },
     { id: 'mock-silent', label: 'Sahte sessizlik (test)', gender: 'unknown', sizeMB: 0, license: 'MIT', available: true },
+    // konuşmacıya benzeyen ses (common/voice-match.js) adayları: cinsiyet + perde profili; bip gibi çalar
+    { id: 'mock-f-low', label: 'Sahte kadın, kalın (test)', gender: 'female', f0: 180, sizeMB: 0, license: 'MIT', available: true, cached: true },
+    { id: 'mock-f-high', label: 'Sahte kadın, ince (test)', gender: 'female', f0: 240, sizeMB: 0, license: 'MIT', available: true, cached: true },
+    { id: 'mock-m-low', label: 'Sahte erkek, kalın (test)', gender: 'male', f0: 100, sizeMB: 0, license: 'MIT', available: true, cached: true },
+    { id: 'mock-m-high', label: 'Sahte erkek, ince (test)', gender: 'male', f0: 135, sizeMB: 0, license: 'MIT', available: true, cached: true },
   ];
 }
 

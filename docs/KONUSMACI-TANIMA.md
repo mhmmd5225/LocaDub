@@ -51,3 +51,40 @@ Tüm satırlar için `tools/spk-eval.mjs` çalıştırılır.)
 - Ayırma kapalı (müzik altında orijinal ses): değerlendirmedeki "çalınan" ses, cümle çalarken önceki cümlenin kümesinden tahmin edilir
   (erken karar yok), bu yüzden tutarlılık ≈ %60'a düşer; bu yüzden ayırma yokken otomatik kadın/erkek kapalıdır.
 - Müzik 0 dB'de hiçbir yöntem çalışmaz (cinsiyet ≈ %50).
+
+## Konuşmacıya benzeyen ses (0.5.6)
+
+Her konuşmacı kümesine, ortanca perdesine en yakın **indirilmiş** ses atanır (`common/voice-match.js`); gerekirse en çok
+±2 yarım tonluk perde ayarıyla. Atama küme ≈ 3 sn ötümlü konuşma (60 perde çerçevesi) topladıktan sonra bir kez yapılır ve
+video boyunca değişmez; aynı cinsiyetten ikinci konuşmacıya, neredeyse aynı yakınlıkta başka bir aday varsa farklı ses verilir.
+Bir cinsiyette ikiden az aday varsa o cinsiyette eski kural (cinsiyet sesi, favori) geçerlidir. Ayar: `matchVoices` (varsayılan açık).
+
+Seslerin perde profili (`engines/tts/voices.js` `f0`) ve seçimin ölçümü: `node tools/voice-match.mjs` (veri: `tools/spk-data.mjs`).
+80 LibriSpeech konuşmacısı, seçim ilk 7 cümleyle, ölçüm kalan 7 cümleyle (perde farkı, yarım ton):
+
+| Yöntem | Ortanca fark | ≤ 1 yarım ton | ≤ 2 yarım ton |
+|---|---|---|---|
+| Varsayılan cinsiyet sesi (Ahenk / Antalia) | 2.0 | %25 | %55 |
+| Benzeyen ses (13 ses: küçük sesler + Supertonic) | 1.0 | %55 | %84 |
+
+**Neden perde, neden konuşmacı vektörü değil:** İlk denemede seçim konuşmacı tanıma vektörünün (WeSpeaker) benzerliğiyle
+yapıldı; ölçüde varsayılandan çok iyi görünüyordu (kosinüs 0.04 → 0.22) ama dinleme testinde kulakla uyuşmadı (kadın konuşmacıya
+perdesi daha uzak bir ses, ince sesli erkeğe daha kalın bir ses seçti). Kimlik vektörü perdeye büyük ölçüde duyarsızdır; kulağın
+"benziyor" dediği şey en çok perde ve parlaklıktır. Parlaklık (spektral merkez) ayrılmış seste müzik kalıntısından etkilendiği için
+yalnız perde kullanılır.
+
+**Ses kopyalama (voice cloning) denendi, eklenmedi.** Aynı veride (4 hedef konuşmacı, 8 Türkçe cümle; benzerlik WeSpeaker,
+anlaşılırlık Whisper CER; işlemci 4 çekirdek):
+
+| Yöntem | Benzerlik (tavan 0.90) | CER | Süre / ses süresi | İndirme |
+|---|---|---|---|---|
+| kNN-VC (WavLM + HiFi-GAN), 30 sn örnek, fp32 | 0.45 | %0.9 | 0.25 | 451 MB |
+| kNN-VC, 30 sn örnek, 8-bit | 0.35 | %2.2 | 0.89 | 124 MB |
+| kNN-VC, 10 sn örnek, 8-bit | 0.32 | %23.7 | 1.01 | 124 MB |
+| Chatterbox ses dönüştürme, 10 sn örnek | 0.47 | %0.4 | 3.2 | 1.08 GB |
+| Chatterbox çok dilli TTS (Türkçe), 10 sn örnek | 0.51 | %7.9 | 3.9 | 1.4 GB |
+
+Dinleme testinde: kNN-VC "yaklaşık %25 benziyor"; Chatterbox ses dönüştürme sesin rengini taşıyor ama tonlama kaynak TTS'inki
+kadar düz; Chatterbox Türkçe TTS yabancı aksanlı (ONNX sürümünün sözlüğünde ş/ğ/İ yok, birleşik işaretlere ayrılarak çalıştırıldı).
+Büyük indirme ve (Windows'ta sürücü çökmesi yaşanmış) GPU yükü karşılığında kazanç yetersiz bulundu. Orijinal konuşmacının
+tonlamasını taşımak ayrı ve daha zor bir sorundur (konuşma İngilizce, dublaj Türkçe).
