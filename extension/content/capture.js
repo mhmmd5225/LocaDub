@@ -3,6 +3,7 @@
 // zamanıyla saklanır, son KEEP_SEC tutulur. range(t0, t1) o aralığın sesini verir (eksikse null).
 
 import { audioContext, videoGraph } from './player.js';
+import { logError } from '../common/errlog.js';
 
 const OUT_RATE = 16000;
 const KEEP_SEC = 60;
@@ -78,7 +79,8 @@ export class OriginalCapture {
       g.source.connect(this.node);
       this.node.connect(this.sink).connect(c.destination);
       return true;
-    } catch {
+    } catch (e) {
+      logError('ses yakalama', e);
       this.node = null;
       return false;
     }

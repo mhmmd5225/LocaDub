@@ -7,6 +7,7 @@
 //   dispose()
 
 import { fetchModel, isCached } from '../common/model-cache.js';
+import { logError } from '../../common/errlog.js';
 import { spkModelById, DEFAULT_SPK_MODEL } from './models.js';
 
 export const id = 'spk';
@@ -56,7 +57,7 @@ export function init({ onProgress } = {}) {
     const bytes = await fetchModel(model.url, { onProgress: (p) => onProgress?.({ ...p, total: p.total || model.bytes }) });
     if (bytes.byteLength !== model.bytes) throw new Error(`Konuşmacı modeli bozuk indi (${bytes.byteLength}/${model.bytes} bayt)`);
     let head = null;
-    try { head = await (await fetch(new URL(`./gender-${model.id}.json`, import.meta.url))).json(); } catch { /* sınıflandırıcısız: yalnız perde */ }
+    try { head = await (await fetch(new URL(`./gender-${model.id}.json`, import.meta.url))).json(); } catch (e) { logError('konuşmacı sınıflandırıcı', e); /* sınıflandırıcısız: yalnız perde */ }
     await request({ type: 'load', model, bytes, head }, [bytes]);
   })().catch((e) => { stop(e); throw e; });
   return ready;

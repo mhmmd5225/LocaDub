@@ -148,7 +148,7 @@ async function loadSystemVoices() {
   try {
     const all = await chrome.tts.getVoices();
     systemVoices = all.filter((v) => v.lang && /^tr\b/i.test(v.lang)).map((v) => ({ voiceName: v.voiceName, remote: !!v.remote }));
-  } catch {
+  } catch { // günlüğe yazılmaz: liste boş görünür (beklenen)
     systemVoices = [];
   }
 }

@@ -10,14 +10,21 @@ test('scrub: YouTube adresleri ve video kimlikleri silinir, model adresleri kal�
   assert.equal(scrub('x'.repeat(900)).length, 500);
 });
 
-test('pushError: ardışık aynı hata sayılır, en fazla MAX_ERRORS', () => {
+test('pushError: aynı hata (ardışık olmasa da) tek kayıtta sayılır, en fazla MAX_ERRORS', () => {
   let l = [];
   l = pushError(l, { source: 'mt.translate', message: 'A', at: 1 });
   l = pushError(l, { source: 'mt.translate', message: 'A', at: 2 });
   assert.deepEqual(l, [{ at: 2, source: 'mt.translate', message: 'A', count: 2 }]);
-  for (let i = 0; i < 20; i++) l = pushError(l, { source: 's', message: 'E' + i, at: 10 + i });
+  for (let i = 0; i < MAX_ERRORS + 10; i++) l = pushError(l, { source: 's', message: 'E' + i, at: 10 + i });
   assert.equal(l.length, MAX_ERRORS);
-  assert.equal(l[l.length - 1].message, 'E19');
+  assert.equal(l[l.length - 1].message, 'E' + (MAX_ERRORS + 9));
+  // araya başka hata girse de aynı hata tek satır: sayı artar, sona taşınır
+  let m = pushError([], { source: 'a', message: 'X', at: 1 });
+  m = pushError(m, { source: 'b', message: 'Y', at: 2 });
+  m = pushError(m, { source: 'a', message: 'X', at: 3 });
+  assert.deepEqual(m, [{ at: 2, source: 'b', message: 'Y' }, { at: 3, source: 'a', message: 'X', count: 2 }]);
+  // aynı ileti farklı kaynakta ayrı kayıt
+  assert.equal(pushError(m, { source: 'c', message: 'X', at: 4 }).length, 3);
 });
 
 test('buildReport: ayarlar, motorlar, modeller, hatalar; sözlük metni girmez', () => {

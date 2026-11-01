@@ -1,7 +1,7 @@
 // Tanılama: son hatalar (halka tampon) ve kullanıcının sorun bildirirken kopyalayacağı rapor (saf; node testleriyle sınanır).
 // Gizlilik: rapora video kimliği, YouTube adresi, altyazı ya da çeviri metni girmez; sözlükten yalnızca kural sayısı.
 
-export const MAX_ERRORS = 10;
+export const MAX_ERRORS = 50;
 
 // YouTube adreslerini ve video kimliklerini siler; model (HuggingFace) adresleri kalır.
 export function scrub(text) {
@@ -11,15 +11,20 @@ export function scrub(text) {
     .slice(0, 500);
 }
 
-/** Yeni hatayı ekler (ardışık aynı hata sayılır), en fazla MAX_ERRORS kayıt döner. */
+/**
+ * Yeni hatayı ekler: aynı (kaynak, ileti) daha önce varsa (ardışık olmasa da) tek kayıtta sayılır ve en sona alınır;
+ * en fazla MAX_ERRORS kayıt döner.
+ */
 export function pushError(list, { source, message, at = Date.now() }) {
   const msg = scrub(message);
+  const src = String(source || '?');
   const out = Array.isArray(list) ? list.slice() : [];
-  const last = out[out.length - 1];
-  if (last && last.source === source && last.message === msg) {
-    out[out.length - 1] = { ...last, at, count: (last.count || 1) + 1 };
+  const i = out.findIndex((e) => e.source === src && e.message === msg);
+  if (i >= 0) {
+    const [prev] = out.splice(i, 1);
+    out.push({ ...prev, at, count: (prev.count || 1) + 1 });
   } else {
-    out.push({ at, source: String(source || '?'), message: msg });
+    out.push({ at, source: src, message: msg });
   }
   return out.slice(-MAX_ERRORS);
 }

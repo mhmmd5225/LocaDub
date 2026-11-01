@@ -29,7 +29,7 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 - **Kabul:** tüm sonuçlar < 90 sn; WebGPU yoksa "WebGPU yok" + WASM sonuçları; hatada kısmi sonuç + hata satırı.
 - **Test:** `tests/extension/bench.test.mjs` (ortalama, rtf, biçim); `options-nav` e2e'de düğme ve mock sonuç tablosu.
 
-### T2. Hata görünürlüğü (S–M)
+### T2. Hata görünürlüğü (S–M) — **yapıldı** (`common/errlog.js`; rapor 50 kayıt, yinelenen hata tek satır)
 - **Dosyalar:** yeni `extension/common/errlog.js` (`logError(scope, err)`; en çok 50 kayıt; aynı (scope, mesaj) 10 sn içinde tekrar yazılmaz;
   `chrome.storage.session`), `common/diagnostics.js` ("Son hatalar" kaynağı), ilgili dosyalar.
 - **Adımlar:** `grep -rn "catch {" extension --include=*.js`. **Kural:** `revokeObjectURL`, `closeDocument`, DOM temizliği, `dispose` sessiz kalır;

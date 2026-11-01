@@ -174,7 +174,7 @@ const now = () => (typeof performance !== 'undefined' ? performance.now() : Date
 function abortError() {
   try {
     return new DOMException('Aborted', 'AbortError');
-  } catch {
+  } catch { // günlüğe yazılmaz: DOMException olmayan ortam için yedek
     const e = new Error('Aborted');
     e.name = 'AbortError';
     return e;

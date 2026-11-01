@@ -8,6 +8,14 @@ const { launch } = require('./common.cjs');
   try {
     const r = await opt.evaluate(() => chrome.runtime.sendMessage({ type: 'engine.init', engine: 'yok' }));
     assert.equal(r.ok, false);
+    // hata günlüğü (common/errlog.js): sayfa bağlamından gönderilen hata arka plana düşer, tekrar tek satırda sayılır
+    await opt.evaluate(async () => {
+      const { logError } = await import(chrome.runtime.getURL('common/errlog.js'));
+      logError('ses yakalama', new Error('sahte köprü hatası'));
+      logError('ses yakalama', new Error('sahte köprü hatası')); // 10 sn içinde: bastırılır
+      logError('altyazı indirme', 'sahte ağ hatası');
+    });
+    await opt.waitForFunction(() => chrome.runtime.sendMessage({ type: 'diag.errors' }).then((r) => r.result.some((e) => e.source === 'altyazı indirme')));
     await opt.reload();
     await opt.waitForTimeout(1500);
     await opt.click('#tab-diger');
@@ -16,6 +24,8 @@ const { launch } = require('./common.cjs');
     const text = await opt.textContent('#diagText');
     assert.match(text, /^LocaDub \d/);
     assert.match(text, /engine\.init: Bilinmeyen motor: yok/);
+    assert.match(text, /ses yakalama: sahte köprü hatası\n/, 'bastırılan tekrar sayılmamalı: ' + text.split('[Son hatalar')[1]);
+    assert.match(text, /altyazı indirme: sahte ağ hatası/);
     assert.match(text, /engineMode: "mock"/);
     assert.match(text, /sözlük: 1 çeviri düzeltmesi/);
     assert.doesNotMatch(text, /gizli kural/);

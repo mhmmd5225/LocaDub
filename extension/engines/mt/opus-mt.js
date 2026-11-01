@@ -100,7 +100,7 @@ export async function isDownloaded(variantId = DEFAULT_VARIANT, base = HF_BASE) 
       for (const [a, b] of p.ranges) if (!(await isRangeCached(p.decoderUrl, a, b))) return false;
     } else if (!(await isCached(p.decoderUrl))) return false;
     return true;
-  } catch {
+  } catch { // günlüğe yazılmaz: önbellek kontrolü, "indirilmemiş" sayılır
     return false;
   }
 }

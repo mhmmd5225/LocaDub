@@ -1,11 +1,12 @@
 // Ses çalma (Web Audio) ve orijinal sesi kısma (ducking).
+import { logError } from '../common/errlog.js';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 let ctx = null;
 export function audioContext() {
   if (!ctx) {
-    try { ctx = new AudioContext({ latencyHint: 'interactive' }); } catch { ctx = null; }
+    try { ctx = new AudioContext({ latencyHint: 'interactive' }); } catch (e) { ctx = null; logError('ses bağlamı', e); }
   }
   return ctx;
 }
@@ -39,7 +40,7 @@ export class DubAudio {
         const src = c.createMediaElementSource(this.el);
         this.gain = c.createGain();
         src.connect(this.gain).connect(c.destination);
-      } catch { this.gain = null; }
+      } catch (e) { this.gain = null; logError('orijinal sesi kısma', e); }
     }
   }
 
@@ -153,7 +154,8 @@ export function videoGraph(v) {
     const g = { source, gain, mute, analyser };
     videoGraphs.set(v, g);
     return g;
-  } catch {
+  } catch (e) {
+    logError('video ses grafiği', e);
     return null;
   }
 }

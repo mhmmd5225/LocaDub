@@ -23,6 +23,7 @@
 
 import { audioContext, videoGraph } from './player.js';
 import { callMain } from './bridge.js';
+import { logError } from '../common/errlog.js';
 import { createDemuxer } from './sep-demux.js';
 import {
   SEP, PacketStore, PcmTimeline, HoldGate, DriftMeter, planNext, runJob, aheadOf, committedEnd, rangeAt, windowFor, bestLag,
@@ -188,7 +189,7 @@ function planes(ad) {
       ad.copyTo(a, { planeIndex: c, format: 'f32-planar' });
       out.push(a);
     }
-  } catch {
+  } catch { // günlüğe yazılmaz: beklenen yedek yol (planar kopya desteklenmiyorsa ara değerlemeli kopya)
     out.length = 0;
     const inter = new Float32Array(n * ch);
     ad.copyTo(inter, { planeIndex: 0, format: 'f32' });
@@ -359,7 +360,7 @@ export class SeparatedAudio extends EventTarget {
       // bekletme sırasında kullanıcı oynattı: bekletme biter, ayırma yeniden yetişene dek video durdurulmaz
       if (this._hold.active && !this._hold.resuming) { this.gate.userOverride(); this._hold.ours = false; this._releaseHold(); }
     });
-    callMain('sep-subscribe').catch(() => {});
+    callMain('sep-subscribe').catch((e) => logError('ses yakalama (köprü)', e));
     const h = sepHost();
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
@@ -368,6 +369,7 @@ export class SeparatedAudio extends EventTarget {
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
+        if (info.fallbackReason) logError('ayırma (WebGPU)', info.fallbackReason); // sessiz yedeğe düşme görünür olsun
         this.model = info.model || null;
         if (Number.isFinite(info.contextSec)) this.ctxSec = Math.min(3, Math.max(0, info.contextSec));
         this.batch = Math.max(1, Number(info.batch) || 1);

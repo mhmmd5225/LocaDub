@@ -12,6 +12,7 @@ import { decodePcmBase64ToInt16, encodePcmBase64, int16ToWav, trimSilenceInt16 }
 import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.js';
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
 import { pageVideo, findPlayer, findVideo } from '../common/page.js';
+import { logError } from '../common/errlog.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -90,7 +91,8 @@ async function fetchText(url) {
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return '';
     return (await res.text()).trim();
-  } catch {
+  } catch (e) {
+    logError('altyazı indirme', e);
     return '';
   }
 }
@@ -368,7 +370,7 @@ class Session {
     }
     let info = null;
     for (let i = 0; i < 40 && this.alive; i++) {
-      try { info = await callMain('get-player-response'); } catch { info = null; }
+      try { info = await callMain('get-player-response'); } catch (e) { info = null; logError('sayfa köprüsü', e); }
       if (info?.videoId === this.videoId) break;
       await sleep(250);
     }
@@ -395,13 +397,13 @@ class Session {
     for (let attempt = 0; !txt && attempt < 3 && this.alive; attempt++) {
       if (attempt) await sleep(1500);
       let cap = null;
-      try { cap = await callMain('get-timedtext-url', { videoId: this.videoId }); } catch { /* yoksay */ }
+      try { cap = await callMain('get-timedtext-url', { videoId: this.videoId }); } catch (e) { logError('sayfa köprüsü', e); }
       if (!cap || !cap.includes('pot=')) {
         try {
           cap = await callMain('trigger-captions', {
             videoId: this.videoId, languageCode: track.languageCode, kind: track.kind,
           }, 20000);
-        } catch { /* yoksay */ }
+        } catch (e) { logError('sayfa köprüsü', e); }
       }
       if (cap && this.alive) txt = await fetchText(sameOrigin(buildJson3Url(mergeTimedTextParams(track.baseUrl, cap), { tlang })));
     }
@@ -700,7 +702,8 @@ class Session {
     const primary = chooseVoice(this._eff(), { gender: voiceGender(settings, settings.voice || DEFAULT_VOICE) });
     for (const g of ['female', 'male']) {
       const v = genderVoice(settings, g);
-      if (v && v !== primary) sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: v, speed: 1, tone: toneFor(settings, v), tag: this.tag }).catch(() => {});
+      if (v && v !== primary) sendBg({ type: 'tts.synthesize', text: 'Merhaba.', voice: v, speed: 1, tone: toneFor(settings, v), tag: this.tag })
+        .then((r) => { if (r && !r.ok && r.code !== 'ABORTED') logError('ses ısıtma', r.error); }).catch((e) => logError('ses ısıtma', e));
     }
   }
 
@@ -716,7 +719,7 @@ class Session {
         if (s.start > t + settings.lookaheadSec) break;
         if (s.spk || s.end < t - 1 || now - (s.spkTry || 0) < 1500) continue;
         let sp = null;
-        try { sp = sep.speechAt(s.start, s.end); } catch { sp = null; }
+        try { sp = sep.speechAt(s.start, s.end); } catch (e) { sp = null; logError('ayırma konuşma izi', e); }
         const pcm = sp && toMono16k(sp);
         if (!pcm) { s.spkTry = now; continue; }
         this._embed(s, pcm, 'ayırma');

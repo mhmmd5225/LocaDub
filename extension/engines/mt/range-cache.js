@@ -20,7 +20,7 @@ export async function isRangeCached(url, start, end, cacheName = DEFAULT_CACHE) 
   if (!cache) return false;
   try {
     return !!(await cache.match(rangeKey(url, start, end)));
-  } catch {
+  } catch { // günlüğe yazılmaz: önbellek okunamıyorsa "yok" sayılır, ağdan indirilir
     return false;
   }
 }

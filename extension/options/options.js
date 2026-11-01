@@ -723,7 +723,7 @@ async function loadSystemVoices() {
     const voices = await chrome.tts.getVoices();
     return voices.filter((v) => v.lang && /^tr\b/i.test(v.lang)).map((v) => ({ voiceName: v.voiceName, remote: !!v.remote }));
   } catch {
-    return [];
+    return []; // günlüğe yazılmaz: sistem sesi listesi yok = liste boş görünür (beklenen)
   }
 }
 
@@ -856,7 +856,7 @@ $('copyDiag').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(text);
     $('diagNote').textContent = 'Kopyalandı.';
-  } catch {
+  } catch { // günlüğe yazılmaz: kendi arayüz bildirimi var
     $('diagNote').textContent = 'Kopyalanamadı; aşağıdaki metni elle seçip kopyalayın.';
     document.querySelector('.diag').open = true;
   }
@@ -922,7 +922,7 @@ $('benchCopy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(benchText);
     $('benchNote').textContent = 'Kopyalandı.';
-  } catch {
+  } catch { // günlüğe yazılmaz: kendi arayüz bildirimi var
     $('benchNote').textContent = 'Kopyalanamadı; metni elle seçip kopyalayın.';
   }
 });
