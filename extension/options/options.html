@@ -256,7 +256,9 @@
         <details class="diag" id="benchBlock">
           <summary>Hız testi</summary>
           <small class="hint" id="benchHelp">Bu cihazda ses ayırma (WebGPU / işlemci, toplu boyutları), seslendirme ve çeviri hızını ölçer; GPU'da bir dakikadan kısa, işlemcide 2–3 dakika sürebilir.
-            Ses ayırma modeli indirilmemişse indirilir (67 MB, hafif model 30 MB). Sonuç Tanılama raporuna da eklenir.</small>
+            Ses ayırma modeli indirilmemişse indirilir (67 MB, hafif model 30 MB). Ekran kartını yoğun kullanır; test sırasında bilgisayar kısa süre yavaşlayabilir.
+          Toplu boyutlar küçükten büyüğe denenir ve sürücü sınırına yaklaşılırsa durur; test yarıda kesilirse (sürücü/sekme çökerse) bir sonraki testte o boyut atlanır.
+          Sonuç Tanılama raporuna da eklenir.</small>
           <div class="diagrow">
             <button type="button" id="benchRun">Testi başlat</button>
             <button type="button" id="benchCopy" hidden>Sonucu kopyala</button>

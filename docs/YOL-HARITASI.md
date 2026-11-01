@@ -57,7 +57,16 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 
 **Faz 1 tamam → sürüm 0.5.3.**
 
-## FAZ 2 — Kararlılık (0.5.4)
+## FAZ 1.5 — GPU güvenliği (0.5.4, kullanıcı raporu sonrası acil)
+
+### T13. Sürücü çökmesi ve GPU'nun sürekli meşgul edilmesi — **yapıldı**
+- WebGPU varsayılan toplu boyut 4 → 1 (`engines/sep/separator.js` `DEFAULT_BATCH`). Hız testi toplu 8'i denemez; sonraki boyut yalnız tahmini tek GPU işi
+  < 0.8 sn ise denenir; çökme koruması (`benchInflight` / `benchCap`, 7 gün).
+- GPU hız sınırı (`pace`): `content/sep-core.js` `gpuPace` → worker → `separator.runWindows`; her pencere grubu en az (ses süresi × targetRtf) sürer.
+- Tanılamada `[Bellek]`: ana iş parçacığı uzun görevleri ve GPU hız sınırı beklemesi.
+- **Kullanıcıdan:** RTX 5060'ta Hız testi + bir videoda takılma kontrolü; raporu paylaşmak. Hâlâ takılırsa: `pacePlay`/`paceHold` değerleri (`SEP`), sayfa tarafı takılmaları (rapordaki uzun görevler).
+
+## FAZ 2 — Kararlılık (0.5.5)
 
 ### T6. Boşta CPU azaltma (S–M)
 - **Dosyalar:** `content/app.js`, `content/separation.js`.

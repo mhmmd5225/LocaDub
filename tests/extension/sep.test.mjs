@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { FFT, stft, stftPair, istft, istftPair } from '../../extension/engines/sep/stft.js';
 import { resample } from '../../extension/engines/sep/resample.js';
 import { SEP_MODELS, DEFAULT_SEP_MODEL, sepModelById, chunkSamples } from '../../extension/engines/sep/models.js';
-import { createSeparator, joinOverlap, CONTEXT_SEC, FADE_SEC } from '../../extension/engines/sep/separator.js';
+import { createSeparator, joinOverlap, CONTEXT_SEC, FADE_SEC, DEFAULT_BATCH } from '../../extension/engines/sep/separator.js';
 import { handleMessage, MOCK_GAIN } from '../../extension/engines/_mock/sep.js';
 
 function rng(seed) {
@@ -404,4 +404,32 @@ test('Sahte işçi: akış kipi (kesinleşen aralık, final, kesinti) ve iptal',
   handleMessage({ type: 'cancel', ids: [5] }, post); // süren iş de bırakılır (zamanlayıcı beklemesin)
   handleMessage({ type: 'mock-rtf', rtf: 0 }, post);
   handleMessage({ type: 'dispose', id: 7 }, post);
+});
+
+test('Hız sınırı (pace): çıktı aynı, sınırlı çağrıda GPU beklemesi birikir; sınırsızda sıfır; yavaş makinede beklemez', async () => {
+  const model = sepModelById('mdxnet-lite');
+  const sr = 44100;
+  const n = Math.round(sr * 9); // ≈ 3 pencere adımı
+  const [L, R] = signal(n, sr, 5);
+  const free = createSeparator({ model, ort: fakeOrt, session: fakeSession('mask'), batch: 1 });
+  const a = await free.process(L.slice(), R.slice(), sr, { startSample: 0, final: true });
+  assert.equal(free.stats.idleMs, 0, 'sınır yokken bekleme yok');
+  const paced = createSeparator({ model, ort: fakeOrt, session: fakeSession('mask'), batch: 1 });
+  const t0 = performance.now();
+  const b = await paced.process(L.slice(), R.slice(), sr, { startSample: 0, final: true, pace: { targetRtf: 0.05 } });
+  const wall = performance.now() - t0;
+  // her pencere en az adım (≈ 3 sn) × 0.05 ≈ 150 ms sürmeli
+  assert.ok(paced.stats.idleMs > 0, 'bekleme birikmeli: ' + paced.stats.idleMs);
+  assert.ok(wall >= (paced.stats.windows * paced.stepSec * 1000 * 0.05) * 0.8, `çok hızlı bitti: ${wall} ms, ${paced.stats.windows} pencere`);
+  // çıktı hız sınırından etkilenmez
+  assert.equal(b.left.length, a.left.length);
+  let maxd = 0;
+  for (let i = 0; i < a.left.length; i++) maxd = Math.max(maxd, Math.abs(a.left[i] - b.left[i]), Math.abs(a.right[i] - b.right[i]));
+  assert.equal(maxd, 0);
+  // makine sınırdan yavaşsa (hedef çok küçük) beklenmez: hedef 1e-6 → bekleme ≈ 0
+  const slow = createSeparator({ model, ort: fakeOrt, session: fakeSession('mask'), batch: 1 });
+  await slow.process(L.slice(), R.slice(), sr, { startSample: 0, final: true, pace: { targetRtf: 1e-6 } });
+  assert.ok(slow.stats.idleMs < 20, String(slow.stats.idleMs));
+  // varsayılan WebGPU toplu boyutu 1 (sürücü güvenliği)
+  assert.equal(DEFAULT_BATCH.webgpu, 1);
 });

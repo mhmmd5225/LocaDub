@@ -9,7 +9,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   SEP, PacketStore, PcmTimeline, HoldGate, DriftMeter, planNext, runJob, writeResult, aheadOf, windowFor, bestLag,
-  planStream, writeStreamResult, mergeRanges, streamChunkSec,
+  planStream, writeStreamResult, mergeRanges, streamChunkSec, gpuPace,
 } from '../../extension/content/sep-core.js';
 import { WebmDemuxer, Mp4Demuxer, createDemuxer, opusDuration } from '../../extension/content/sep-demux.js';
 import { handleMessage as handleMock } from '../../extension/engines/_mock/sep.js';
@@ -600,4 +600,13 @@ test('PacketStore.bytes: tutulan paketlerin toplam baytı; atılanlar düşer', 
   assert.equal(st.bytes, 500);
   st.clear();
   assert.equal(st.bytes, 0);
+});
+
+test('gpuPace: yalnız WebGPU; bekletmede sıkı sınır, oynarken rahat tamponda gevşek sınır, yetişirken sınır yok', () => {
+  assert.equal(gpuPace({ backend: 'wasm', holding: true, aheadSec: 99 }), null);
+  assert.equal(gpuPace({ backend: 'mock', holding: false, aheadSec: 99 }), null);
+  assert.deepEqual(gpuPace({ backend: 'webgpu', holding: true, aheadSec: 0 }), { targetRtf: SEP.paceHold });
+  assert.deepEqual(gpuPace({ backend: 'webgpu', holding: false, aheadSec: SEP.paceComfortSec }), { targetRtf: SEP.pacePlay });
+  assert.equal(gpuPace({ backend: 'webgpu', holding: false, aheadSec: SEP.paceComfortSec - 0.1 }), null, 'yetişmek gerekirken tam hız');
+  assert.ok(SEP.paceHold < SEP.pacePlay);
 });

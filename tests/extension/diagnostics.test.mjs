@@ -81,7 +81,11 @@ test('memoryLines: sekme yok / ayırma kapalı (yalnız cümle sesi) / ayırma a
     ['JS yığını: 118 MB · cümle: 240 · cümle sesi: 14 blob, 52.3 sn']);
   const full = memoryLines({ status: 'playing', memory: { sentences: 5, blobs: 0, audioSec: 0, heapMB: null, packetBytes: 1258291, packets: 2400, pcmBytes: 22649241, sepSec: 31.4, origSec: 31.4 } });
   assert.equal(full[0], 'cümle: 5 · cümle sesi: 0 blob, 0 sn');
-  assert.equal(full[1], 'ayırma paketleri: 1.2 MB (2400 paket) · ayrılmış PCM: 31.4 sn · orijinal PCM: 31.4 sn · PCM belleği: 21.6 MB');
+  assert.equal(full[1], 'ayırma paketleri: 1.2 MB (2400 paket) · ayrılmış PCM: 31.4 sn · orijinal PCM: 31.4 sn · PCM belleği: 21.6 MB · GPU hız sınırı beklemesi: 0 sn');
+  // ana iş parçacığı takılmaları ve GPU hız sınırı beklemesi
+  const lt = memoryLines({ memory: { sentences: 1, blobs: 0, audioSec: 0, longTasks: { n: 12, ms: 1430, max: 210 }, packetBytes: 0, packets: 0, pcmBytes: 0, paceIdleSec: 12.34 } });
+  assert.equal(lt[1], 'ana iş parçacığı takılmaları (>50 ms): 12 kez, toplam 1.4 sn, en uzun 210 ms');
+  assert.match(lt[2], /GPU hız sınırı beklemesi: 12\.3 sn$/);
 });
 
 test('buildReport: [Bellek] bölümü ayırma cevabındaki memory alanından', () => {

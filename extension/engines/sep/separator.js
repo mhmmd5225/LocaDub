@@ -36,7 +36,11 @@ export const CONTEXT_SEC = 1;
 export const FADE_SEC = 0.05;
 export const DEFAULT_OVERLAP = 0.5;
 /** batch verilmezse: WebGPU'da bir çalıştırmada 4 pencere, WASM'da 1 (çıktıyı değiştirmez). */
-export const DEFAULT_BATCH = Object.freeze({ webgpu: 4, wasm: 1, cpu: 1 });
+// WebGPU'da varsayılan 1: tek model çağrısı tek pencere (RTX 5060 gibi sürücülerde uzun GPU işi — Windows ≈ 2 sn'den uzun komutu
+// keserek sürücüyü sıfırlar, ekran kararır — ve bellek baskısı yaratmasın). Daha büyük toplu boyut yalnız ölçümle (Hız testi) seçilir.
+export const DEFAULT_BATCH = Object.freeze({ webgpu: 1, wasm: 1, cpu: 1 });
+/** Hız sınırı: bir pencere grubu en az (pencere adımı × targetRtf) sürer; fazlası bekleme (GPU'yu sürekli meşgul etmemek için). */
+export const MAX_PACE_IDLE_MS = 1000;
 /** UVR gibi en alt 3 bin (DC civarı) sıfırlanır. */
 const ZERO_LOW_BINS = 3;
 
@@ -71,7 +75,7 @@ export function createSeparator(opts = {}) {
   let loading = null;
   let queue = Promise.resolve();
   let stream = null;
-  const stats = { windows: 0, runs: 0 };
+  const stats = { windows: 0, runs: 0, idleMs: 0 };
 
   async function getOrt() {
     if (!ort) {
@@ -183,8 +187,9 @@ export function createSeparator(opts = {}) {
    * dizilere); add(s, yl, yr): çıktısı. Model çalışırken sonraki grubun STFT'si hazırlanır. Son grup eksikse sıfırla
    * dolar (oturumun toplu boyutu sabit); çıktı pencere başınadır, gruplamadan bağımsızdır.
    */
-  async function runWindows(starts, fill, add, isCancelled) {
+  async function runWindows(starts, fill, add, isCancelled, pace) {
     if (!starts.length) return;
+    const stepMs = (geom().step / model.sampleRate) * 1000;
     const chunk = chunkSamples(model);
     const plane = model.dimF * model.dimT;
     const stftOpts = { nFft: model.nFft, hop: model.hop, maxBins: model.dimF };
@@ -211,6 +216,7 @@ export function createSeparator(opts = {}) {
     let next = prepare(0);
     for (let b0 = 0; b0 < starts.length; b0 += batch) {
       if (isCancelled?.()) throw new Error('cancelled');
+      const tGroup = performance.now();
       const { group, data } = next;
       const pending = runModel(data, runs);
       next = b0 + batch < starts.length ? prepare(b0 + batch) : null;
@@ -233,6 +239,12 @@ export function createSeparator(opts = {}) {
         );
         add(s, yl, yr);
       });
+      // Hız sınırı: gruptan sonra, grubun ses süresi × targetRtf dolana kadar bekle (makine zaten yavaşsa beklemez)
+      if (pace?.targetRtf > 0) {
+        const idle = Math.min(MAX_PACE_IDLE_MS, group.length * stepMs * pace.targetRtf - (performance.now() - tGroup));
+        if (idle > 5) await new Promise((r) => setTimeout(r, idle));
+        stats.idleMs += Math.max(0, idle);
+      }
     }
   }
 
@@ -327,7 +339,7 @@ export function createSeparator(opts = {}) {
     return c;
   };
 
-  async function processStream(left, right, sr, { startSample, final = false, reset = false, isCancelled } = {}) {
+  async function processStream(left, right, sr, { startSample, final = false, reset = false, isCancelled, pace } = {}) {
     const start = Math.round(startSample);
     let restarted = false;
     if (!stream || reset || stream.sr !== sr || stream.inPos !== start) { stream = newStream(sr, start); restarted = true; }
@@ -367,7 +379,7 @@ export function createSeparator(opts = {}) {
           const w = win[j - s], i = j - acc.s;
           acc.L[i] += yl[j - s] * w; acc.R[i] += yr[j - s] * w; acc.W[i] += w;
         }
-      }, isCancelled);
+      }, isCancelled, pace);
       S.nextK += starts.length;
       // 3. kesinleşen [fEnd, f1): f1'den önceki örnekleri bundan sonraki pencereler örtmez
       const f1 = Math.max(S.fEnd, final ? mEnd : Math.min(mEnd, S.nextK * step));
@@ -429,7 +441,8 @@ export function createSeparator(opts = {}) {
     load,
     /**
      * Çağrılar sırayla çalışır (ORT oturumu eşzamanlı çalıştırılmaz). o: { startSample, final?, reset?,
-     * isCancelled?() } verilirse akış kipi (dosya başı); isCancelled gruplar arasında sorulur.
+     * isCancelled?(), pace?: { targetRtf } } verilirse akış kipi (dosya başı); isCancelled gruplar arasında sorulur;
+     * pace: GPU'yu sürekli meşgul etmemek için her grup en az (ses süresi × targetRtf) sürer (MAX_PACE_IDLE_MS ile sınırlı).
      */
     process(left, right, sampleRate, o) {
       const p = queue.then(() => run(left, right, sampleRate, o));

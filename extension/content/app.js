@@ -119,6 +119,14 @@ class Session {
     this._wakers = new Set();
     // başlangıç süreleri (ms, oturum başından): altyazı, motorlar, ilk çeviri, ilk ses, aktif
     this.timing = { t0: performance.now() };
+    // [tanılama] ana iş parçacığı takılmaları: 50 ms'yi aşan uzun görevler (video takılmasının sayfa tarafı nedenleri için)
+    this.longTasks = { n: 0, ms: 0, max: 0 };
+    try {
+      this._ltObs = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) { this.longTasks.n++; this.longTasks.ms += e.duration; this.longTasks.max = Math.max(this.longTasks.max, e.duration); }
+      });
+      this._ltObs.observe({ type: 'longtask' });
+    } catch (e) { this._ltObs = null; /* longtask desteklenmiyor: sayaç boş kalır (günlüğe yazılmaz: beklenen) */ }
     this._hold = { done: false, active: false, since: 0, ours: false };
     // konuşanın cinsiyeti (content/gender.js): perde örnekleri, konuşmacı sırası → cinsiyet, en son duyulan
     this.pitch = new GenderTracker();
@@ -205,6 +213,7 @@ class Session {
     return {
       sentences: this.sentences.length, blobs, audioSec: Math.round(audioSec * 10) / 10,
       heapMB: Math.round((performance.memory?.usedJSHeapSize || 0) / 1048576) || null,
+      longTasks: { n: this.longTasks.n, ms: Math.round(this.longTasks.ms), max: Math.round(this.longTasks.max) },
       ...(this.separation?.memoryInfo?.() || {}),
     };
   }
@@ -234,6 +243,7 @@ class Session {
   destroy() {
     if (!this.alive) return;
     this.alive = false;
+    this._ltObs?.disconnect();
     clearInterval(this._tick);
     clearInterval(this._pitchTimer);
     clearInterval(this._persistTimer);
