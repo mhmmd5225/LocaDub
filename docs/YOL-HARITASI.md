@@ -43,7 +43,7 @@ Rapor: `docs/PERFORMANS-RAPORU.md`. Görevler Sonnet 5.5'in tek tek yapabileceğ
 - **Zaman kırılımı:** başlangıç satırına `ses motoru yükleme`, `ilk çeviri`, `ilk sentez` ayrımı (`content/timing.js`).
 - **Kabul:** rapor `[Bellek]` ve ayrıntılı başlangıç satırı içerir. **Test:** `diagnostics.test.mjs`.
 
-### T4. Güncelleme denetimine yedek adres (S) — yüksek değer
+### T4. Güncelleme denetimine yedek adres (S) — yüksek değer — **yapıldı** (`common/version.js` `checkSources`, iki kaynak; yeni host izni)
 - **Dosyalar:** `extension/common/version.js`, `extension/manifest.json` (`host_permissions` + `https://mhmmd5225.github.io/*`), `update-banner.e2e.cjs`.
 - **Adımlar:** adres listesi `[localdub.mhmmd.app, mhmmd5225.github.io/LocaDub]`; ikisini dene, **büyük sürümü** kullan; biri düşerse diğeriyle devam;
   indirme bağlantısı büyük sürümün geldiği adresin `LocaDub.zip`'i.
