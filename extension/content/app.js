@@ -13,6 +13,7 @@ import { loadTranscriptEntry, saveTranscript } from '../common/transcript-store.
 import { applyGlossary, glossaryCompiler } from '../common/glossary.js';
 import { pageVideo, findPlayer, findVideo } from '../common/page.js';
 import { logError } from '../common/errlog.js';
+import { ProgressMarks } from './progressmarks.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
@@ -161,6 +162,7 @@ class Session {
     if (!this.alive || !this.video) return;
 
     this.overlay = new Overlay(this.player);
+    this.marks = new ProgressMarks(this.player); // çubukta dublajlı bölümler (tick'te güncellenir)
     this.audio = new DubAudio();
     this.sys = new SystemVoice(sendBg);
     this.ducker = new Ducker(this.video);
@@ -246,6 +248,7 @@ class Session {
     if (!this.alive) return;
     this.alive = false;
     this._ltObs?.disconnect();
+    this.marks?.destroy();
     clearInterval(this._tick);
     clearInterval(this._pitchTimer);
     clearInterval(this._persistTimer);
@@ -614,6 +617,7 @@ class Session {
       const tSyn = performance.now();
       await this.synth(needAu[0]);
       if (this.timing.synthMs == null) this.timing.synthMs = Math.round(performance.now() - tSyn); // ilk sentezin süresi
+      if (this.sentences[needAu[0]]?.audio) this.sentences[needAu[0]].dubbed = true; // çubukta işaretli kalsın (bellekten atılsa da)
       this._mark('firstAudio');
       this._prewarmVoices();
       return true;
@@ -972,6 +976,8 @@ class Session {
     const ai = activeIndex(S, t);
     this.overlay.setText(settings.showSubtitles && ai >= 0 ? (S[ai].tr ? shownText(S[ai]) : '') : '');
     if (this.enginesReady) this._updatePrep(t);
+    const nowMs = performance.now();
+    if (!this._marksAt || nowMs - this._marksAt > 500) { this._marksAt = nowMs; this.marks?.update(S, v.duration); }
 
     if (v.paused || v.seeking || !(this.mtReady || this.ttsReady)) return;
     if (this.audio.busy || this.sys.busy) return; // sıradaki bekler

@@ -127,3 +127,10 @@
 
 /* Dar oynatıcıda yalnızca rozet (ve dönen gösterge) kalsın. */
 .ytp-small-mode .yt-tr-dub-btn .yt-tr-dub-label { display: none; }
+
+/* Oynatıcı çubuğunda dublaj işaretleri (content/progressmarks.js): çubuğun hemen üstünde ince şerit */
+.ld-marks { position: absolute; left: 0; right: 0; top: -6px; height: 4px; pointer-events: none; z-index: 40; }
+.ld-marks > div { position: absolute; inset: 0; }
+.ld-marks i { position: absolute; top: 0; bottom: 0; border-radius: 1px; }
+.ld-marks-dubbed i { background: #3ccf8e; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.35); }
+.ld-marks-translated i { background: rgba(255, 255, 255, 0.55); }
