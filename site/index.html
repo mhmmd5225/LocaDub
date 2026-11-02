@@ -3,236 +3,374 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LocaDub: YouTube'u Türkçe izleyin</title>
-  <meta name="description" content="İngilizce YouTube videolarını bilgisayarınızda Türkçe seslendiren ücretsiz Chrome eklentisi. Metin ve ses hiçbir sunucuya gitmez.">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)">
-  <meta property="og:title" content="LocaDub: YouTube'u Türkçe izleyin">
+  <title>LocaDub: YouTube için Türkçe dublaj</title>
+  <meta name="description" content="İngilizce YouTube videolarını bilgisayarınızda Türkçe seslendiren ücretsiz Chrome eklentisi. Konuşma gider, müzik kalır. Metin ve ses hiçbir sunucuya gitmez.">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:title" content="LocaDub: YouTube için Türkçe dublaj">
   <meta property="og:description" content="İngilizce YouTube videolarını bilgisayarınızda Türkçe seslendiren ücretsiz Chrome eklentisi.">
   <meta property="og:image" content="https://localdub.mhmmd.app/icon.png">
   <link rel="icon" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #ffffff;
-      --soft: #f4f5f7;
-      --ink: #12161c;
-      --mute: #5d6672;
-      --line: #e3e6ea;
-      --red: #d42a2f;
-      --red-ink: #ffffff;
-      --green: #22c55e;
-      color-scheme: light;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0e1116;
-        --soft: #161b22;
-        --ink: #eef1f4;
-        --mute: #9aa4b0;
-        --line: #252c35;
-        --red: #ef4146;
-        color-scheme: dark;
-      }
+      --black: #000;
+      --white: #fff;
+      --light: #f5f5f7;
+      --gray: #86868b;
+      --gray-dark: #6e6e73;
+      --ink: #1d1d1f;
+      --blue: #0071e3;
+      --blue-dark: #2997ff;
+      --red: #e3262d;
+      --green: #30d158;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-    body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.55 "Figtree", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    a { color: inherit; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; background: var(--white); color: var(--ink); font: 400 17px/1.47 var(--font); letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
     img, svg { display: block; }
     h1, h2, h3, p { margin: 0; }
-    :focus-visible { outline: 3px solid var(--red); outline-offset: 3px; border-radius: 8px; }
-    .wrap { width: min(1080px, 100% - 40px); margin-inline: auto; }
+    :focus-visible { outline: 3px solid var(--blue-dark); outline-offset: 3px; border-radius: 8px; }
+    .wrap { width: min(980px, 100% - 44px); margin-inline: auto; }
 
-    /* Üst çubuk */
-    .nav { height: 72px; display: flex; align-items: center; gap: 16px; }
-    .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; text-decoration: none; margin-right: auto; }
-    .logo img { width: 32px; height: 32px; border-radius: 9px; }
-    .nav .link { color: var(--mute); text-decoration: none; font-weight: 500; font-size: 15.5px; }
-    .nav .link:hover { color: var(--ink); }
+    /* Gezinme çubuğu */
+    .gn { position: sticky; top: 0; z-index: 50; height: 48px; background: rgba(22, 22, 23, .8); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); color: #e8e8ed; }
+    .gn .wrap { height: 100%; display: flex; align-items: center; gap: 28px; font-size: 12.5px; letter-spacing: -0.01em; }
+    .gn .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; margin-right: auto; color: #f5f5f7; }
+    .gn .logo img { width: 20px; height: 20px; border-radius: 5px; }
+    .gn a:not(.logo):not(.pill) { opacity: .8; transition: opacity .2s; }
+    .gn a:hover { opacity: 1; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; background: var(--blue); color: #fff; border-radius: 980px; font-weight: 400; transition: background .2s; }
+    .pill:hover { background: #0077ed; }
+    .gn .pill { padding: 4px 12px; font-size: 12px; }
 
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 52px; padding: 0 26px; border-radius: 14px; font: 600 16.5px/1 "Figtree", sans-serif; text-decoration: none; border: 0; cursor: pointer; transition: transform .15s, background .15s; }
-    .btn svg { width: 19px; height: 19px; }
-    .btn.red { background: var(--red); color: var(--red-ink); }
-    .btn.red:hover { background: color-mix(in srgb, var(--red) 88%, #000); }
-    .btn.soft { background: var(--soft); color: var(--ink); }
-    .btn.soft:hover { background: var(--line); }
-    .btn:active { transform: scale(.98); }
-    .btn.sm { height: 40px; padding: 0 16px; font-size: 15px; border-radius: 11px; }
+    /* Bağlantı düğmeleri (Apple: mavi metin ve ›) */
+    .links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 16px 36px; margin-top: 26px; font-size: 19px; }
+    .links .pill { padding: 12px 24px; font-size: 17px; }
+    .more { color: var(--blue); display: inline-flex; align-items: center; gap: 4px; }
+    .dark .more { color: var(--blue-dark); }
+    .more:hover { text-decoration: underline; }
+    .more svg { width: 9px; height: 14px; }
 
-    /* Giriş */
-    .hero { text-align: center; padding: 56px 0 0; }
-    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px; border-radius: 999px; background: var(--soft); font-size: 14px; font-weight: 500; color: var(--mute); margin-bottom: 24px; }
-    .badge b { background: var(--green); color: #04220f; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
-    h1 { font-size: clamp(42px, 7vw, 80px); line-height: 1.02; font-weight: 800; letter-spacing: -0.045em; }
-    .sub { font-size: clamp(17px, 2.2vw, 20px); color: var(--mute); max-width: 34em; margin: 20px auto 0; }
-    .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 32px; }
-    .note { margin-top: 14px; font-size: 14px; color: var(--mute); }
+    /* Siyah giriş */
+    .dark { background: var(--black); color: #f5f5f7; }
+    .hero { text-align: center; padding: 76px 0 0; overflow: hidden; }
+    .eyebrow { font-size: 21px; font-weight: 600; color: #f5f5f7; letter-spacing: .01em; }
+    .hero h1 {
+      margin-top: 6px; font-size: clamp(52px, 10vw, 112px); line-height: 1.02; font-weight: 700; letter-spacing: -0.045em;
+      background: linear-gradient(180deg, #ffffff 30%, #a9a9b0 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero .sub { font-size: clamp(19px, 2.4vw, 28px); line-height: 1.25; font-weight: 500; color: var(--gray); margin-top: 14px; letter-spacing: -0.02em; }
+    .ver { font-size: 14px; color: var(--gray-dark); margin-top: 14px; }
 
-    /* Oynatıcı görseli */
-    .player { position: relative; margin: 56px auto 0; max-width: 920px; aspect-ratio: 16 / 9; border-radius: 22px; overflow: hidden; background: #171c22;
-      box-shadow: 0 30px 60px -30px rgba(10, 20, 30, .45), 0 0 0 1px var(--line); }
-    .scene { position: absolute; inset: 0; background:
-      radial-gradient(60% 70% at 25% 30%, #3a4a58 0%, transparent 60%),
-      radial-gradient(50% 60% at 80% 75%, #4a3a33 0%, transparent 60%), #1c2228; }
-    .host { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 30%; aspect-ratio: 1 / 1.05; }
-    .host::before { content: ""; position: absolute; left: 32%; top: 4%; width: 36%; aspect-ratio: 1; border-radius: 50%; background: #c8cfd5; }
-    .host::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: 0; height: 50%; border-radius: 50% 50% 0 0; background: #c8cfd5; }
-    .cap { position: absolute; left: 50%; bottom: 17%; transform: translateX(-50%); width: 90%; text-align: center; }
-    .cap span { display: inline; background: rgba(0,0,0,.72); color: #fff; padding: 4px 12px; border-radius: 6px; font-size: clamp(14px, 2.3vw, 24px); line-height: 1.75; font-weight: 500; box-decoration-break: clone; -webkit-box-decoration-break: clone; transition: opacity .3s; }
-    .cap span.en { color: #c9d0d6; }
-    .cap.hide span { opacity: 0; }
-    .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 13%; min-height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 3%; background: linear-gradient(transparent, rgba(0,0,0,.55)); color: #fff; }
-    .bar .track { position: absolute; left: 3%; right: 3%; top: 0; height: 4px; border-radius: 2px; background: rgba(255,255,255,.25); }
-    .bar .track i { position: absolute; left: 0; top: 0; bottom: 0; width: 41%; border-radius: 2px; background: #f00; }
-    .bar .track em { position: absolute; left: 41%; width: 22%; top: -5px; height: 3px; border-radius: 2px; background: #3ccf8e; }
-    .bar .play { width: 0; height: 0; border-left: 12px solid #fff; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
-    .bar .time { font-size: 13px; opacity: .85; font-variant-numeric: tabular-nums; }
-    .tr { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 4px 12px 4px 4px; border-radius: 999px; background: rgba(34,197,94,.22); }
-    .tr b { background: var(--green); color: #04220f; font-size: 11.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
-    .tr.off { background: rgba(255,255,255,.12); }
-    .tr.off b { background: transparent; color: #fff; box-shadow: inset 0 0 0 1.5px #fff; }
+    /* Dizüstü görseli */
+    .stage { position: relative; margin: 64px auto 0; width: min(1040px, 100%); padding: 0 22px; }
+    .glow { position: absolute; left: 50%; top: 18%; width: 80%; height: 70%; transform: translateX(-50%); background: radial-gradient(closest-side, rgba(227, 38, 45, .35), rgba(41, 151, 255, .18) 55%, transparent); filter: blur(40px); pointer-events: none; }
+    .laptop { position: relative; }
+    .lid { position: relative; margin: 0 auto; width: 84%; border-radius: 18px 18px 6px 6px; padding: 1.4% 1.4% 2.2%; background: linear-gradient(#2b2b2e, #1a1a1c); box-shadow: inset 0 0 0 1px #3a3a3d; }
+    .base { position: relative; height: clamp(10px, 1.7vw, 18px); margin: 0 auto; width: 100%; border-radius: 2px 2px 14px 14px / 2px 2px 100% 100%; background: linear-gradient(#d8d8dc, #8e8e93 60%, #5a5a5e); }
+    .base::before { content: ""; position: absolute; left: 50%; top: 0; width: 14%; height: 45%; transform: translateX(-50%); border-radius: 0 0 8px 8px; background: #a1a1a6; }
+    .screen { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: #0f0f0f; }
+    .yt { position: absolute; inset: 0; display: grid; grid-template-rows: 7% 1fr 15%; }
+    .yt-top { display: flex; align-items: center; gap: 1.5%; padding: 0 2.5%; background: #0f0f0f; }
+    .yt-top i { height: 34%; aspect-ratio: 1.4; border-radius: 3px; background: #ff0033; }
+    .yt-top b { width: 9%; height: 22%; border-radius: 3px; background: #2a2a2a; }
+    .yt-top span { margin-left: 18%; width: 36%; height: 46%; border-radius: 99px; background: #121212; box-shadow: inset 0 0 0 1px #303030; }
+    .video { position: relative; margin: 0 2.5%; border-radius: 6px; overflow: hidden;
+      background:
+        radial-gradient(70% 90% at 78% 30%, rgba(255, 170, 90, .55), transparent 60%),
+        radial-gradient(60% 80% at 15% 85%, rgba(40, 90, 160, .65), transparent 60%),
+        linear-gradient(160deg, #1b2a3c, #3b2a2a 60%, #1a1416); }
+    .person { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 26%; aspect-ratio: 1 / 1.1; }
+    .person::before { content: ""; position: absolute; left: 32%; top: 2%; width: 36%; aspect-ratio: 1; border-radius: 50%; background: linear-gradient(#1c1c1e, #0c0c0d); }
+    .person::after { content: ""; position: absolute; left: 3%; right: 3%; bottom: 0; height: 52%; border-radius: 50% 50% 0 0; background: linear-gradient(#1c1c1e, #0c0c0d); }
+    .sub-tr { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); width: 86%; text-align: center; }
+    .sub-tr span { background: rgba(8, 8, 8, .75); color: #fff; font-size: clamp(9px, 1.7vw, 19px); line-height: 1.6; padding: .15em .5em; border-radius: 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone; transition: opacity .35s; }
+    .sub-tr.swap span { opacity: 0; }
+    .ctrl { position: absolute; left: 0; right: 0; bottom: 0; height: 15%; min-height: 22px; padding: 0 2.5%; display: flex; align-items: center; gap: 2%; background: linear-gradient(transparent, rgba(0,0,0,.6)); }
+    .prog { position: absolute; left: 2.5%; right: 2.5%; top: 0; height: 3px; background: rgba(255,255,255,.25); border-radius: 2px; }
+    .prog i { position: absolute; inset: 0 62% 0 0; background: #ff0033; border-radius: 2px; }
+    .prog em { position: absolute; left: 38%; width: 21%; top: -4px; height: 2px; background: #3ccf8e; border-radius: 2px; }
+    .play { width: 0; height: 0; border-left: clamp(6px, 1vw, 11px) solid #fff; border-top: clamp(4px, .6vw, 7px) solid transparent; border-bottom: clamp(4px, .6vw, 7px) solid transparent; }
+    .tr { margin-left: auto; display: inline-flex; align-items: center; gap: .5em; font-size: clamp(7px, 1vw, 12px); font-weight: 600; color: #fff; padding: .3em .8em .3em .3em; border-radius: 99px; background: rgba(48, 209, 88, .22); }
+    .tr b { background: var(--green); color: #032a10; padding: .15em .5em; border-radius: 99px; font-size: .92em; }
+    .yt-meta { padding: 1.4% 2.5% 0; display: grid; gap: 7%; align-content: start; }
+    .yt-meta i { height: 14%; min-height: 4px; width: 46%; border-radius: 3px; background: #2a2a2a; }
+    .yt-meta i + i { width: 24%; background: #1f1f1f; }
 
-    /* Özellikler */
-    section { padding: 112px 0 0; }
-    h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.08; font-weight: 800; letter-spacing: -0.035em; text-align: center; }
-    .lead { text-align: center; color: var(--mute); margin: 12px auto 0; max-width: 32em; }
-    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
-    .f { background: var(--soft); border-radius: 20px; padding: 26px; }
-    .f .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); display: grid; place-items: center; color: var(--red); margin-bottom: 18px; }
-    .f .ic svg { width: 22px; height: 22px; }
-    .f h3 { font-size: 18.5px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
-    .f p { color: var(--mute); font-size: 15.5px; }
-    .f.wide { grid-column: span 2; display: grid; grid-template-columns: auto 1fr; gap: 0 22px; align-items: center; background: var(--ink); color: var(--bg); }
-    .f.wide .ic { margin: 0; background: var(--red); color: #fff; width: 56px; height: 56px; border-radius: 16px; }
-    .f.wide .ic svg { width: 28px; height: 28px; }
-    .f.wide p { color: color-mix(in srgb, var(--bg) 70%, transparent); }
+    /* Bölümler */
+    .sec { padding: 140px 0; text-align: center; }
+    .sec h2 { font-size: clamp(40px, 6.4vw, 80px); line-height: 1.05; font-weight: 700; letter-spacing: -0.04em; }
+    .sec .lead { font-size: clamp(19px, 2.2vw, 24px); line-height: 1.33; font-weight: 500; color: var(--gray-dark); max-width: 30em; margin: 20px auto 0; letter-spacing: -0.015em; }
+    .dark .lead { color: var(--gray); }
+    .grad { background: linear-gradient(90deg, #ff6a5a, #e3262d 40%, #ff9f0a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+    /* Kaydırmaya bağlı sahne: konuşma gider, Türkçe gelir */
+    .scrolly { position: relative; height: 240vh; background: var(--light); }
+    .sticky { position: sticky; top: 48px; height: calc(100vh - 48px); display: grid; place-items: center; overflow: hidden; }
+    .stems { width: min(860px, 100% - 44px); text-align: left; }
+    .stems h2 { text-align: center; font-size: clamp(40px, 6.4vw, 80px); line-height: 1.05; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 56px; }
+    .stem { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 20px; padding: 14px 0; }
+    .stem .name { font-size: 17px; font-weight: 600; transition: color .2s; }
+    .stem .name small { display: block; font-size: 13px; font-weight: 400; color: var(--gray-dark); }
+    .wave { height: 64px; width: 100%; }
+    .wave path { stroke: currentColor; }
+    .stem.speech { color: #a1a1a6; }
+    .stem.music { color: #0a84ff; }
+    .stem.dub { color: var(--red); }
+    .stem .name { color: var(--ink); }
+    .stem.speech .name s { text-decoration-thickness: 2px; text-decoration-color: transparent; transition: text-decoration-color .3s; }
+    .stem.speech.gone .name s { text-decoration-color: var(--ink); }
+    .meter { margin: 40px auto 0; text-align: center; font-size: 19px; color: var(--gray-dark); min-height: 1.5em; }
+    .meter strong { color: var(--ink); font-weight: 600; }
+
+    /* Konuşmacılar */
+    .voices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 72px; text-align: left; }
+    .card { border-radius: 28px; padding: 30px; background: #161617; }
+    .avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 20px; color: #000; margin-bottom: 44px; }
+    .card .who { font-size: 14px; color: var(--gray); }
+    .card .hz { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; margin: 4px 0 18px; }
+    .card .hz small { font-size: 18px; font-weight: 600; color: var(--gray); margin-left: 4px; }
+    .card .to { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; padding-top: 18px; border-top: 1px solid #2c2c2e; }
+    .card .to svg { width: 18px; height: 18px; color: var(--gray); }
+
+    /* Özellik ızgarası */
+    .bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 20px; margin-top: 72px; text-align: left; }
+    .tile { background: var(--white); border-radius: 28px; padding: 36px; display: flex; flex-direction: column; min-height: 300px; }
+    .tile.w3 { grid-column: span 3; } .tile.w2 { grid-column: span 2; } .tile.w4 { grid-column: span 4; }
+    .tile .big { font-size: clamp(64px, 8vw, 104px); font-weight: 700; letter-spacing: -0.05em; line-height: 1; margin-top: auto; }
+    .tile h3 { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+    .tile p { color: var(--gray-dark); font-size: 17px; margin-top: 8px; }
+    .tile.black { background: var(--black); color: #f5f5f7; }
+    .tile.black p { color: var(--gray); }
+    .tile .ic { width: 52px; height: 52px; margin-bottom: auto; color: var(--ink); }
+    .tile.black .ic { color: #f5f5f7; }
+    .tile .ic + h3 { margin-top: 40px; }
 
     /* Kurulum */
-    .steps { list-style: none; margin: 48px auto 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
-    .steps li { counter-increment: s; border: 1px solid var(--line); border-radius: 20px; padding: 24px; }
-    .steps li::before { content: counter(s); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--bg); font-weight: 700; font-size: 15px; margin-bottom: 16px; }
-    .steps h3 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-    .steps p { color: var(--mute); font-size: 15.5px; }
-    code { font: 500 .88em ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--soft); padding: 1px 6px; border-radius: 6px; }
-    .last { text-align: center; margin-top: 40px; }
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 72px; text-align: left; border-top: 1px solid #d2d2d7; }
+    .steps li { list-style: none; padding: 28px 28px 0 0; }
+    .steps li + li { padding-left: 28px; border-left: 1px solid #d2d2d7; }
+    .steps .n { font-size: 15px; font-weight: 600; color: var(--gray-dark); }
+    .steps h3 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 8px 0 6px; }
+    .steps p { color: var(--gray-dark); }
+    .steps ol { margin: 0; padding: 0; display: contents; }
+    code { font: 500 .9em ui-monospace, "SF Mono", Consolas, monospace; background: var(--light); padding: 1px 6px; border-radius: 6px; }
 
-    footer { margin-top: 112px; border-top: 1px solid var(--line); }
-    footer .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 28px 0 40px; color: var(--mute); font-size: 14.5px; }
-    footer nav { display: flex; gap: 20px; margin-left: auto; }
-    footer a { text-decoration: none; }
-    footer a:hover { color: var(--ink); }
+    /* Son çağrı */
+    .final { padding: 120px 0 130px; }
+    .final h2 { background: linear-gradient(180deg, #fff 30%, #a1a1a6); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-    @media (max-width: 860px) {
-      .grid, .steps { grid-template-columns: 1fr 1fr; }
-      .f.wide { grid-column: 1 / -1; }
-      section { padding-top: 88px; }
+    footer { background: var(--light); color: var(--gray-dark); font-size: 12px; line-height: 1.5; letter-spacing: -0.01em; }
+    footer .wrap { padding: 18px 0 22px; }
+    footer p + p { margin-top: 8px; }
+    footer .row { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; border-top: 1px solid #d2d2d7; padding-top: 10px; margin-top: 12px; }
+    footer nav { display: flex; gap: 18px; }
+    footer a { color: #424245; }
+    footer a:hover { text-decoration: underline; }
+
+    /* Görünürken belirme (yalnız giriş görseli ve bölüm başlıkları) */
+    .rise { opacity: 0; transform: translateY(40px); transition: opacity 1s cubic-bezier(.2,.7,.2,1), transform 1s cubic-bezier(.2,.7,.2,1); }
+    .rise.in { opacity: 1; transform: none; }
+    .stage .laptop { transform: scale(.94); opacity: 0; transition: transform 1.4s cubic-bezier(.2,.7,.2,1), opacity 1.2s; }
+    .stage.in .laptop { transform: none; opacity: 1; }
+
+    @media (max-width: 900px) {
+      .voices { grid-template-columns: 1fr; max-width: 520px; margin-inline: auto; }
+      .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tile.w3, .tile.w2 { grid-column: span 1; } .tile.w4 { grid-column: span 2; }
+      .steps { grid-template-columns: 1fr; border-top: 0; }
+      .steps li, .steps li + li { padding: 24px 0; border-left: 0; border-top: 1px solid #d2d2d7; }
+      .sec { padding: 100px 0; }
     }
-    @media (max-width: 600px) {
-      .wrap { width: min(1080px, 100% - 32px); }
-      .nav .link { display: none; }
-      .hero { padding-top: 32px; }
-      .cta .btn { flex: 1 1 100%; }
-      .player { margin-top: 40px; border-radius: 16px; aspect-ratio: 4 / 3; }
-      .host { width: 44%; }
-      .cap { bottom: 23%; }
-      .cap span { font-size: 14px; }
-      .bar .time { display: none; }
-      .grid, .steps { grid-template-columns: 1fr; gap: 12px; }
-      .f.wide { grid-template-columns: 1fr; gap: 16px; }
-      .f, .steps li { padding: 22px; }
-      footer nav { margin-left: 0; }
+    @media (max-width: 640px) {
+      .gn a.hide-s { display: none; }
+      .hero { padding-top: 56px; }
+      .links { flex-direction: column; gap: 18px; }
+      .stage { margin-top: 48px; padding: 0 12px; }
+      .lid { width: 92%; border-radius: 12px 12px 4px 4px; }
+      .bento { gap: 12px; }
+      .tile { min-height: 200px; padding: 22px; border-radius: 22px; }
+      .tile.w4 { min-height: 220px; }
+      .tile h3 { font-size: 19px; }
+      .tile p { font-size: 15px; }
+      .tile .big { font-size: 56px; }
+      .tile .ic { width: 40px; height: 40px; }
+      .tile .ic + h3 { margin-top: 28px; }
+      .stem { grid-template-columns: 1fr; gap: 4px; padding: 10px 0; }
+      .wave { height: 44px; }
+      .stems h2 { margin-bottom: 32px; }
+      .card { padding: 26px; }
     }
-    @media (prefers-reduced-motion: reduce) { .cap span { transition: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .rise, .stage .laptop { opacity: 1; transform: none; transition: none; }
+      .scrolly { height: auto; }
+      .sticky { position: static; height: auto; padding: 100px 0; }
+      .sub-tr span { transition: none; }
+    }
   </style>
 </head>
 <body>
-  <header class="wrap nav">
-    <a class="logo" href="./"><img src="icon.png" alt="" width="32" height="32">LocaDub</a>
-    <a class="link" href="#ozellikler">Özellikler</a>
-    <a class="link" href="#kurulum">Kurulum</a>
-    <a class="link" href="https://github.com/mhmmd5225/LocaDub">GitHub</a>
-    <a class="btn red sm" href="LocaDub.zip" download>İndir</a>
+  <header class="gn">
+    <div class="wrap">
+      <a class="logo" href="./"><img src="icon.png" alt="" width="20" height="20">LocaDub</a>
+      <a class="hide-s" href="#dublaj">Dublaj</a>
+      <a class="hide-s" href="#sesler">Sesler</a>
+      <a class="hide-s" href="#ozellikler">Özellikler</a>
+      <a class="hide-s" href="#kurulum">Kurulum</a>
+      <a class="pill" href="LocaDub.zip" download>İndir</a>
+    </div>
   </header>
 
   <main>
-    <div class="wrap hero">
-      <span class="badge"><b>TR</b><span data-version>Ücretsiz Chrome eklentisi</span></span>
-      <h1>YouTube'u Türkçe izleyin.</h1>
-      <p class="sub">İngilizce videoları bilgisayarınızda Türkçeye çevirir ve seslendirir. İnternete bir şey göndermez.</p>
-      <div class="cta">
-        <a class="btn red" href="LocaDub.zip" download>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
-          <span data-dl>Chrome için indir</span>
-        </a>
-        <a class="btn soft" href="#kurulum">Nasıl kurulur?</a>
-      </div>
-      <p class="note">Masaüstü Chrome 116 ve üstü</p>
-
-      <figure class="player" aria-label="Örnek: İngilizce altyazı Türkçe seslendiriliyor" style="margin-bottom:0">
-        <div class="scene"><div class="host"></div></div>
-        <div class="cap" id="cap"><span id="capText">Yaklaşık otuz dakikamız kaldı, size sonuçları göstereyim.</span></div>
-        <div class="bar" aria-hidden="true">
-          <span class="track"><i></i><em></em></span>
-          <span class="play"></span>
-          <span class="time">5:12 / 12:40</span>
-          <span class="tr" id="tr"><b>TR</b><span>Dublaj aktif</span></span>
-        </div>
-      </figure>
-    </div>
-
-    <section id="ozellikler">
+    <section class="dark hero">
       <div class="wrap">
-        <h2>Gerçek bir dublaj gibi</h2>
-        <p class="lead">Tek tuşla açılır, videoyla birlikte konuşur.</p>
-        <div class="grid">
-          <div class="f wide">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-            <div>
-              <h3>Müzik ve efektler kalır</h3>
-              <p>İngilizce konuşma videodan ayrılır; yerine Türkçe ses gelir.</p>
+        <p class="eyebrow">LocaDub</p>
+        <h1>Türkçe dublaj.</h1>
+        <p class="sub">YouTube için. Tamamen bilgisayarınızda.</p>
+        <div class="links">
+          <a class="pill" href="LocaDub.zip" download data-dl>Chrome için indir</a>
+          <a class="more" href="#dublaj">Nasıl çalıştığını görün <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></a>
+        </div>
+        <p class="ver" data-version>Ücretsiz. Masaüstü Chrome 116 ve üstü.</p>
+      </div>
+      <div class="stage" id="stage">
+        <div class="glow"></div>
+        <figure class="laptop" style="margin:0" aria-label="Dizüstü ekranında YouTube; video Türkçe dublajlı oynuyor">
+          <div class="lid">
+            <div class="screen">
+              <div class="yt">
+                <div class="yt-top"><i></i><b></b><span></span></div>
+                <div class="video">
+                  <div class="person"></div>
+                  <div class="sub-tr" id="cap"><span id="capText">Yaklaşık otuz dakikamız kaldı, size sonuçları göstereyim.</span></div>
+                  <div class="ctrl" aria-hidden="true">
+                    <span class="prog"><i></i><em></em></span>
+                    <span class="play"></span>
+                    <span class="tr"><b>TR</b>Dublaj aktif</span>
+                  </div>
+                </div>
+                <div class="yt-meta"><i></i><i></i></div>
+              </div>
             </div>
           </div>
-          <div class="f">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M17 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg></div>
-            <h3>Her konuşmacıya ayrı ses</h3>
-            <p>Kadın, erkek, kalın, ince: sesine en yakın Türkçe ses.</p>
+          <div class="base"></div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="scrolly" id="dublaj" aria-label="Konuşma gider, müzik kalır">
+      <div class="sticky">
+        <div class="stems">
+          <h2>Konuşma gider.<br>Müzik kalır.</h2>
+          <div class="stem speech" id="stSpeech">
+            <span class="name"><s>İngilizce konuşma</s><small>videodan ayrılır</small></span>
+            <svg class="wave" viewBox="0 0 600 64" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
-          <div class="f">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-            <h3>Tamamen yerel</h3>
-            <p>Altyazı, çeviri ve ses bilgisayarınızdan çıkmaz.</p>
+          <div class="stem music">
+            <span class="name">Müzik ve efektler<small>olduğu gibi kalır</small></span>
+            <svg class="wave" viewBox="0 0 600 64" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
-          <div class="f">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></div>
-            <h3>13 Türkçe ses</h3>
-            <p>Erkek ve kadın sesleri; isterseniz Türkçe altyazı da.</p>
+          <div class="stem dub" id="stDub">
+            <span class="name">Türkçe dublaj<small>cihazınızda üretilir</small></span>
+            <svg class="wave" viewBox="0 0 600 64" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
-          <div class="f">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></div>
-            <h3>Ücretsiz</h3>
-            <p>Hesap, abonelik ya da API anahtarı yok.</p>
+          <p class="meter" id="meter" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="dark sec" id="sesler">
+      <div class="wrap">
+        <h2 class="rise">Her sese,<br><span class="grad">kendi sesi.</span></h2>
+        <p class="lead rise">LocaDub kimin konuştuğunu sesinden tanır. Her konuşmacıya, perdesine en yakın Türkçe ses verilir.</p>
+        <div class="voices">
+          <div class="card rise">
+            <div class="avatar" style="background:#64d2ff">1</div>
+            <p class="who">Konuşmacı 1, erkek</p>
+            <p class="hz">132<small>Hz</small></p>
+            <p class="to"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>Antalia Mini</p>
+          </div>
+          <div class="card rise">
+            <div class="avatar" style="background:#ff9f0a">2</div>
+            <p class="who">Konuşmacı 2, kadın</p>
+            <p class="hz">205<small>Hz</small></p>
+            <p class="to"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>Supertonic Kadın 2</p>
+          </div>
+          <div class="card rise">
+            <div class="avatar" style="background:#bf5af2">3</div>
+            <p class="who">Konuşmacı 3, erkek</p>
+            <p class="hz">95<small>Hz</small></p>
+            <p class="to"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>Supertonic Erkek 2</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="kurulum">
+    <section class="sec" id="ozellikler" style="background:var(--light)">
       <div class="wrap">
-        <h2>Üç adımda kurulum</h2>
+        <h2 class="rise">Tek tuş. Gerisi otomatik.</h2>
+        <p class="lead rise">Oynatıcıdaki TR düğmesine basın. LocaDub çevirir, seslendirir ve videoyla aynı anda konuşturur.</p>
+        <div class="bento">
+          <div class="tile black w4 rise">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            <h3>Bilgisayarınızdan çıkmaz.</h3>
+            <p>Altyazı, çeviri ve ses tarayıcınızın içinde işlenir. Sunucu yok, hesap yok.</p>
+          </div>
+          <div class="tile w2 rise">
+            <h3>Türkçe ses</h3>
+            <p>Kadın ve erkek, üç üslup.</p>
+            <p class="big">13</p>
+          </div>
+          <div class="tile w2 rise">
+            <h3>Ücret</h3>
+            <p>Abonelik ya da API anahtarı yok.</p>
+            <p class="big">0 ₺</p>
+          </div>
+          <div class="tile w2 rise">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 15h4M13 15h4"/></svg>
+            <h3>Türkçe altyazı</h3>
+            <p>İsterseniz çeviri ekranda da görünür.</p>
+          </div>
+          <div class="tile w2 rise">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>
+            <h3>Ekran kartıyla hızlı</h3>
+            <p>WebGPU varsa kullanır; yoksa işlemcide çalışır.</p>
+          </div>
+          <div class="tile w3 rise">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+            <h3>Hazır bölümler çubukta.</h3>
+            <p>Dublajı hazır kısımlar ilerleme çubuğunda yeşil görünür.</p>
+          </div>
+          <div class="tile w3 rise">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+            <h3>Shorts'ta da.</h3>
+            <p>Normal videolarda, Shorts'ta ve gömülü videolarda çalışır.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="kurulum">
+      <div class="wrap">
+        <h2 class="rise">Bir dakikada kurun.</h2>
         <ol class="steps">
-          <li><h3>İndirin</h3><p>ZIP'i indirip açın; içinden <code>LocaDub</code> klasörü çıkar.</p></li>
-          <li><h3>Chrome'a yükleyin</h3><p><code>chrome://extensions</code>, Geliştirici modu, <em>Paketlenmemiş öğe yükle</em>.</p></li>
-          <li><h3>TR'ye basın</h3><p>Bir YouTube videosunda oynatıcıdaki TR düğmesi dublajı başlatır.</p></li>
+          <li class="rise"><span class="n">Adım 1</span><h3>İndirin.</h3><p>ZIP'i açın; içinden <code>LocaDub</code> klasörü çıkar.</p></li>
+          <li class="rise"><span class="n">Adım 2</span><h3>Yükleyin.</h3><p><code>chrome://extensions</code> sayfasında Geliştirici modunu açıp <em>Paketlenmemiş öğe yükle</em>'ye basın.</p></li>
+          <li class="rise"><span class="n">Adım 3</span><h3>TR'ye basın.</h3><p>Bir YouTube videosunda oynatıcıdaki TR düğmesi dublajı başlatır.</p></li>
         </ol>
-        <div class="last">
-          <a class="btn red" href="LocaDub.zip" download>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
-            <span data-dl>Chrome için indir</span>
-          </a>
+      </div>
+    </section>
+
+    <section class="dark sec final">
+      <div class="wrap">
+        <h2 class="rise">Bir sonraki videoyu<br>Türkçe izleyin.</h2>
+        <div class="links rise">
+          <a class="pill" href="LocaDub.zip" download data-dl>Chrome için indir</a>
+          <a class="more" href="https://github.com/mhmmd5225/LocaDub">Kaynak kod <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></a>
         </div>
       </div>
     </section>
@@ -240,53 +378,116 @@
 
   <footer>
     <div class="wrap">
-      <span>LocaDub, açık kaynak. Türkçe ses yapay zekâ ile üretilir.</span>
-      <nav aria-label="Alt bağlantılar">
-        <a href="https://github.com/mhmmd5225/LocaDub">GitHub</a>
-        <a href="https://github.com/mhmmd5225/LocaDub/issues">Sorun bildir</a>
-        <a href="gizlilik.html">Gizlilik</a>
-      </nav>
+      <p>Türkçe ses yapay zekâ ile cihazınızda üretilir. Çeviri makine çevirisidir. İngilizce altyazısı olan videolarda çalışır; canlı yayın ve mobil desteklenmez.</p>
+      <p>Modeller: OPUS-MT (CC BY 4.0), Antalia Mini, EMA Lightning (Apache-2.0), Ahenk Cep (CC BY 4.0), Supertonic 3 (OpenRAIL-M), UVR MDX-Net (MIT), WeSpeaker (CC BY 4.0). Çeviri ve okunuş yaklaşımı <a href="https://github.com/ozcancelik/harfiyen">harfiyen</a> (MIT).</p>
+      <div class="row">
+        <span>LocaDub, açık kaynak.</span>
+        <nav aria-label="Alt bağlantılar">
+          <a href="https://github.com/mhmmd5225/LocaDub">GitHub</a>
+          <a href="https://github.com/mhmmd5225/LocaDub/issues">Sorun bildir</a>
+          <a href="gizlilik.html">Gizlilik</a>
+        </nav>
+      </div>
     </div>
   </footer>
 
   <script>
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // Sürüm ve paket boyutu (yayın iş akışı version.json üretir)
     fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
       if (!v) return;
       const mb = (v.bytes / 1048576).toFixed(1).replace('.', ',');
-      document.querySelectorAll('[data-dl]').forEach((el) => { el.textContent = `Chrome için indir (${mb} MB)`; });
-      document.querySelectorAll('[data-version]').forEach((el) => { el.textContent = `Sürüm ${v.version}, ücretsiz`; });
+      document.querySelectorAll('[data-version]').forEach((el) => { el.textContent = `Sürüm ${v.version}. Ücretsiz. Masaüstü Chrome 116 ve üstü. ${mb} MB.`; });
     }).catch(() => {});
 
-    // Altyazı önce İngilizce, sonra Türkçe (dublaj açılır)
-    const LINES = [
-      ["we've got about thirty minutes left, so let me show you the results", 'Yaklaşık otuz dakikamız kaldı, size sonuçları göstereyim.'],
-      ["it's not about how fast you go, it's about how consistent you are", 'Ne kadar hızlı gittiğin değil, ne kadar istikrarlı olduğun önemli.'],
-      ['do you know what happens when you mix these two chemicals?', 'Bu iki kimyasalı karıştırınca ne olur, biliyor musunuz?'],
+    // Görünürken belirme
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    }, { rootMargin: '0px 0px -12% 0px' });
+    document.querySelectorAll('.rise, #stage').forEach((el) => io.observe(el));
+
+    // Ekrandaki altyazı: Türkçe cümleler döner
+    const TR = [
+      'Yaklaşık otuz dakikamız kaldı, size sonuçları göstereyim.',
+      'Ne kadar hızlı gittiğin değil, ne kadar istikrarlı olduğun önemli.',
+      'Bu iki kimyasalı karıştırınca ne olur, biliyor musunuz?',
     ];
-    const cap = document.getElementById('cap');
-    const text = document.getElementById('capText');
-    const tr = document.getElementById('tr');
-    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-    async function show(t, en) {
-      cap.classList.add('hide');
-      await wait(300);
-      text.textContent = t;
-      text.className = en ? 'en' : '';
-      tr.className = en ? 'tr off' : 'tr';
-      tr.lastElementChild.textContent = en ? 'Dublaj kapalı' : 'Dublaj aktif';
-      cap.classList.remove('hide');
+    if (!reduce) {
+      const cap = document.getElementById('cap');
+      const txt = document.getElementById('capText');
+      let i = 0;
+      setInterval(() => {
+        cap.classList.add('swap');
+        setTimeout(() => { i = (i + 1) % TR.length; txt.textContent = TR[i]; cap.classList.remove('swap'); }, 350);
+      }, 4200);
     }
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      (async () => {
-        for (let i = 0; ; i = (i + 1) % LINES.length) {
-          await show(LINES[i][0], true);
-          await wait(2600);
-          await show(LINES[i][1], false);
-          await wait(3800);
-        }
-      })();
+
+    // Dalga şekilleri (tekrarlanabilir sözde rastgele)
+    const rnd = (s) => () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const SEG = [[0.04, 0.2], [0.27, 0.46], [0.53, 0.72], [0.79, 0.96]];
+    function bars(kind) {
+      const r = rnd(kind === 'speech' ? 3 : kind === 'music' ? 9 : 5);
+      const n = 120, bw = 600 / n;
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const x = (i + 0.5) / n;
+        let a;
+        if (kind === 'music') a = 0.28 + 0.2 * Math.abs(Math.sin(i * 0.31)) + 0.12 * r();
+        else a = SEG.some(([s, e]) => x >= s && x <= e) ? 0.35 + 0.65 * r() : 0.04;
+        out.push([i * bw + bw / 2, a]);
+      }
+      return out;
     }
+    const WAVES = {};
+    document.querySelectorAll('.stem').forEach((st) => {
+      const kind = st.classList.contains('speech') ? 'speech' : st.classList.contains('music') ? 'music' : 'dub';
+      WAVES[kind] = { svg: st.querySelector('.wave'), bars: bars(kind) };
+    });
+    function draw(kind, k) {
+      const { svg, bars: b } = WAVES[kind];
+      let d = '';
+      for (const [x, a] of b) {
+        const h = Math.max(2, a * k * 60);
+        d += `M${x.toFixed(1)} ${(32 - h / 2).toFixed(1)}v${h.toFixed(1)}`;
+      }
+      svg.innerHTML = `<path d="${d}" stroke-width="3.1" stroke-linecap="round"/>`;
+    }
+
+    // Kaydırmaya bağlı: konuşma söner, Türkçe gelir
+    const scrolly = document.querySelector('.scrolly');
+    const stSpeech = document.getElementById('stSpeech');
+    const meter = document.getElementById('meter');
+    let lastP = -1;
+    function progress() {
+      if (reduce) return 1;
+      const r = scrolly.getBoundingClientRect();
+      const span = r.height - innerHeight;
+      return Math.min(1, Math.max(0, (-r.top + innerHeight * 0.15) / (span * 0.75)));
+    }
+    function update() {
+      const p = Math.round(progress() * 100) / 100;
+      if (p === lastP) return;
+      lastP = p;
+      const ease = (t) => t * t * (3 - 2 * t);
+      const speech = 1 - ease(Math.min(1, p / 0.55));
+      const dub = ease(Math.max(0, Math.min(1, (p - 0.35) / 0.55)));
+      draw('speech', speech);
+      draw('music', 1);
+      draw('dub', dub);
+      stSpeech.classList.toggle('gone', speech < 0.15);
+      meter.innerHTML = p < 0.3 ? 'Orijinal video: <strong>İngilizce konuşma ve müzik</strong>'
+        : p < 0.75 ? 'Konuşma ayrılıyor…'
+        : 'Duyduğunuz: <strong>müzik ve Türkçe dublaj</strong>';
+    }
+    let ticking = false;
+    addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { ticking = false; update(); });
+    }, { passive: true });
+    addEventListener('resize', update);
+    update();
   </script>
 </body>
 </html>
