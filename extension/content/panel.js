@@ -198,7 +198,7 @@ export class Panel {
     this.live = h('span', { class: 'ld-sr', 'aria-live': 'polite' });
 
     // panel
-    this.mainSwitch = toggle('', (on) => { resumeAudio(); setSettings({ enabled: on }); }, { 'aria-label': 'Türkçe dublaj' });
+    this.mainSwitch = toggle('', (on) => { resumeAudio(); window.dispatchEvent(new CustomEvent('locadub-set-enabled', { detail: on })); }, { 'aria-label': 'Türkçe dublaj' });
     this.headState = h('span', { class: 'ld-head-state' });
     const head = h('div', { class: 'ld-head' },
       h('span', { class: 'ld-logo ld-logo-l', 'aria-hidden': 'true', text: 'TR' }),
@@ -408,7 +408,7 @@ export class Panel {
   _renderControls() {
     const s = this.settings;
     if (!s) return;
-    this.mainSwitch.input.checked = s.enabled;
+    this.mainSwitch.input.checked = !!this.vm.enabled; // sekmeye özel (app.js)
     const sys = s.voice === 'system';
     this.genderSwitch.input.checked = s.genderVoices && !sys;
     this.genderSwitch.input.disabled = sys;
