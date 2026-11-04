@@ -215,12 +215,12 @@ const sizePlayer = (page, w, h) => page.evaluate(([w, h]) => {
 
     // dublaj kapalı: hap yok, TR düğmesi duruyor; altyazı itmesi kalkar
     await page.keyboard.press('Escape');
-    await opt.evaluate(() => chrome.storage.local.set({ enabled: false }));
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('locadub-set-enabled', { detail: false })));
     await page.waitForSelector('.ld-pill', { state: 'hidden', timeout: 5000 });
     assert.equal(await page.locator('#movie_player .yt-tr-dub-btn').count(), 1);
     assert.equal(await page.evaluate(() => document.getElementById('movie_player').classList.contains('ld-pill-on')), false);
     await page.screenshot({ path: path.join(OUT, 'panel-disabled.png') });
-    await opt.evaluate(() => chrome.storage.local.set({ enabled: true }));
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('locadub-set-enabled', { detail: true })));
     await page.waitForSelector('.ld-pill', { state: 'visible', timeout: 5000 });
     if (await page.locator('.ld-panel').isHidden()) await page.click('.ld-pill');
     await page.waitForSelector('.ld-panel:not([hidden])');

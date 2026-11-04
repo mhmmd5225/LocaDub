@@ -65,7 +65,21 @@ function bindRange(id, fmt) {
 bindRange('ttsVolume', (v) => `%${Math.round(v * 100)}`);
 bindRange('originalVolume', (v) => `%${Math.round(v * 100)}`);
 
-$('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
+// Dublaj durumu sekmeye özeldir: açılır pencere etkin sekmedeki içerik betiğiyle konuşur (YouTube dışında depoya yazar).
+let tabEnabled = null; // null: etkin sekmede eklenti yok
+async function tabMsg(m) {
+  try {
+    const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return t?.id ? await chrome.tabs.sendMessage(t.id, m) : null;
+  } catch { return null; }
+}
+async function refreshTab() { const r = await tabMsg({ type: 'dub.state' }); tabEnabled = r ? !!r.enabled : null; }
+$('enabled').addEventListener('change', async (e) => {
+  const r = await tabMsg({ type: 'dub.set', enabled: e.target.checked });
+  if (!r) setSettings({ enabled: e.target.checked });
+  await refreshTab();
+  render();
+});
 $('separation').checked = settings.separation !== 'off';
 $('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
 $('openOptions').addEventListener('click', () => openOptions());
@@ -180,7 +194,9 @@ function show(kind, title, detail = '', action = null, pct = null) {
 }
 
 async function render() {
-  $('enabled').checked = settings.enabled;
+  await refreshTab();
+  const on = tabEnabled ?? settings.enabled;
+  $('enabled').checked = on;
   const res = await bg({ type: 'engine.status' });
   const st = res.ok ? res.result : null;
   const dl = Object.values(progress).filter((p) => p && !p.done && !p.error && !p.cached && p.total);
@@ -196,7 +212,7 @@ async function render() {
   } else if (!settings.modelsApproved) {
     show('warn', 'Modeller indirilmedi', 'Dublaj için çeviri ve ses modellerinin bir kez indirilmesi gerekiyor.',
       { label: 'Modelleri indir', run: () => openOptions('#indirme') });
-  } else if (!settings.enabled) {
+  } else if (!on) {
     show('off', 'Dublaj kapalı', modelNames() || 'Açmak için anahtarı ya da videodaki TR düğmesini kullanın.');
   } else {
     show('ok', 'Dublaj açık', modelNames() || 'İngilizce altyazılı bir YouTube videosu açın.');

@@ -1234,7 +1234,7 @@ function ensureButton() {
   const player = session?.player?.isConnected ? session.player : findPlayer(document, pageKind());
   ensureToggleButton(state, () => {
     resumeAudio();
-    setSettings({ enabled: !settings.enabled });
+    setEnabled(!settings.enabled);
   }, detail, player);
   // oynatıcı paneli: oynatıcı değişince yeniden kurulur
   if (panel && (panel.player !== player || !panel.root.isConnected)) { panel.destroy(); panel = null; }
@@ -1250,6 +1250,17 @@ function route() {
   if (!vid || !settings.enabled) return;
   session = new Session(vid);
   session.start().catch((e) => console.error(LOG, e));
+}
+
+// Dublajın açık/kapalı durumu sekmeye özeldir: bir sekmede kapatmak ötekini etkilemez. Depodaki `enabled` yalnız
+// yeni açılan sekmenin başlangıç değeridir (son seçim); başka sekmenin değişikliği buradaki durumu değiştirmez.
+function setEnabled(on) {
+  on = !!on;
+  if (settings.enabled === on) return;
+  const prev = settings;
+  settings = { ...settings, enabled: on };
+  onSettings(prev, ['enabled']);
+  setSettings({ enabled: on });
 }
 
 function onSettings(prev, keys) {
@@ -1277,11 +1288,16 @@ export async function start() {
   settings = await getSettings();
   onSettingsChanged((s, keys) => {
     const prev = settings;
-    settings = s;
-    onSettings(prev, keys);
+    keys = keys.filter((k) => k !== 'enabled'); // sekmeye özel (setEnabled)
+    settings = { ...s, enabled: prev.enabled };
+    if (keys.length) onSettings(prev, keys);
   });
+  window.addEventListener('locadub-set-enabled', (e) => setEnabled(e.detail));
   chrome.runtime.onMessage.addListener((msg, _from, respond) => {
     if (msg?.type === 'engine.progress') session?.onProgress(msg);
+    // açılır pencere: bu sekmenin dublaj durumu (sekmeye özel)
+    if (msg?.type === 'dub.state') respond({ enabled: !!settings.enabled });
+    if (msg?.type === 'dub.set') { setEnabled(msg.enabled); respond({ enabled: !!settings.enabled }); }
     // [tanılama] ses ayırma özeti: ayarlar sayfasındaki rapor için (background diag.separation → üst çerçeve)
     if (msg?.type === 'diag.separation') {
       const sp = session?.separation;

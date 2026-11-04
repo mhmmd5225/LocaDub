@@ -319,3 +319,9 @@ dialog p { margin: 0 0 6px; }
   font: 12px/1.5 var(--ld-mono); color: var(--fg);
 }
 #benchBlock .diagrow { margin-top: 8px; }
+.au-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 13px; }
+.au-row #autoUpdateStatus { flex: 1 1 260px; color: var(--muted, inherit); }
+#autoUpdateGroup { padding: 7px 18px; }
+#autoUpdateGroup[open] { padding: 9px 18px 12px; }
+#autoUpdateGroup summary { cursor: pointer; }
+#autoUpdateGroup .au-row { margin-top: 8px; }

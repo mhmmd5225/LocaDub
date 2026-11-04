@@ -306,3 +306,10 @@ xvfb-run -a node tests/extension/e2e/separation.e2e.cjs     # bekletme senaryola
 - **Hız sınırı:** `process({ pace: { targetRtf } })` ile her pencere grubu en az (grubun ses süresi × targetRtf) sürer; fazlası bekleme
   (en çok 1 sn). İçerik betiği (`gpuPace`): video bekletilirken 0.25, oynarken ve ileride ≥ 12 sn tampon varken 0.6, yetişmek gerekirken sınır yok.
   WASM'da sınır yok. Çıktı hız sınırından etkilenmez (birim testi: fark 0). Değerler başlangıç tahminidir (`SEP.paceHold`, `SEP.pacePlay`).
+
+## Ekran kartı alınamazsa (0.5.7)
+
+`navigator.gpu` var olsa bile `requestAdapter()` null dönebilir (ör. sürücü çökmesinden sonra Chrome WebGPU'yu kapatır).
+Ayırma bu durumda sessizce WASM'a düşer ve gerçek zamandan yavaş kalır. 0.5.7'den itibaren neden tanılama raporunda
+(`ekran kartı sorunu:`) ve panelde görünür; alınan kartın özeti `ekran kartı:` satırındadır. Çözüm: Chrome'u tamamen
+kapatıp açmak; `chrome://gpu` sayfasında WebGPU'nun "Hardware accelerated" olduğunu doğrulamak.
