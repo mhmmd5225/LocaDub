@@ -319,6 +319,8 @@ export class SeparatedAudio extends EventTarget {
       batch: this.batch,
       chunkSec: Math.round(this.chunkSec * 100) / 100,
       streaming: this.streaming,
+      gpuAdapter: this.gpuAdapter || null,
+      fallbackReason: this.fallbackReason || null,
     };
   }
 
@@ -371,6 +373,8 @@ export class SeparatedAudio extends EventTarget {
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
+        this.gpuAdapter = info.adapter || null;
+        this.fallbackReason = info.fallbackReason || null;
         if (info.fallbackReason) logError('ayırma (WebGPU)', info.fallbackReason); // sessiz yedeğe düşme görünür olsun
         this.model = info.model || null;
         if (Number.isFinite(info.contextSec)) this.ctxSec = Math.min(3, Math.max(0, info.contextSec));
@@ -808,7 +812,9 @@ export class SeparatedAudio extends EventTarget {
           `${this.gate.etaSec != null ? `, ≈ ${Math.ceil(this.gate.etaSec)} sn` : ''})`
         : 'Ses ayırma yetişmedi: bu bölümde orijinal ses çalıyor.';
       case 'playing': return `Gerçek dublaj: yalnızca müzik ve efektler${this.backend ? ` (${this.backend})` : ''}.` +
-        (this.backend === 'wasm' ? ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.' : '');
+        (this.backend === 'wasm' ? (this.fallbackReason && /bağdaştırıcı/.test(this.fallbackReason)
+          ? ' Chrome ekran kartını kapattı: Chrome\'u tamamen kapatıp açın; ayırma şimdi yavaş.'
+          : ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.') : '');
       default: void t; return '';
     }
   }

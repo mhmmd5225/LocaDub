@@ -72,6 +72,7 @@ export function createSeparator(opts = {}) {
   let session = opts.session || null;
   let backend = session ? opts.backend || 'custom' : null;
   let fallbackReason = null; // WebGPU kurulamayıp yedeğe düşüldüyse nedeni (tanılama: worker 'loaded' → içerik betiği)
+  let adapterInfo = null; // alınan ekran kartının özeti (tanılama)
   let loading = null;
   let queue = Promise.resolve();
   let stream = null;
@@ -101,10 +102,18 @@ export function createSeparator(opts = {}) {
     if (want === 'cpu' || want === 'wasm') return want;
     const gpu = globalThis.navigator?.gpu;
     if (gpu) {
-      const adapter = await gpu.requestAdapter().catch(() => null);
-      if (adapter) return 'webgpu';
+      const adapter = (await gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null))
+        || (await gpu.requestAdapter().catch(() => null));
+      if (adapter) {
+        const i = adapter.info || {};
+        adapterInfo = [i.vendor, i.architecture, i.description].filter(Boolean).join(' ').slice(0, 120) || 'bilinmiyor';
+        return 'webgpu';
+      }
+      fallbackReason = 'WebGPU bağdaştırıcısı alınamadı: Chrome ekran kartını eklentiye kapatmış olabilir (sürücü çökmesinden sonra). Chrome\'u tamamen kapatıp açın; chrome://gpu\'ya bakın.';
+    } else {
+      fallbackReason = 'Ayırma işçisinde WebGPU yok.';
     }
-    if (want === 'webgpu') console.warn('[sep] WebGPU yok, WASM kullanılıyor');
+    console.warn('[sep] ' + fallbackReason);
     return 'wasm';
   }
 
@@ -430,6 +439,7 @@ export function createSeparator(opts = {}) {
     get model() { return model; },
     get backend() { return backend; },
     get fallbackReason() { return fallbackReason; },
+    get adapter() { return adapterInfo; },
     get batch() { return batch; },
     get overlap() { return overlap; },
     contextSec: CONTEXT_SEC,

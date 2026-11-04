@@ -76,7 +76,7 @@ self.onmessage = (ev) => {
         const s = await load(msg);
         self.postMessage({
           type: 'loaded', id, backend: s.backend, model: s.model.id, contextSec: s.contextSec, chunkSec: s.chunkSec,
-          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null,
+          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null, adapter: s.adapter || null,
         });
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');

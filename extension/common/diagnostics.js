@@ -56,7 +56,10 @@ export function separationLines(sep) {
   const c = [];
   if (num(sep.holds) != null) c.push(`bekleme: ${sep.holds} kez, toplam ${Math.round((num(sep.holdMs) || 0) / 1000)} sn`);
   c.push(`son hata: ${sep.lastError ? scrub(sep.lastError) : 'yok'}`);
-  return [a.join(' · '), b.join(' · '), c.join(' · ')];
+  const out = [a.join(' · '), b.join(' · '), c.join(' · ')];
+  if (sep.gpuAdapter) out.push(`ekran kartı: ${scrub(sep.gpuAdapter)}`);
+  if (sep.fallbackReason) out.push(`ekran kartı sorunu: ${scrub(sep.fallbackReason)}`);
+  return out;
 }
 
 const mb = (b) => `${(b / 1048576).toFixed(1)} MB`;
@@ -101,7 +104,7 @@ export function buildReport(d) {
     const one = (name, s) => `${name}: ${s?.ready ? 'hazır' : s?.loading ? 'yükleniyor' : 'yüklü değil'}` +
       `${s?.backend || s?.voice ? ` (${s.backend || s.voice})` : ''}${s?.error ? ` — hata: ${scrub(s.error)}` : ''}`;
     L.push(one('çeviri', st.mt), one('ses', st.tts));
-    L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU: ${!!st.webgpu} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
+    L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU API: ${st.webgpu ? 'var' : 'yok'} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
   L.push('', '[Bellek]', ...memoryLines(d.separation));
