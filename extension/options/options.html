@@ -234,16 +234,26 @@
         </div>
       </div>
 
+      <details class="group" id="autoUpdateGroup" title="Eklenti klasörden yüklü olduğu için Chrome onu kendiliğinden güncellemez. Klasörü bir kez seçerseniz yeni sürüm indirilir, bu klasöre yazılır ve eklenti yeniden yüklenir (açık YouTube sekmesi yokken).">
+        <summary><b>Otomatik güncelleme</b> <span class="note" id="autoUpdateNote"></span></summary>
+        <div class="au-row">
+          <span id="autoUpdateStatus"></span>
+          <button type="button" id="autoUpdatePick">Eklenti klasörünü seç</button>
+          <button type="button" id="autoUpdateNow" hidden>Şimdi güncelle</button>
+          <button type="button" id="autoUpdateOff" class="secondary" hidden>Bağlantıyı kaldır</button>
+        </div>
+      </details>
+
       <div class="group">
         <h2>Sözlük <span class="note" id="glossaryNote"></span></h2>
         <div class="pair">
           <label class="stack">
             <span><b>Çeviri düzeltmeleri</b> <small>altyazıda ve seste</small></span>
-            <textarea id="glossaryMt" rows="3" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
+            <textarea id="glossaryMt" rows="2" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
           </label>
           <label class="stack">
             <span><b>Okunuşlar</b> <small>yalnızca seste</small></span>
-            <textarea id="glossaryTts" rows="3" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
+            <textarea id="glossaryTts" rows="2" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
           </label>
         </div>
         <small class="hint">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Sonuna <code>*</code> koyarsanız sözcüğün ekleri korunur; <code>#</code> ile başlayan satır yorumdur.</small>

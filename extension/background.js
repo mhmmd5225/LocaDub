@@ -1,7 +1,8 @@
 // Service worker: offscreen yönetimi, mesaj yönlendirme, ilerleme yayını, chrome.tts (sistem sesi).
 
 import { getSettings } from './common/settings.js';
-import { checkSources } from './common/version.js';
+import { checkSources, compareVersions } from './common/version.js';
+import { getDirHandle, permission, applyUpdate } from './common/self-update.js';
 import { pushError } from './common/diagnostics.js';
 
 const OFFSCREEN_URL = 'offscreen.html';
@@ -178,10 +179,31 @@ async function checkUpdate() {
     });
     if (!latest) return null; // iki kaynak da yanıt vermedi (çevrimdışı): sessizce geç
     await chrome.storage.local.set({ update: { latest, checkedAt: Date.now() } });
+    autoApply(latest).catch(() => {});
     return latest;
   } catch {
     return null; // sessiz: depolama yazılamadı
   }
+}
+
+// Otomatik uygulama: eklenti klasörü seçilmiş ve yazma izni sürüyorsa yeni paket indirilir, klasöre yazılır ve eklenti
+// yeniden yüklenir. Açık bir YouTube sekmesi varken yapılmaz (dublajı kesmesin): sonraki denetimde ya da tarayıcı
+// açılışında denenir. Sonuç chrome.storage.local → updateApply (ayarlar sayfasında görünür).
+let applying = false;
+async function autoApply(latest) {
+  const installed = chrome.runtime.getManifest().version;
+  if (applying || compareVersions(latest.version, installed) <= 0) return;
+  const dir = await getDirHandle();
+  if (!dir || !(await permission(dir))) return;
+  if ((await chrome.tabs.query({ url: ['https://www.youtube.com/*', 'https://www.youtube-nocookie.com/*'] })).length) return;
+  applying = true;
+  try {
+    const r = await applyUpdate(dir, latest, installed);
+    await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), ...r } });
+    chrome.runtime.reload();
+  } catch (e) {
+    await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), error: String(e?.message || e).slice(0, 200) } });
+  } finally { applying = false; }
 }
 
 function scheduleUpdateCheck() {
@@ -190,6 +212,7 @@ function scheduleUpdateCheck() {
 
 chrome.alarms.onAlarm.addListener((a) => { if (a.name === UPDATE_ALARM) checkUpdate(); });
 chrome.runtime.onStartup.addListener(scheduleUpdateCheck);
+chrome.runtime.onStartup.addListener(() => { checkUpdate(); }); // tarayıcı açılışında, YouTube sekmesi açılmadan önce
 
 // Her tarayıcı açılışında dublaj kapalı başlar (servis çalışanının uyanması onStartup'ı tetiklemez).
 function resetEnabledOnStartup() {

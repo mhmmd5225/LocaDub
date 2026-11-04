@@ -1080,3 +1080,43 @@ selectTab(tabFromHash() || 'indirme');
 renderBasics();
 refreshModels();
 renderStatus();
+
+
+// ---------- Otomatik güncelleme (common/self-update.js) ----------
+{
+  const T = await import('../common/self-update.js');
+  const V = await import('../common/version.js');
+  const st = $('autoUpdateStatus');
+  const set = (t) => { st.textContent = t; };
+  async function renderAuto() {
+    const dir = await T.getDirHandle();
+    const { update, updateApply } = await chrome.storage.local.get(['update', 'updateApply']);
+    const cur = chrome.runtime.getManifest().version;
+    const latest = update?.latest && V.compareVersions(update.latest.version, cur) > 0 ? update.latest : null;
+    $('autoUpdatePick').textContent = dir ? 'Klasörü değiştir' : 'Eklenti klasörünü seç';
+    $('autoUpdateOff').hidden = !dir;
+    $('autoUpdateNow').hidden = !(dir && latest);
+    $('autoUpdateNow').textContent = latest ? `${latest.version} sürümüne güncelle` : '';
+    const ok = dir ? await T.permission(dir).catch(() => false) : false;
+    $('autoUpdateNote').textContent = dir ? (ok ? '· açık' : '· izin gerekli') : '· kapalı';
+    set(!dir ? 'Kapalı: yeni sürümü elle indirip kurmanız gerekir.'
+      : (ok ? `Açık: klasör "${dir.name}".` : `Klasör "${dir.name}" seçili ama yazma izni yok; "Şimdi güncelle" ya da klasörü yeniden seçmek izni yeniler.`) +
+        (latest ? ` Yeni sürüm ${latest.version} hazır.` : ' Kurulu sürüm güncel.') +
+        (updateApply?.error ? ` Son deneme başarısız: ${updateApply.error}` : ''));
+  }
+  const run = async (fn) => { try { await fn(); } catch (e) { if (e?.name !== 'AbortError') set(`Hata: ${e?.message || e}`); return; } renderAuto(); };
+  $('autoUpdatePick').addEventListener('click', () => run(() => T.pickExtensionDir()));
+  $('autoUpdateOff').addEventListener('click', () => run(() => T.clearDirHandle()));
+  $('autoUpdateNow').addEventListener('click', () => run(async () => {
+    const dir = await T.getDirHandle();
+    if (!dir || !(await T.permission(dir, true))) throw new Error('Klasöre yazma izni verilmedi');
+    const { update } = await chrome.storage.local.get('update');
+    set('İndiriliyor…');
+    const r = await T.applyUpdate(dir, update.latest, chrome.runtime.getManifest().version, { onProgress: (i, n) => set(`Yazılıyor… ${i}/${n}`) });
+    await chrome.storage.local.set({ updateApply: { version: update.latest.version, at: Date.now(), ...r } });
+    set('Güncellendi; eklenti yeniden yükleniyor…');
+    setTimeout(() => chrome.runtime.reload(), 600);
+  }));
+  chrome.storage.onChanged.addListener((c, a) => { if (a === 'local' && (c.update || c.updateApply)) renderAuto(); });
+  renderAuto();
+}
