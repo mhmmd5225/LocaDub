@@ -313,3 +313,20 @@ xvfb-run -a node tests/extension/e2e/separation.e2e.cjs     # bekletme senaryola
 Ayırma bu durumda sessizce WASM'a düşer ve gerçek zamandan yavaş kalır. 0.5.7'den itibaren neden tanılama raporunda
 (`ekran kartı sorunu:`) ve panelde görünür; alınan kartın özeti `ekran kartı:` satırındadır. Çözüm: Chrome'u tamamen
 kapatıp açmak; `chrome://gpu` sayfasında WebGPU'nun "Hardware accelerated" olduğunu doğrulamak.
+
+## Deneysel: WebNN (NPU) arka ucu (0.5.8)
+
+Ayarlar → Diğer → *Otomatik güncelleme ve deneysel* → **Deneysel ses ayırma arka ucu** → "WebNN — NPU". Varsayılan
+"Otomatik"tir (WebNN hiç denenmez). Yalnız ses ayırma bu yolu kullanır; çeviri ve seslendirme modelleri dinamik şekilli
+olduğundan WebNN'e uygun değildir.
+
+- **Gerekenler:** `chrome://flags/#web-machine-learning-neural-network` açık, Chrome yeniden başlatılmış, güncel NPU sürücüsü
+  (Intel Core Ultra: *Intel AI Boost* sürücüsü). "NPU'yu dene" düğmesi bağlam kurulabiliyor mu diye bakar.
+- **Güvenli geri dönüş:** WebNN yoksa ya da oturum kurulamazsa (ör. modelde NPU'nun desteklemediği bir işlem) ayırma kendiliğinden
+  WebGPU'ya, o da yoksa WASM'a düşer; neden tanılama raporunda `ekran kartı sorunu:` satırında yazar.
+- **Ölçüm:** NPU seçiliyken *Hız testi* ek olarak "ses ayırma (WebNN NPU)" satırı verir (toplu 1, WebGPU ölçümünün yanında).
+- **Beklenti:** hız garantisi yoktur; NPU'nun amacı çoğunlukla GPU'yu/işlemciyi boşaltmak ve güç tasarrufudur.
+
+| Cihaz | WebGPU rtf | WebNN NPU rtf | WASM rtf |
+|---|---|---|---|
+| Intel Core Ultra 7 265 | _ölçülecek_ | _ölçülecek_ | _ölçülecek_ |

@@ -1,5 +1,6 @@
 // YouTube içerik uygulaması: altyazı → çeviri → seslendirme → senkron çalma.
 
+import { backendChoice } from '../common/webnn.js';
 import { getSettings, setSettings, onSettingsChanged, chooseVoice, toneFor, voiceGender, genderVoice } from '../common/settings.js';
 import { styleSpeed } from '../engines/tts/styles.js';
 import { DEFAULT_VOICE } from '../engines/tts/voices.js';
@@ -324,13 +325,13 @@ class Session {
     const want = this.alive && this.video && settings.enabled && settings.separation === 'auto' && !ad &&
       (settings.engineMode === 'mock' || settings.modelsApproved);
     const mode = settings.engineMode === 'mock' ? 'mock' : 'real';
-    if (this.separation && (!want || this.separation.mode !== mode)) {
+    if (this.separation && (!want || this.separation.mode !== mode || this.separation.backendChoice.kind !== backendChoice(settings.sepBackend).kind)) {
       this.separation.destroy();
       this.separation = null;
     }
     if (this.separation) this.separation.setPrebuffer(settings.prebufferSec);
     if (!want || this.separation) return;
-    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, otherHold: () => this._hold.active });
+    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, backend: settings.sepBackend, otherHold: () => this._hold.active });
     sep.addEventListener('state', (ev) => this._onSepState(ev.detail));
     this.separation = sep.start();
   }
@@ -1269,6 +1270,13 @@ function onSettings(prev, keys) {
   if ((has('separation') && settings.separation === 'off') || (has('enabled') && !settings.enabled)) {
     session?.syncSeparation();
     disposeSeparation();
+  }
+  if (has('sepBackend') && session) {
+    // deneysel arka uç değişti: işçi yeni ayarla yeniden yüklensin
+    session.separation?.destroy();
+    session.separation = null;
+    disposeSeparation();
+    session.syncSeparation();
   }
   if (has('enabled')) { route(); return; }
   ensureButton();

@@ -45,9 +45,9 @@ export function createSepClient({ mock = false, workerUrl } = {}) {
     });
   }
 
-  async function load({ model, backend = 'auto', onProgress, threads, overlap, batch } = {}) {
-    const msg = { type: 'load', model, backend, threads, overlap, batch };
-    const multi = !mock && globalThis.crossOriginIsolated && (threads === undefined || threads > 1) && backend !== 'webgpu';
+  async function load({ model, backend = 'auto', webnnDevice, onProgress, threads, overlap, batch } = {}) {
+    const msg = { type: 'load', model, backend, webnnDevice, threads, overlap, batch };
+    const multi = !mock && globalThis.crossOriginIsolated && (threads === undefined || threads > 1) && backend !== 'webgpu' && backend !== 'webnn';
     if (!multi) return send(msg, [], onProgress);
     // bekçi indirme bittikten sonra kurulur (model işçinin içinde indirilir; yavaş ağ askı sayılmamalı)
     let timer, fire;

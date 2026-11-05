@@ -48,13 +48,14 @@ async function load(msg) {
   configure(msg.threads);
   const model = msg.model || 'auto';
   const want = msg.backend || 'auto';
-  const key = [model, want, msg.overlap ?? '', msg.batch ?? ''].join('|');
+  const key = [model, want, msg.webnnDevice ?? '', msg.overlap ?? '', msg.batch ?? ''].join('|');
   if (sep && sepKey === key) return sep;
   if (sep) await sep.dispose();
   sep = null;
   const s = createSeparator({
     model,
     backend: want,
+    webnnDevice: msg.webnnDevice,
     ort,
     overlap: msg.overlap,
     batch: msg.batch,

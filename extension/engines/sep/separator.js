@@ -26,6 +26,7 @@
 // o.final: girdi sonrası sıfır sayılıp her şey kesinleştirilir (video sonu / önceden ayrılmış parçaya varış), akış biter.
 // Ölçüm: docs/SES-AYIRMA.md.
 
+import { probeWebNN, webnnProvider } from '../../common/webnn.js';
 import { sepModelById, chunkSamples, WASM_SEP_MODEL } from './models.js';
 import { stftPair, istftPair, hann } from './stft.js';
 import { resample, StreamResampler } from './resample.js';
@@ -48,7 +49,7 @@ const ZERO_LOW_BINS = 3;
  * @param {object} opts
  * @param {string|object} [opts.model] katalog kimliği (models.js), model nesnesi ya da 'auto' (WebGPU'da
  *   varsayılan model, WASM'da hafif model; seçim load()'da)
- * @param {'webgpu'|'wasm'|'auto'|'cpu'} [opts.backend] 'cpu' yalnızca onnxruntime-node
+ * @param {'webgpu'|'wasm'|'webnn'|'auto'|'cpu'} [opts.backend] 'webnn': deneysel NPU (opts.webnnDevice); olmazsa WebGPU/WASM'a düşer; 'cpu' yalnızca onnxruntime-node
  * @param {(p:{loaded:number,total:number})=>void} [opts.onProgress] indirme ilerlemesi
  * @param {object} [opts.ort] onnxruntime modülü (yoksa paketli ort.webgpu.min.mjs)
  * @param {(url:string, o:object)=>Promise<ArrayBuffer>} [opts.fetchModel] (yoksa model-cache.js)
@@ -98,7 +99,15 @@ export function createSeparator(opts = {}) {
     return buf;
   }
 
+  const note = (r) => { fallbackReason = fallbackReason ? `${fallbackReason} · ${r}` : r; console.warn('[sep] ' + r); };
+
   async function pickBackend(want) {
+    if (want === 'webnn') {
+      const pr = await probeWebNN(opts.webnnDevice || 'npu');
+      if (pr.ok) return 'webnn';
+      note(pr.reason); // WebGPU/WASM'a düşülür; neden tanılamada görünür
+      want = 'auto';
+    }
     if (want === 'cpu' || want === 'wasm') return want;
     const gpu = globalThis.navigator?.gpu;
     if (gpu) {
@@ -109,18 +118,17 @@ export function createSeparator(opts = {}) {
         adapterInfo = [i.vendor, i.architecture, i.description].filter(Boolean).join(' ').slice(0, 120) || 'bilinmiyor';
         return 'webgpu';
       }
-      fallbackReason = 'WebGPU bağdaştırıcısı alınamadı: Chrome ekran kartını eklentiye kapatmış olabilir (sürücü çökmesinden sonra). Chrome\'u tamamen kapatıp açın; chrome://gpu\'ya bakın.';
+      note('WebGPU bağdaştırıcısı alınamadı: Chrome ekran kartını eklentiye kapatmış olabilir (sürücü çökmesinden sonra). Chrome\'u tamamen kapatıp açın; chrome://gpu\'ya bakın.');
     } else {
-      fallbackReason = 'Ayırma işçisinde WebGPU yok.';
+      note('Ayırma işçisinde WebGPU yok.');
     }
-    console.warn('[sep] ' + fallbackReason);
     return 'wasm';
   }
 
   async function createSession(o, bytes, be) {
     const so = {
       graphOptimizationLevel: 'all',
-      executionProviders: [be],
+      executionProviders: [be === 'webnn' ? webnnProvider(opts.webnnDevice || 'npu') : be],
       freeDimensionOverrides: { batch_size: denoise ? 2 * batch : batch },
       ...(opts.sessionOptions || {}),
     };
@@ -140,8 +148,20 @@ export function createSeparator(opts = {}) {
           session = await createSession(o, bytes, b);
           await warmUp();
         };
+        if (be === 'webnn') {
+          try {
+            await open('webnn', 1);
+            adapterInfo = `WebNN ${opts.webnnDevice || 'npu'}`;
+          } catch (e) {
+            // model WebNN'in desteklemediği bir işlem içeriyor ya da NPU sürücüsü hata verdi: WebGPU/WASM'a düş
+            session = null;
+            note(`WebNN (${opts.webnnDevice || 'npu'}) kurulamadı: ${String(e?.message || e).slice(0, 160)}`);
+            be = await pickBackend('auto');
+            if (autoModel && be === 'wasm') { model = sepModelById(WASM_SEP_MODEL); bytes = await modelBytes(); }
+          }
+        }
         try {
-          await open(be, wantBatch || DEFAULT_BATCH[be] || 1);
+          if (be !== 'webnn') await open(be, wantBatch || DEFAULT_BATCH[be] || 1);
         } catch (e) {
           if (be !== 'webgpu') throw e;
           session = null;

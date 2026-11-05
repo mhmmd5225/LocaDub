@@ -213,6 +213,7 @@ function renderBasics() {
   $('showSubtitles').checked = settings.showSubtitles;
   $('checkUpdates').checked = settings.checkUpdates;
   $('holdStart').checked = settings.holdStart;
+  $('sepBackend').value = settings.sepBackend;
   $('separation').checked = settings.separation !== 'off';
   $('prebufferSec').disabled = settings.separation === 'off';
   $('prebufferRow').classList.toggle('is-off', settings.separation === 'off');
@@ -226,6 +227,12 @@ function renderBasics() {
 $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
+$('sepBackend').addEventListener('change', (e) => setSettings({ sepBackend: e.target.value }));
+$('webnnProbe').addEventListener('click', async () => {
+  const { probeWebNN } = await import('../common/webnn.js');
+  const r = await probeWebNN('npu');
+  $('webnnResult').textContent = r.ok ? 'NPU kullanılabilir.' : r.reason;
+});
 $('holdStart').addEventListener('change', (e) => setSettings({ holdStart: e.target.checked }));
 $('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
 $('mock').addEventListener('change', async (e) => {
@@ -1024,6 +1031,7 @@ async function startBench() {
     const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
     const result = await runBench({
       sep: { createClient: () => createSepClient({ mock: isMock() }), guard: benchGuard },
+      sepNpu: settings.sepBackend === 'webnn-npu' ? { createClient: () => createSepClient({ mock: isMock() }) } : null, // yalnız deneysel NPU seçiliyken
       tts: {
         synth: async (text) => {
           if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };

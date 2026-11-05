@@ -30,7 +30,7 @@ export function pushError(list, { source, message, at = Date.now() }) {
 }
 
 const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2', 'voice3', 'voice4',
-  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'prebufferSec',
+  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'sepBackend', 'prebufferSec',
   'ttsSpeed', 'ttsVolume', 'originalVolume', 'lookaheadSec', 'showSubtitles', 'modelsApproved', 'checkUpdates'];
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -104,7 +104,7 @@ export function buildReport(d) {
     const one = (name, s) => `${name}: ${s?.ready ? 'hazır' : s?.loading ? 'yükleniyor' : 'yüklü değil'}` +
       `${s?.backend || s?.voice ? ` (${s.backend || s.voice})` : ''}${s?.error ? ` — hata: ${scrub(s.error)}` : ''}`;
     L.push(one('çeviri', st.mt), one('ses', st.tts));
-    L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU API: ${st.webgpu ? 'var' : 'yok'} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
+    L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU API: ${st.webgpu ? 'var' : 'yok'} · WebNN API: ${st.webnn ? 'var' : 'yok'} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
   L.push('', '[Bellek]', ...memoryLines(d.separation));
