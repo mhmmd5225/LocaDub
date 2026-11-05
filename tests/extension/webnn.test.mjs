@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { probeWebNN, backendChoice, normalizeSepBackend, webnnProvider } from '../../extension/common/webnn.js';
+import { probeWebNNAll, formatProbeAll, probeWebNN, backendChoice, normalizeSepBackend, webnnProvider } from '../../extension/common/webnn.js';
 import { createSeparator } from '../../extension/engines/sep/separator.js';
 import { SEP_MODELS, sepModelById } from '../../extension/engines/sep/models.js';
 import { normalizeSettings } from '../../extension/common/settings.js';
+import { separationLines } from '../../extension/common/diagnostics.js';
 import { formatBench } from '../../extension/common/bench.js';
 
 test('probeWebNN: yok / bağlam kurulamıyor / başarılı', async () => {
@@ -18,6 +19,7 @@ test('probeWebNN: yok / bağlam kurulamıyor / başarılı', async () => {
 
 test('ayar eşlemesi ve doğrulama', () => {
   assert.deepEqual(backendChoice('webnn-npu'), { kind: 'webnn', deviceType: 'npu' });
+  assert.deepEqual(backendChoice('webnn-gpu'), { kind: 'webnn', deviceType: 'gpu' });
   assert.deepEqual(backendChoice('wasm'), { kind: 'wasm' });
   assert.deepEqual(backendChoice('saçma'), { kind: 'auto' });
   assert.equal(normalizeSepBackend('saçma'), 'auto');
@@ -53,7 +55,7 @@ async function withMl(ml, fn) {
   try { return await fn(); } finally { if (had) Object.defineProperty(nav, 'ml', had); else delete nav.ml; }
 }
 
-test('Ayırıcı: WebNN NPU oturumu kurulursa webnn kullanılır', async () => {
+test('Ayırıcı: WebNN oturumu kurulursa webnn kullanılır', async () => {
   const { ort, created } = fakeOrtWith(() => okSession());
   await withMl({ createContext: async () => ({}) }, async () => {
     const sep = createSeparator({ model: 'kim-vocal-2', backend: 'webnn', webnnDevice: 'npu', ort, fetchModel });
@@ -97,4 +99,51 @@ test('Hız testi çıktısı: WebNN satırı', () => {
   assert.match(line({ backend: 'webnn', rtf: 0.5, loadMs: 2000 }), /0\.50 rtf \(2\.0× gerçek zaman\)/);
   assert.match(line({ backend: 'wasm', fallbackReason: 'WebNN yok' }), /kullanılamadı, wasm çalıştı \(WebNN yok\)/);
   assert.match(line({ error: 'x' }), /hata — x/);
+});
+
+test('probeWebNNAll: NPU hata, GPU/CPU tamam', async () => {
+  const nav = { ml: { createContext: async ({ deviceType }) => { if (deviceType === 'npu') throw new Error('NPU sunulmuyor'); return {}; } } };
+  const all = await probeWebNNAll(nav);
+  assert.equal(all.npu.ok, false);
+  assert.equal(all.gpu.ok, true);
+  assert.match(formatProbeAll(all), /NPU: .*NPU sunulmuyor · GPU: tamam · CPU: tamam/);
+});
+
+test('Ayırıcı: WebNN yedeğe düşünce webnn bilgisi adımı ve nedeni verir; rapora girer', async () => {
+  const { ort } = fakeOrtWith((so) => { if (so.executionProviders[0]?.name === 'webnn') throw new Error('Conv desteklenmiyor'); return okSession(); });
+  await withMl({ createContext: async () => ({}) }, async () => {
+    const sep = createSeparator({ model: 'auto', backend: 'webnn', webnnDevice: 'npu', ort, fetchModel });
+    await sep.load();
+    assert.deepEqual({ ...sep.webnn }, { requested: true, used: false, device: 'npu', step: 'oturum', reason: 'Conv desteklenmiyor' });
+    const lines = separationLines({ status: 'playing', backend: 'wasm', model: 'x', webnn: sep.webnn });
+    assert.ok(lines.some((l) => /webnn \(npu\): kullanılamadı \(oturum adımı\) — Conv desteklenmiyor/.test(l)), lines.join('\n'));
+  });
+  await withMl(undefined, async () => {
+    const { ort: o2 } = fakeOrtWith(() => okSession());
+    const sep = createSeparator({ model: 'auto', backend: 'webnn', ort: o2, fetchModel });
+    await sep.load();
+    assert.equal(sep.webnn.step, 'bağlam');
+  });
+});
+
+test("Ayırma kalitesi 'fast': WebGPU'da da hafif model; 'high'te Kim Vocal 2", async () => {
+  const { ort } = fakeOrtWith(() => okSession());
+  const gpu = { requestAdapter: async () => ({ info: { vendor: 'intel' } }) };
+  const nav = globalThis.navigator;
+  const had = Object.getOwnPropertyDescriptor(nav, 'gpu');
+  Object.defineProperty(nav, 'gpu', { value: gpu, configurable: true });
+  try {
+    const fast = createSeparator({ model: 'auto', backend: 'auto', quality: 'fast', ort, fetchModel });
+    assert.equal((await fast.load()).model, 'mdxnet-lite');
+    const high = createSeparator({ model: 'auto', backend: 'auto', quality: 'high', ort, fetchModel });
+    assert.equal((await high.load()).model, 'kim-vocal-2');
+    assert.equal((await high.load()).backend, 'webgpu');
+  } finally { if (had) Object.defineProperty(nav, 'gpu', had); else delete nav.gpu; }
+  assert.equal(normalizeSettings({ sepQuality: 'fast' }).sepQuality, 'fast');
+  assert.equal(normalizeSettings({ sepQuality: 'x' }).sepQuality, 'high');
+});
+
+test('Yetişemeyen ayırmada rapora öneri satırı', () => {
+  assert.ok(separationLines({ status: 'playing', backend: 'webgpu', model: 'kim-vocal-2', rtf: 3.27 }).some((l) => /^öneri:.*Hızlı/.test(l)));
+  assert.ok(!separationLines({ status: 'playing', backend: 'webgpu', model: 'kim-vocal-2', rtf: 0.5 }).some((l) => /^öneri:/.test(l)));
 });

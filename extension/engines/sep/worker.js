@@ -48,7 +48,7 @@ async function load(msg) {
   configure(msg.threads);
   const model = msg.model || 'auto';
   const want = msg.backend || 'auto';
-  const key = [model, want, msg.webnnDevice ?? '', msg.overlap ?? '', msg.batch ?? ''].join('|');
+  const key = [model, want, msg.webnnDevice ?? '', msg.quality ?? '', msg.overlap ?? '', msg.batch ?? ''].join('|');
   if (sep && sepKey === key) return sep;
   if (sep) await sep.dispose();
   sep = null;
@@ -56,6 +56,7 @@ async function load(msg) {
     model,
     backend: want,
     webnnDevice: msg.webnnDevice,
+    quality: msg.quality,
     ort,
     overlap: msg.overlap,
     batch: msg.batch,
@@ -77,7 +78,7 @@ self.onmessage = (ev) => {
         const s = await load(msg);
         self.postMessage({
           type: 'loaded', id, backend: s.backend, model: s.model.id, contextSec: s.contextSec, chunkSec: s.chunkSec,
-          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null, adapter: s.adapter || null,
+          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null, adapter: s.adapter || null, webnn: s.webnn || null,
         });
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');

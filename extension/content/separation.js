@@ -250,8 +250,9 @@ export class SeparatedAudio extends EventTarget {
    * otherHold(): dublajın kendi başlangıç bekletmesi sürüyor mu (app.js _hold) — iki bekletme birbirinin videosunu
    * erken sürdürmesin.
    */
-  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, backend = 'auto' } = {}) {
+  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, backend = 'auto', quality = 'high' } = {}) {
     super();
+    this.quality = quality;
     this.backendChoice = backendChoice(backend); // ayar: deneysel WebNN (common/webnn.js)
     this.video = video;
     this.mode = mode;
@@ -322,6 +323,7 @@ export class SeparatedAudio extends EventTarget {
       chunkSec: Math.round(this.chunkSec * 100) / 100,
       streaming: this.streaming,
       gpuAdapter: this.gpuAdapter || null,
+      webnn: this.webnn || null,
       fallbackReason: this.fallbackReason || null,
     };
   }
@@ -371,11 +373,12 @@ export class SeparatedAudio extends EventTarget {
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
       // model kendiliğinden: WebGPU'da Kim Vocal 2, yoksa hafif model daha az örtüşmeyle (engines/sep/worker.js)
-      .then(() => h.load({ model: 'auto', backend: this.backendChoice.kind, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...(h.gpu || this.backendChoice.kind === 'webnn' ? {} : { overlap: 0.25 }) }))
+      .then(() => h.load({ model: 'auto', backend: this.backendChoice.kind, quality: this.quality, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...((h.gpu || this.backendChoice.kind === 'webnn') && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
         this.gpuAdapter = info.adapter || null;
+        this.webnn = info.webnn || null;
         this.fallbackReason = info.fallbackReason || null;
         if (info.fallbackReason) logError('ayırma (WebGPU)', info.fallbackReason); // sessiz yedeğe düşme görünür olsun
         this.model = info.model || null;
@@ -816,7 +819,9 @@ export class SeparatedAudio extends EventTarget {
       case 'playing': return `Gerçek dublaj: yalnızca müzik ve efektler${this.backend ? ` (${this.backend})` : ''}.` +
         (this.backend === 'wasm' ? (this.fallbackReason && /bağdaştırıcı/.test(this.fallbackReason)
           ? ' Chrome ekran kartını kapattı: Chrome\'u tamamen kapatıp açın; ayırma şimdi yavaş.'
-          : ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.') : '');
+          : ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.') : '') +
+        (this.rtf > 1.2 && this.status === 'playing' ? ' Ayırma yetişemiyor: Ayarlar\'nda \'Hızlı\' ayırma kalitesini ya da WebNN arka ucunu deneyin.' : '') +
+        (this.webnn?.requested && !this.webnn.used ? ` NPU (WebNN) kullanılamadı${this.webnn.reason ? ': ' + String(this.webnn.reason).slice(0, 90) : ''}.` : '');
       default: void t; return '';
     }
   }

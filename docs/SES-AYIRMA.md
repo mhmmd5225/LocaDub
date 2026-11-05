@@ -330,3 +330,11 @@ olduğundan WebNN'e uygun değildir.
 | Cihaz | WebGPU rtf | WebNN NPU rtf | WASM rtf |
 |---|---|---|---|
 | Intel Core Ultra 7 265 | _ölçülecek_ | _ölçülecek_ | _ölçülecek_ |
+
+### Ayrı ekran kartı olmayan cihazlar (0.5.9)
+
+Intel Core Ultra 7 265 (yalnız iGPU Xe-LPG) ölçümü: WebGPU + Kim Vocal 2 = 3.27 rtf (gerçek zamandan ≈ 3× yavaş), video sık bekler.
+Çözümler seçenektir, otomatik değildir (varsayılan kalite yüksek kalır):
+- **Ayarlar → Diğer → Otomatik güncelleme ve deneysel → "Ayırma: hızlı (hafif model)"**: `mdxnet-lite`, WebGPU'da da (≈ 3–5× hızlı).
+- **WebNN — NPU / WebNN — GPU** arka uçları (deneysel); "NPU'yu dene" üç cihazı da sınar.
+- Ayırma yetişemiyorsa (rtf > 1.2) panel ve tanılama raporu (`öneri:` satırı) bu seçenekleri önerir.
