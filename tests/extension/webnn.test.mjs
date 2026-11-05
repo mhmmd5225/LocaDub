@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { probeWebNN, backendChoice, normalizeSepBackend, webnnProvider } from '../../extension/common/webnn.js';
+import { probeWebNNAll, formatProbeAll, probeWebNN, backendChoice, normalizeSepBackend, webnnProvider } from '../../extension/common/webnn.js';
 import { createSeparator } from '../../extension/engines/sep/separator.js';
 import { SEP_MODELS, sepModelById } from '../../extension/engines/sep/models.js';
 import { normalizeSettings } from '../../extension/common/settings.js';
+import { separationLines } from '../../extension/common/diagnostics.js';
 import { formatBench } from '../../extension/common/bench.js';
 
 test('probeWebNN: yok / bağlam kurulamıyor / başarılı', async () => {
@@ -97,4 +98,29 @@ test('Hız testi çıktısı: WebNN satırı', () => {
   assert.match(line({ backend: 'webnn', rtf: 0.5, loadMs: 2000 }), /0\.50 rtf \(2\.0× gerçek zaman\)/);
   assert.match(line({ backend: 'wasm', fallbackReason: 'WebNN yok' }), /kullanılamadı, wasm çalıştı \(WebNN yok\)/);
   assert.match(line({ error: 'x' }), /hata — x/);
+});
+
+test('probeWebNNAll: NPU hata, GPU/CPU tamam', async () => {
+  const nav = { ml: { createContext: async ({ deviceType }) => { if (deviceType === 'npu') throw new Error('NPU sunulmuyor'); return {}; } } };
+  const all = await probeWebNNAll(nav);
+  assert.equal(all.npu.ok, false);
+  assert.equal(all.gpu.ok, true);
+  assert.match(formatProbeAll(all), /NPU: .*NPU sunulmuyor · GPU: tamam · CPU: tamam/);
+});
+
+test('Ayırıcı: WebNN yedeğe düşünce webnn bilgisi adımı ve nedeni verir; rapora girer', async () => {
+  const { ort } = fakeOrtWith((so) => { if (so.executionProviders[0]?.name === 'webnn') throw new Error('Conv desteklenmiyor'); return okSession(); });
+  await withMl({ createContext: async () => ({}) }, async () => {
+    const sep = createSeparator({ model: 'auto', backend: 'webnn', webnnDevice: 'npu', ort, fetchModel });
+    await sep.load();
+    assert.deepEqual({ ...sep.webnn }, { requested: true, used: false, device: 'npu', step: 'oturum', reason: 'Conv desteklenmiyor' });
+    const lines = separationLines({ status: 'playing', backend: 'wasm', model: 'x', webnn: sep.webnn });
+    assert.ok(lines.some((l) => /webnn \(npu\): kullanılamadı \(oturum adımı\) — Conv desteklenmiyor/.test(l)), lines.join('\n'));
+  });
+  await withMl(undefined, async () => {
+    const { ort: o2 } = fakeOrtWith(() => okSession());
+    const sep = createSeparator({ model: 'auto', backend: 'webnn', ort: o2, fetchModel });
+    await sep.load();
+    assert.equal(sep.webnn.step, 'bağlam');
+  });
 });

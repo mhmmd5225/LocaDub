@@ -73,6 +73,7 @@ export function createSeparator(opts = {}) {
   let session = opts.session || null;
   let backend = session ? opts.backend || 'custom' : null;
   let fallbackReason = null; // WebGPU kurulamayıp yedeğe düşüldüyse nedeni (tanılama: worker 'loaded' → içerik betiği)
+  let webnnInfo = opts.backend === 'webnn' ? { requested: true, used: false, device: opts.webnnDevice || 'npu', step: null, reason: null } : null; // WebNN denemesi (tanılama)
   let adapterInfo = null; // alınan ekran kartının özeti (tanılama)
   let loading = null;
   let queue = Promise.resolve();
@@ -106,6 +107,7 @@ export function createSeparator(opts = {}) {
       const pr = await probeWebNN(opts.webnnDevice || 'npu');
       if (pr.ok) return 'webnn';
       note(pr.reason); // WebGPU/WASM'a düşülür; neden tanılamada görünür
+      webnnInfo = { ...webnnInfo, step: 'bağlam', reason: pr.reason };
       want = 'auto';
     }
     if (want === 'cpu' || want === 'wasm') return want;
@@ -152,10 +154,12 @@ export function createSeparator(opts = {}) {
           try {
             await open('webnn', 1);
             adapterInfo = `WebNN ${opts.webnnDevice || 'npu'}`;
+            webnnInfo = { ...webnnInfo, used: true };
           } catch (e) {
             // model WebNN'in desteklemediği bir işlem içeriyor ya da NPU sürücüsü hata verdi: WebGPU/WASM'a düş
             session = null;
             note(`WebNN (${opts.webnnDevice || 'npu'}) kurulamadı: ${String(e?.message || e).slice(0, 160)}`);
+            webnnInfo = { ...webnnInfo, step: 'oturum', reason: String(e?.message || e).slice(0, 200) };
             be = await pickBackend('auto');
             if (autoModel && be === 'wasm') { model = sepModelById(WASM_SEP_MODEL); bytes = await modelBytes(); }
           }
@@ -460,6 +464,7 @@ export function createSeparator(opts = {}) {
     get backend() { return backend; },
     get fallbackReason() { return fallbackReason; },
     get adapter() { return adapterInfo; },
+    get webnn() { return webnnInfo; },
     get batch() { return batch; },
     get overlap() { return overlap; },
     contextSec: CONTEXT_SEC,

@@ -58,6 +58,10 @@ export function separationLines(sep) {
   c.push(`son hata: ${sep.lastError ? scrub(sep.lastError) : 'yok'}`);
   const out = [a.join(' · '), b.join(' · '), c.join(' · ')];
   if (sep.gpuAdapter) out.push(`ekran kartı: ${scrub(sep.gpuAdapter)}`);
+  if (sep.webnn?.requested) {
+    const w = sep.webnn;
+    out.push(`webnn (${scrub(w.device || 'npu')}): ${w.used ? 'kullanıldı' : `kullanılamadı${w.step ? ` (${scrub(w.step)} adımı)` : ''}${w.reason ? ' — ' + scrub(w.reason) : ''}`}`);
+  }
   if (sep.fallbackReason) out.push(`ekran kartı sorunu: ${scrub(sep.fallbackReason)}`);
   return out;
 }

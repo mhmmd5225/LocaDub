@@ -229,9 +229,11 @@ $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
 $('sepBackend').addEventListener('change', (e) => setSettings({ sepBackend: e.target.value }));
 $('webnnProbe').addEventListener('click', async () => {
-  const { probeWebNN } = await import('../common/webnn.js');
-  const r = await probeWebNN('npu');
-  $('webnnResult').textContent = r.ok ? 'NPU kullanılabilir.' : r.reason;
+  const { probeWebNNAll, formatProbeAll } = await import('../common/webnn.js');
+  const all = await probeWebNNAll();
+  const text = formatProbeAll(all);
+  $('webnnResult').textContent = text;
+  chrome.storage.local.set({ webnnProbe: { at: Date.now(), text } }).catch(() => {}); // tanılama raporuna girer
 });
 $('holdStart').addEventListener('change', (e) => setSettings({ holdStart: e.target.checked }));
 $('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
@@ -963,7 +965,7 @@ async function browserInfo() {
 async function diagnosticsReport() {
   const [status, errors, timings, info, sep, benchSaved] = await Promise.all([
     bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), bg({ type: 'diag.timings' }), browserInfo(), bg({ type: 'diag.separation' }),
-    chrome.storage.local.get('benchLast').then((o) => o.benchLast).catch(() => null),
+    chrome.storage.local.get(['benchLast', 'webnnProbe']).then((o) => ({ ...o.benchLast, probe: o.webnnProbe })).catch(() => null),
   ]);
   const models = [];
   const seen = new Set();
@@ -980,7 +982,7 @@ async function diagnosticsReport() {
   return buildReport({
     version: chrome.runtime.getManifest().version, ...info, settings,
     status: status.ok ? status.result : null, separation: sep.ok ? sep.result : null, models, errors: errors.ok ? errors.result : [],
-    timings: timings.ok ? timings.result : [], bench: benchSaved?.lines, benchAt: benchSaved?.at,
+    timings: timings.ok ? timings.result : [], bench: [...(benchSaved?.lines || []), ...(benchSaved?.probe ? [`WebNN denemesi (${new Date(benchSaved.probe.at).toISOString()}): ${benchSaved.probe.text}`] : [])], benchAt: benchSaved?.at,
     glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
   });
 }
