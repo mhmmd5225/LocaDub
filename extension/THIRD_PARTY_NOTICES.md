@@ -10,6 +10,9 @@ Bu eklenti aşağıdaki üçüncü taraf yazılımları ve modelleri içerir vey
 - Lisans: MIT
 - Dosyalar: `ort.wasm.min.mjs`, `ort.webgpu.min.mjs`, `ort-wasm-simd-threaded.mjs`,
   `ort-wasm-simd-threaded.wasm`, `ort-wasm-simd-threaded.jsep.mjs`, `ort-wasm-simd-threaded.jsep.wasm`
+- Değişiklik: `ort-wasm-simd-threaded.jsep.mjs` içinde embind `_emval_get_method_caller` kod derlemek yerine (`new Function`)
+  aynı işi kapanışla yapacak şekilde yamalandı (Chrome MV3 eklenti CSP'si 'unsafe-eval' vermez; WebNN için gerekli).
+  Yama: `tools/patch-ort-csp.py`. Diğer dosyalar özgün.
 
 ```
 MIT License
