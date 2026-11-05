@@ -160,6 +160,7 @@ function status() {
     tts: one('tts'),
     crossOriginIsolated: !!self.crossOriginIsolated,
     webgpu: !!navigator.gpu,
+    webnn: !!navigator.ml,
     hardwareConcurrency: navigator.hardwareConcurrency || 1,
   };
 }

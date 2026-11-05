@@ -235,12 +235,23 @@
       </div>
 
       <details class="group" id="autoUpdateGroup" title="Eklenti klasörden yüklü olduğu için Chrome onu kendiliğinden güncellemez. Klasörü bir kez seçerseniz yeni sürüm indirilir, bu klasöre yazılır ve eklenti yeniden yüklenir (açık YouTube sekmesi yokken).">
-        <summary><b>Otomatik güncelleme</b> <span class="note" id="autoUpdateNote"></span></summary>
+        <summary><b>Otomatik güncelleme ve deneysel</b> <span class="note" id="autoUpdateNote"></span></summary>
         <div class="au-row">
           <span id="autoUpdateStatus"></span>
           <button type="button" id="autoUpdatePick">Eklenti klasörünü seç</button>
           <button type="button" id="autoUpdateNow" hidden>Şimdi güncelle</button>
           <button type="button" id="autoUpdateOff" class="secondary" hidden>Bağlantıyı kaldır</button>
+        </div>
+        <div class="au-row">
+          <span class="note" id="sepBackendNote">Deneysel ses ayırma arka ucu</span>
+          <select id="sepBackend" aria-label="Ses ayırma arka ucu">
+            <option value="auto">Otomatik (WebGPU, yoksa işlemci)</option>
+            <option value="webnn-npu">WebNN — NPU (deneysel)</option>
+            <option value="webgpu">Yalnız WebGPU</option>
+            <option value="wasm">Yalnız işlemci (WASM)</option>
+          </select>
+          <button type="button" id="webnnProbe" class="secondary">NPU'yu dene</button>
+          <span id="webnnResult" title="WebNN: chrome://flags/#web-machine-learning-neural-network bayrağı ve güncel NPU sürücüsü gerekir; kurulamazsa ayırma kendiliğinden WebGPU'ya (yoksa işlemciye) döner."></span>
         </div>
       </details>
 

@@ -1,6 +1,7 @@
 // Ortak ayarlar: varsayılanlar + chrome.storage.local yardımcıları.
 
 import { DEFAULT_STYLE, DEFAULT_QUALITY, normalizeStyle, normalizePitch, normalizeQuality, normalizeBlend, normalizeTone } from '../engines/tts/styles.js';
+import { normalizeSepBackend } from './webnn.js';
 import { DEFAULT_VOICE, VOICES, voiceById } from '../engines/tts/voices.js';
 
 export const DEFAULTS = Object.freeze({
@@ -33,6 +34,7 @@ export const DEFAULTS = Object.freeze({
   showSubtitles: true,     // Türkçe altyazı overlay'i
   lookaheadSec: 30,        // ileri-bakış penceresi
   separation: 'auto',      // gerçek dublaj: orijinal sesten konuşma ayrılır, yalnız müzik + efekt kalır ('auto' | 'off'; engines/sep)
+  sepBackend: 'auto',      // DENEYSEL ses ayırma arka ucu: 'auto' (WebGPU, yoksa WASM) | 'webgpu' | 'webnn-npu' | 'wasm' (common/webnn.js)
   prebufferSec: 20,        // ayırma için başta en çok bu kadar beklenir (5–60 sn); ayırma yetişmezse video bekletilir
   holdStart: true,         // dublaj başlarken video, ilk cümlenin sesi hazır olana kadar bekletilir (en fazla 25 sn)
   fixAsrPunct: false,      // otomatik altyazıda çeviriden önce noktalama/büyük harf (isteğe bağlı model indirilince açılır)
@@ -73,6 +75,7 @@ export function normalizeSettings(raw = {}) {
   s.voiceBlend = normalizeBlend(s.voiceBlend);
   s.genderVoices = !!s.genderVoices;
   s.matchVoices = !!s.matchVoices;
+  s.sepBackend = normalizeSepBackend(s.sepBackend);
   s.favFemale = normalizeFavorite(s.favFemale, 'female');
   s.favMale = normalizeFavorite(s.favMale, 'male');
   s.speakerCount = clamp(Math.round(Number(s.speakerCount)) || 2, ...LIMITS.speakerCount);

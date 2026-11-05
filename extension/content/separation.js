@@ -21,6 +21,7 @@
 //   başına pencere; chunkSec: iş başına ses (sn); streaming: akış kipi.
 // speechAt(t0, t1): konuşanı cümle çalmadan önce ölçmek için temiz konuşma (orijinal − eşlik); sınıf başlığında.
 
+import { backendChoice } from '../common/webnn.js';
 import { audioContext, videoGraph } from './player.js';
 import { callMain } from './bridge.js';
 import { logError } from '../common/errlog.js';
@@ -249,8 +250,9 @@ export class SeparatedAudio extends EventTarget {
    * otherHold(): dublajın kendi başlangıç bekletmesi sürüyor mu (app.js _hold) — iki bekletme birbirinin videosunu
    * erken sürdürmesin.
    */
-  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false } = {}) {
+  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, backend = 'auto' } = {}) {
     super();
+    this.backendChoice = backendChoice(backend); // ayar: deneysel WebNN (common/webnn.js)
     this.video = video;
     this.mode = mode;
     this.prebufferSec = prebufferSec;
@@ -369,7 +371,7 @@ export class SeparatedAudio extends EventTarget {
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
       // model kendiliğinden: WebGPU'da Kim Vocal 2, yoksa hafif model daha az örtüşmeyle (engines/sep/worker.js)
-      .then(() => h.load({ model: 'auto', backend: 'auto', ...(h.gpu ? {} : { overlap: 0.25 }) }))
+      .then(() => h.load({ model: 'auto', backend: this.backendChoice.kind, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...(h.gpu || this.backendChoice.kind === 'webnn' ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
