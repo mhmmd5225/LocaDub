@@ -1,1 +1,2 @@
 onnxruntime-web 1.22.0
+ort-wasm-simd-threaded.jsep.mjs: yamalı (tools/patch-ort-csp.py; _emval_get_method_caller eval'siz, MV3 CSP için)

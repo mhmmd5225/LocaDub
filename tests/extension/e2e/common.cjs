@@ -48,10 +48,10 @@ function clipsMse(clips) {
   return { video: v, audio: a };
 }
 
-async function launch({ videos, settings = {}, onTimedtext, asr, videoFile, mse } = {}) {
+async function launch({ videos, settings = {}, onTimedtext, asr, videoFile, mse, extraArgs = [] } = {}) {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'locadub-prof-')), {
     headless: false,
-    args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--autoplay-policy=no-user-gesture-required'],
+    args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--autoplay-policy=no-user-gesture-required', ...extraArgs],
     // Vekil sunucu gerektiren ortamlarda gerçek ağ istekleri (ör. sitedeki version.json) için
     proxy: process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost' } : undefined,
   });

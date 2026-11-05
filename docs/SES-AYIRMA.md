@@ -338,3 +338,11 @@ Intel Core Ultra 7 265 (yalnız iGPU Xe-LPG) ölçümü: WebGPU + Kim Vocal 2 = 
 - **Ayarlar → Diğer → Otomatik güncelleme ve deneysel → "Ayırma: hızlı (hafif model)"**: `mdxnet-lite`, WebGPU'da da (≈ 3–5× hızlı).
 - **WebNN — NPU / WebNN — GPU** arka uçları (deneysel); "NPU'yu dene" üç cihazı da sınar.
 - Ayırma yetişemiyorsa (rtf > 1.2) panel ve tanılama raporu (`öneri:` satırı) bu seçenekleri önerir.
+
+### WebNN ve eklenti CSP'si (0.5.10)
+
+0.5.9'da "WebNN — NPU" `Evaluating a string as JavaScript violates … 'unsafe-eval'` hatasıyla kuruluyordu: ORT'nin WebNN yürütücüsü
+`emscripten::val` kullanır ve embind her çağrı biçimi için `new Function` ile kod derler; MV3 eklenti sayfalarında `'unsafe-eval'` yasaktır.
+`lib/ort/ort-wasm-simd-threaded.jsep.mjs` bu kısımda yamalandı (`tools/patch-ort-csp.py`, ort yükseltilince yeniden uygulanır).
+Test: birim `ort-csp.test.mjs`, e2e `webnn-csp.e2e.cjs` (Chromium WebNN cpu ile oturum kurar; yamasız sürümde aynı hatayı verir).
+Bu yalnız engeli kaldırır; modelin NPU'da desteklenip desteklenmediği ve hızı cihazda ölçülür.
