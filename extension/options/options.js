@@ -214,6 +214,7 @@ function renderBasics() {
   $('checkUpdates').checked = settings.checkUpdates;
   $('holdStart').checked = settings.holdStart;
   $('sepBackend').value = settings.sepBackend;
+  $('sepQuality').value = settings.sepQuality;
   $('separation').checked = settings.separation !== 'off';
   $('prebufferSec').disabled = settings.separation === 'off';
   $('prebufferRow').classList.toggle('is-off', settings.separation === 'off');
@@ -228,6 +229,7 @@ $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.c
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
 $('sepBackend').addEventListener('change', (e) => setSettings({ sepBackend: e.target.value }));
+$('sepQuality').addEventListener('change', (e) => setSettings({ sepQuality: e.target.value }));
 $('webnnProbe').addEventListener('click', async () => {
   const { probeWebNNAll, formatProbeAll } = await import('../common/webnn.js');
   const all = await probeWebNNAll();
@@ -1033,7 +1035,7 @@ async function startBench() {
     const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
     const result = await runBench({
       sep: { createClient: () => createSepClient({ mock: isMock() }), guard: benchGuard },
-      sepNpu: settings.sepBackend === 'webnn-npu' ? { createClient: () => createSepClient({ mock: isMock() }) } : null, // yalnız deneysel NPU seçiliyken
+      sepNpu: String(settings.sepBackend).startsWith('webnn') ? { webnnDevice: settings.sepBackend === 'webnn-gpu' ? 'gpu' : 'npu', createClient: () => createSepClient({ mock: isMock() }) } : null, // yalnız deneysel WebNN seçiliyken
       tts: {
         synth: async (text) => {
           if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };

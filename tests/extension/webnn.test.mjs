@@ -19,6 +19,7 @@ test('probeWebNN: yok / bağlam kurulamıyor / başarılı', async () => {
 
 test('ayar eşlemesi ve doğrulama', () => {
   assert.deepEqual(backendChoice('webnn-npu'), { kind: 'webnn', deviceType: 'npu' });
+  assert.deepEqual(backendChoice('webnn-gpu'), { kind: 'webnn', deviceType: 'gpu' });
   assert.deepEqual(backendChoice('wasm'), { kind: 'wasm' });
   assert.deepEqual(backendChoice('saçma'), { kind: 'auto' });
   assert.equal(normalizeSepBackend('saçma'), 'auto');
@@ -54,7 +55,7 @@ async function withMl(ml, fn) {
   try { return await fn(); } finally { if (had) Object.defineProperty(nav, 'ml', had); else delete nav.ml; }
 }
 
-test('Ayırıcı: WebNN NPU oturumu kurulursa webnn kullanılır', async () => {
+test('Ayırıcı: WebNN oturumu kurulursa webnn kullanılır', async () => {
   const { ort, created } = fakeOrtWith(() => okSession());
   await withMl({ createContext: async () => ({}) }, async () => {
     const sep = createSeparator({ model: 'kim-vocal-2', backend: 'webnn', webnnDevice: 'npu', ort, fetchModel });
@@ -123,4 +124,26 @@ test('Ayırıcı: WebNN yedeğe düşünce webnn bilgisi adımı ve nedeni verir
     await sep.load();
     assert.equal(sep.webnn.step, 'bağlam');
   });
+});
+
+test("Ayırma kalitesi 'fast': WebGPU'da da hafif model; 'high'te Kim Vocal 2", async () => {
+  const { ort } = fakeOrtWith(() => okSession());
+  const gpu = { requestAdapter: async () => ({ info: { vendor: 'intel' } }) };
+  const nav = globalThis.navigator;
+  const had = Object.getOwnPropertyDescriptor(nav, 'gpu');
+  Object.defineProperty(nav, 'gpu', { value: gpu, configurable: true });
+  try {
+    const fast = createSeparator({ model: 'auto', backend: 'auto', quality: 'fast', ort, fetchModel });
+    assert.equal((await fast.load()).model, 'mdxnet-lite');
+    const high = createSeparator({ model: 'auto', backend: 'auto', quality: 'high', ort, fetchModel });
+    assert.equal((await high.load()).model, 'kim-vocal-2');
+    assert.equal((await high.load()).backend, 'webgpu');
+  } finally { if (had) Object.defineProperty(nav, 'gpu', had); else delete nav.gpu; }
+  assert.equal(normalizeSettings({ sepQuality: 'fast' }).sepQuality, 'fast');
+  assert.equal(normalizeSettings({ sepQuality: 'x' }).sepQuality, 'high');
+});
+
+test('Yetişemeyen ayırmada rapora öneri satırı', () => {
+  assert.ok(separationLines({ status: 'playing', backend: 'webgpu', model: 'kim-vocal-2', rtf: 3.27 }).some((l) => /^öneri:.*Hızlı/.test(l)));
+  assert.ok(!separationLines({ status: 'playing', backend: 'webgpu', model: 'kim-vocal-2', rtf: 0.5 }).some((l) => /^öneri:/.test(l)));
 });

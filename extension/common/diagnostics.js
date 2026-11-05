@@ -30,7 +30,7 @@ export function pushError(list, { source, message, at = Date.now() }) {
 }
 
 const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2', 'voice3', 'voice4',
-  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'sepBackend', 'prebufferSec',
+  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'sepBackend', 'sepQuality', 'prebufferSec',
   'ttsSpeed', 'ttsVolume', 'originalVolume', 'lookaheadSec', 'showSubtitles', 'modelsApproved', 'checkUpdates'];
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -58,6 +58,7 @@ export function separationLines(sep) {
   c.push(`son hata: ${sep.lastError ? scrub(sep.lastError) : 'yok'}`);
   const out = [a.join(' · '), b.join(' · '), c.join(' · ')];
   if (sep.gpuAdapter) out.push(`ekran kartı: ${scrub(sep.gpuAdapter)}`);
+  if (num(sep.rtf) > 1.2 && sep.status !== 'error') out.push(`öneri: ayırma yetişemiyor (${sep.rtf.toFixed(1)} rtf); ayarlarda 'Hızlı' ayırma kalitesini ya da WebNN (NPU/GPU) arka ucunu deneyin`);
   if (sep.webnn?.requested) {
     const w = sep.webnn;
     out.push(`webnn (${scrub(w.device || 'npu')}): ${w.used ? 'kullanıldı' : `kullanılamadı${w.step ? ` (${scrub(w.step)} adımı)` : ''}${w.reason ? ' — ' + scrub(w.reason) : ''}`}`);

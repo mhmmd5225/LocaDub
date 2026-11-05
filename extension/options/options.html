@@ -247,8 +247,13 @@
           <select id="sepBackend" aria-label="Ses ayırma arka ucu">
             <option value="auto">Otomatik (WebGPU, yoksa işlemci)</option>
             <option value="webnn-npu">WebNN — NPU (deneysel)</option>
+            <option value="webnn-gpu">WebNN — GPU (deneysel)</option>
             <option value="webgpu">Yalnız WebGPU</option>
             <option value="wasm">Yalnız işlemci (WASM)</option>
+          </select>
+          <select id="sepQuality" aria-label="Ses ayırma kalitesi" title="Yüksek: en temiz ayırma. Hızlı: hafif model, ≈ 3–5× daha hızlı, biraz daha az temiz; ayrı ekran kartı olmayan cihazlar için.">
+            <option value="high">Ayırma: yüksek kalite</option>
+            <option value="fast">Ayırma: hızlı (hafif model)</option>
           </select>
           <button type="button" id="webnnProbe" class="secondary">NPU'yu dene</button>
           <span id="webnnResult" title="WebNN: chrome://flags/#web-machine-learning-neural-network bayrağı ve güncel NPU sürücüsü gerekir; kurulamazsa ayırma kendiliğinden WebGPU'ya (yoksa işlemciye) döner."></span>

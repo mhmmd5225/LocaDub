@@ -4,11 +4,13 @@
 /** sepBackend ayarı → { kind: 'auto'|'webgpu'|'wasm'|'webnn', deviceType?: 'npu' } */
 export function backendChoice(v) {
   if (v === 'webnn-npu') return { kind: 'webnn', deviceType: 'npu' };
+  if (v === 'webnn-gpu') return { kind: 'webnn', deviceType: 'gpu' };
   if (v === 'webgpu' || v === 'wasm') return { kind: v };
   return { kind: 'auto' };
 }
 
-export const normalizeSepBackend = (v) => (['auto', 'webgpu', 'webnn-npu', 'wasm'].includes(v) ? v : 'auto');
+export const normalizeSepQuality = (v) => (v === 'fast' ? 'fast' : 'high');
+export const normalizeSepBackend = (v) => (['auto', 'webgpu', 'webnn-npu', 'webnn-gpu', 'wasm'].includes(v) ? v : 'auto');
 
 /**
  * navigator.ml üzerinden istenen aygıtta bağlam kurulabiliyor mu? → { ok, deviceType, reason? }

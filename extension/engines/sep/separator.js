@@ -100,6 +100,7 @@ export function createSeparator(opts = {}) {
     return buf;
   }
 
+  const wantLite = (be) => be === 'wasm' || opts.quality === 'fast'; // hafif model: işlemcide ya da kullanıcı 'hızlı' seçtiyse
   const note = (r) => { fallbackReason = fallbackReason ? `${fallbackReason} · ${r}` : r; console.warn('[sep] ' + r); };
 
   async function pickBackend(want) {
@@ -143,7 +144,7 @@ export function createSeparator(opts = {}) {
       loading = (async () => {
         const o = await getOrt();
         let be = await pickBackend(opts.backend || 'auto');
-        if (autoModel && be === 'wasm') model = sepModelById(WASM_SEP_MODEL);
+        if (autoModel && wantLite(be)) model = sepModelById(WASM_SEP_MODEL);
         let bytes = await modelBytes();
         const open = async (b, n) => {
           batch = n;
@@ -161,7 +162,7 @@ export function createSeparator(opts = {}) {
             note(`WebNN (${opts.webnnDevice || 'npu'}) kurulamadı: ${String(e?.message || e).slice(0, 160)}`);
             webnnInfo = { ...webnnInfo, step: 'oturum', reason: String(e?.message || e).slice(0, 200) };
             be = await pickBackend('auto');
-            if (autoModel && be === 'wasm') { model = sepModelById(WASM_SEP_MODEL); bytes = await modelBytes(); }
+            if (autoModel && wantLite(be)) { model = sepModelById(WASM_SEP_MODEL); bytes = await modelBytes(); }
           }
         }
         try {

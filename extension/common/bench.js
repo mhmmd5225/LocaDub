@@ -161,7 +161,7 @@ export async function runBench({ sep, sepNpu, tts, mt, onStep, now = () => Date.
   const result = { at: now() };
   result.sep = sep ? await runSepBench({ ...sep, onStep }) : null;
   // deneysel: aynı ölçüm WebNN (NPU) ile; yedeğe düşerse arka uç adı bunu gösterir
-  result.sepNpu = sepNpu ? await runSepBench({ ...sepNpu, backend: 'webnn', webnnDevice: 'npu', batches: [1], guard: undefined, onStep }) : null;
+  result.sepNpu = sepNpu ? await runSepBench({ ...sepNpu, backend: 'webnn', webnnDevice: sepNpu.webnnDevice || 'npu', batches: [1], guard: undefined, onStep }) : null;
   result.tts = tts ? await runTtsBench({ ...tts, onStep }) : null;
   result.mt = mt ? await runMtBench({ ...mt, onStep }) : null;
   return result;
@@ -206,11 +206,11 @@ export function formatBench(r) {
   const n = r?.sepNpu;
   if (n) {
     const x = n.runs?.[0];
-    if (!x) L.push('ses ayırma (WebNN NPU): sonuç yok');
-    else if (x.error) L.push(`ses ayırma (WebNN NPU): hata — ${x.error}`);
-    else if (x.backend !== 'webnn') L.push(`ses ayırma (WebNN NPU): kullanılamadı, ${x.backend || '?'} çalıştı${x.fallbackReason ? ` (${x.fallbackReason})` : ''}`);
-    else if (!(x.rtf > 0)) L.push('ses ayırma (WebNN NPU): ölçülemedi');
-    else L.push(`ses ayırma (WebNN NPU): ${f2(x.rtf)} rtf (${f1(1 / x.rtf)}× gerçek zaman) · yükleme ${f1((x.loadMs || 0) / 1000)} sn`);
+    if (!x) L.push('ses ayırma (WebNN): sonuç yok');
+    else if (x.error) L.push(`ses ayırma (WebNN): hata — ${x.error}`);
+    else if (x.backend !== 'webnn') L.push(`ses ayırma (WebNN): kullanılamadı, ${x.backend || '?'} çalıştı${x.fallbackReason ? ` (${x.fallbackReason})` : ''}`);
+    else if (!(x.rtf > 0)) L.push('ses ayırma (WebNN): ölçülemedi');
+    else L.push(`ses ayırma (WebNN): ${f2(x.rtf)} rtf (${f1(1 / x.rtf)}× gerçek zaman) · yükleme ${f1((x.loadMs || 0) / 1000)} sn`);
   }
   const t = r?.tts;
   if (!t) L.push('seslendirme: çalıştırılmadı');
