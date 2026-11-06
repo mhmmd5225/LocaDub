@@ -190,19 +190,25 @@ async function checkUpdate() {
 // yeniden yüklenir. Açık bir YouTube sekmesi varken yapılmaz (dublajı kesmesin): sonraki denetimde ya da tarayıcı
 // açılışında denenir. Sonuç chrome.storage.local → updateApply (ayarlar sayfasında görünür).
 let applying = false;
-async function autoApply(latest) {
+// manual: açılır penceredeki "Şimdi güncelle" (kullanıcı istedi: açık YouTube sekmesi beklenmez). Dönen: 'started' | neden.
+async function autoApply(latest, { manual = false } = {}) {
   const installed = chrome.runtime.getManifest().version;
-  if (applying || compareVersions(latest.version, installed) <= 0) return;
+  if (applying) return 'busy';
+  if (!latest || compareVersions(latest.version, installed) <= 0) return 'current';
   const dir = await getDirHandle();
-  if (!dir || !(await permission(dir))) return;
-  if ((await chrome.tabs.query({ url: ['https://www.youtube.com/*', 'https://www.youtube-nocookie.com/*'] })).length) return;
+  if (!dir) return 'no-dir';
+  if (!(await permission(dir))) return 'no-permission';
+  if (!manual && (await chrome.tabs.query({ url: ['https://www.youtube.com/*', 'https://www.youtube-nocookie.com/*'] })).length) return 'busy-tabs';
   applying = true;
   try {
     const r = await applyUpdate(dir, latest, installed);
     await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), ...r } });
-    chrome.runtime.reload();
+    setTimeout(() => chrome.runtime.reload(), manual ? 300 : 0);
+    return 'started';
   } catch (e) {
-    await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), error: String(e?.message || e).slice(0, 200) } });
+    const error = String(e?.message || e).slice(0, 200);
+    await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), error } });
+    return 'error: ' + error;
   } finally { applying = false; }
 }
 
@@ -274,6 +280,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     case 'diag.errors':
       chrome.storage.session.get('errors').then(({ errors = [] }) => sendResponse({ ok: true, result: errors }));
+      return true;
+    case 'update.apply':
+      chrome.storage.local.get('update').then(({ update }) => autoApply(update?.latest, { manual: true }))
+        .then((result) => sendResponse({ ok: true, result }), (e) => sendResponse({ ok: false, error: String(e?.message || e) }));
       return true;
     case 'update.check':
       checkUpdate().then((result) => sendResponse({ ok: true, result }));

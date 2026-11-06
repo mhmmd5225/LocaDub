@@ -1,6 +1,7 @@
 // Açılır pencere: dublajı aç/kapa, kısa durum, hızlı ses ayarları. Ayrıntılar ve modeller ayarlar sayfasında.
 
 import { getSettings, setSettings, onSettingsChanged } from '../common/settings.js';
+import { getDirHandle, permission } from '../common/self-update.js';
 import { DOWNLOAD_URL, INSTALL_URL, updateFrom } from '../common/version.js';
 
 let shownUpdate = null; // renderUpdate'in gösterdiği güncelleme (indirme / kurulum bağlantıları kaynağa göre)
@@ -34,9 +35,34 @@ async function renderUpdate() {
   $('update').hidden = !u || updateDismissed === u.version;
   shownUpdate = u;
   if (u) $('updateTitle').textContent = `Yeni sürüm: LocaDub ${u.version}${u.sizeMB ? ` (${u.sizeMB} MB)` : ''}`;
+  // otomatik güncelleme klasörü seçiliyse tek tıkla güncelle (common/self-update.js; Ayarlar → Diğer)
+  const dir = u ? await getDirHandle().catch(() => null) : null;
+  $('updateNow').hidden = !dir;
+  $('updateDownload').classList.toggle('secondary', !!dir);
+  $('updateHint').textContent = dir
+    ? 'Şimdi güncelle: yeni sürüm indirilip eklenti klasörüne yazılır ve eklenti yeniden başlar (açık dublaj durur). Modeller ve ayarlar korunur.'
+    : 'İndirdiğiniz klasörü eskisinin yerine koyup chrome://extensions sayfasında eklentiyi yenileyin. Modeller ve ayarlar korunur. Ayarlar → Diğer\'den eklenti klasörünü seçerseniz tek tıkla güncellenir.';
   return update;
 }
 
+$('updateNow').addEventListener('click', async () => {
+  const btn = $('updateNow');
+  btn.disabled = true;
+  btn.textContent = 'Güncelleniyor…';
+  try {
+    const dir = await getDirHandle();
+    // izin tarayıcı yeniden açılınca sıfırlanabilir: kullanıcı tıklaması burada, izni burada iste
+    if (!dir || !(await permission(dir, true))) throw new Error('Klasöre yazma izni verilmedi');
+    const res = await bg({ type: 'update.apply' });
+    const r = res?.ok ? res.result : 'error: ' + (res?.error || '?');
+    if (r !== 'started') throw new Error(r === 'current' ? 'Zaten güncel' : r === 'busy' ? 'Güncelleme zaten sürüyor' : String(r).replace(/^error: /, ''));
+    btn.textContent = 'Eklenti yeniden başlıyor…';
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Şimdi güncelle';
+    $('updateHint').textContent = 'Güncellenemedi: ' + (e?.message || e);
+  }
+});
 $('updateDownload').addEventListener('click', () => chrome.tabs.create({ url: shownUpdate?.downloadUrl || DOWNLOAD_URL }));
 $('updateHow').addEventListener('click', () => chrome.tabs.create({ url: shownUpdate?.installUrl || INSTALL_URL }));
 $('updateLater').addEventListener('click', async () => {
