@@ -31,7 +31,7 @@ export async function probeWebNN(deviceType = 'npu', nav = globalThis.navigator)
 }
 
 /** ort oturumu için yürütme sağlayıcısı girdisi. */
-export const webnnProvider = (deviceType = 'npu') => ({ name: 'webnn', deviceType, powerPreference: 'default' });
+export const webnnProvider = (deviceType = 'npu', powerPreference = 'default') => ({ name: 'webnn', deviceType, powerPreference });
 
 /** NPU, GPU ve CPU için ayrı ayrı bağlam dener (tanılama: hangisi sunuluyor?) → { npu, gpu, cpu } her biri { ok, reason? }. */
 export async function probeWebNNAll(nav = globalThis.navigator) {

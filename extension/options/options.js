@@ -1037,7 +1037,7 @@ async function startBench() {
     const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
     const result = await runBench({
       sep: { createClient: () => createSepClient({ mock: isMock() }), guard: benchGuard },
-      sepNpu: String(settings.sepBackend).startsWith('webnn') ? { webnnDevice: settings.sepBackend === 'webnn-gpu' ? 'gpu' : 'npu', createClient: () => createSepClient({ mock: isMock() }) } : null, // yalnız deneysel WebNN seçiliyken
+      sepNpu: String(settings.sepBackend).startsWith('webnn') || (settings.sepBackend === 'auto' && navigator.ml) ? { webnnDevice: settings.sepBackend === 'webnn-npu' ? 'npu' : 'gpu', createClient: () => createSepClient({ mock: isMock() }) } : null, // WebNN karşılaştırması (otomatikte GPU: hibrit dizüstünde harici kart olabilir)
       tts: {
         synth: async (text) => {
           if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };
@@ -1141,7 +1141,7 @@ renderStatus();
   const { probeGpuPreferences } = await import('../common/gpu.js');
   probeGpuPreferences().then((r) => {
     $('gpuNote').textContent = !r.high ? 'WebGPU kartı alınamadı'
-      : r.same ? `iki tercih de aynı kartı veriyor: ${r.high} (hibrit değilse normal; hibritse Windows Grafik ayarını kontrol edin)`
+      : r.same ? `iki tercih de aynı kartı veriyor: ${r.high}. Chrome Windows'ta tek kart kullanır; harici kart için eklenti WebNN'i kendisi dener, olmazsa chrome://flags/#force-high-performance-gpu`
         : `yüksek performans → ${r.high} · düşük güç → ${r.low}`;
   }).catch(() => {});
 }

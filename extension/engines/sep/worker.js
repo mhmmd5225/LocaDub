@@ -48,7 +48,7 @@ async function load(msg) {
   configure(msg.threads);
   const model = msg.model || 'auto';
   const want = msg.backend || 'auto';
-  const key = [model, want, msg.webnnDevice ?? '', msg.quality ?? '', msg.gpuPreference ?? '', msg.overlap ?? '', msg.batch ?? ''].join('|');
+  const key = [model, want, msg.webnnDevice ?? '', msg.quality ?? '', msg.gpuPreference ?? '', msg.preferBackend ?? '', msg.overlap ?? '', msg.batch ?? ''].join('|');
   if (sep && sepKey === key) return sep;
   if (sep) await sep.dispose();
   sep = null;
@@ -58,6 +58,7 @@ async function load(msg) {
     webnnDevice: msg.webnnDevice,
     quality: msg.quality,
     gpuPreference: msg.gpuPreference,
+    preferBackend: msg.preferBackend,
     ort,
     overlap: msg.overlap,
     batch: msg.batch,
@@ -79,7 +80,7 @@ self.onmessage = (ev) => {
         const s = await load(msg);
         self.postMessage({
           type: 'loaded', id, backend: s.backend, model: s.model.id, contextSec: s.contextSec, chunkSec: s.chunkSec,
-          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null, adapter: s.adapter || null, webnn: s.webnn || null,
+          stepSec: s.stepSec, batch: s.batch, overlap: s.overlap, streaming: true, fallbackReason: s.fallbackReason || null, adapter: s.adapter || null, webnn: s.webnn || null, autoPick: s.autoPick || null,
         });
       } else if (msg.type === 'process') {
         if (!sep) throw new Error('Ayırma modeli yüklenmedi (önce load)');

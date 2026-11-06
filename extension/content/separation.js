@@ -21,6 +21,7 @@
 //   başına pencere; chunkSec: iş başına ses (sn); streaming: akış kipi.
 // speechAt(t0, t1): konuşanı cümle çalmadan önce ölçmek için temiz konuşma (orijinal − eşlik); sınıf başlığında.
 
+import { cachedPick, autoPickKey } from '../common/gpu.js';
 import { backendChoice } from '../common/webnn.js';
 import { audioContext, videoGraph } from './player.js';
 import { callMain } from './bridge.js';
@@ -150,6 +151,19 @@ class SepHost {
     this._rejectAll('Ayırma kapatıldı');
     setTimeout(() => this.frame?.remove(), 600);
   }
+}
+
+// ---------- hibrit dizüstü otomatik kart kararı (chrome.storage.local → sepAutoPick) ----------
+// Anahtar: WebGPU kart özeti + Chrome sürümü; işçideki ilk ölçümün kartı (info.adapter Intel ise) yalnız ölçüm sırasında bilinir,
+// bu yüzden anahtar Chrome sürümüne göre tutulur ve karar AUTO_PICK_DAYS gün geçerlidir.
+async function readAutoPick() {
+  try {
+    const { sepAutoPick } = await chrome.storage.local.get('sepAutoPick');
+    return cachedPick(sepAutoPick, autoPickKey('auto'));
+  } catch { return null; }
+}
+function saveAutoPick(backend) {
+  try { chrome.storage.local.set({ sepAutoPick: { key: autoPickKey('auto'), backend, at: Date.now() } }); } catch { /* yoksay */ }
 }
 
 function sepHost() {
@@ -325,6 +339,7 @@ export class SeparatedAudio extends EventTarget {
       streaming: this.streaming,
       gpuAdapter: this.gpuAdapter || null,
       webnn: this.webnn || null,
+      autoPick: this.autoPick || null,
       fallbackReason: this.fallbackReason || null,
     };
   }
@@ -373,13 +388,16 @@ export class SeparatedAudio extends EventTarget {
     const h = sepHost();
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
+      .then(() => readAutoPick()) // hibrit dizüstü: önceki otomatik kart kararı (common/gpu.js)
       // model kendiliğinden: WebGPU'da Kim Vocal 2, yoksa hafif model daha az örtüşmeyle (engines/sep/worker.js)
-      .then(() => h.load({ model: 'auto', backend: this.backendChoice.kind, quality: this.quality, gpuPreference: this.gpuPreference, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...((h.gpu || this.backendChoice.kind === 'webnn') && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
+      .then((prefer) => h.load({ model: 'auto', backend: this.backendChoice.kind, ...(prefer ? { preferBackend: prefer } : {}), quality: this.quality, gpuPreference: this.gpuPreference, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...((h.gpu || this.backendChoice.kind === 'webnn') && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
         this.gpuAdapter = info.adapter || null;
         this.webnn = info.webnn || null;
+        this.autoPick = info.autoPick || null;
+        if (info.autoPick && !info.autoPick.cached && info.adapter) saveAutoPick(info.autoPick.chosen); // ölçüldü: sonraki yüklemede tekrar ölçülmez
         this.fallbackReason = info.fallbackReason || null;
         if (info.fallbackReason) logError('ayırma (WebGPU)', info.fallbackReason); // sessiz yedeğe düşme görünür olsun
         this.model = info.model || null;
