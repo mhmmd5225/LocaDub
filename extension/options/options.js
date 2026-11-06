@@ -215,6 +215,7 @@ function renderBasics() {
   $('holdStart').checked = settings.holdStart;
   $('sepBackend').value = settings.sepBackend;
   $('sepQuality').value = settings.sepQuality;
+  $('gpuPreference').value = settings.gpuPreference;
   $('separation').checked = settings.separation !== 'off';
   $('prebufferSec').disabled = settings.separation === 'off';
   $('prebufferRow').classList.toggle('is-off', settings.separation === 'off');
@@ -229,6 +230,7 @@ $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.c
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
 $('sepBackend').addEventListener('change', (e) => setSettings({ sepBackend: e.target.value }));
+$('gpuPreference').addEventListener('change', (e) => setSettings({ gpuPreference: e.target.value }));
 $('sepQuality').addEventListener('change', (e) => setSettings({ sepQuality: e.target.value }));
 $('webnnProbe').addEventListener('click', async () => {
   const { probeWebNNAll, formatProbeAll } = await import('../common/webnn.js');
@@ -1131,4 +1133,15 @@ renderStatus();
   }));
   chrome.storage.onChanged.addListener((c, a) => { if (a === 'local' && (c.update || c.updateApply)) renderAuto(); });
   renderAuto();
+}
+
+
+// ---------- Ekran kartı tercihi: hangi kart geliyor? (common/gpu.js) ----------
+{
+  const { probeGpuPreferences } = await import('../common/gpu.js');
+  probeGpuPreferences().then((r) => {
+    $('gpuNote').textContent = !r.high ? 'WebGPU kartı alınamadı'
+      : r.same ? `iki tercih de aynı kartı veriyor: ${r.high} (hibrit değilse normal; hibritse Windows Grafik ayarını kontrol edin)`
+        : `yüksek performans → ${r.high} · düşük güç → ${r.low}`;
+  }).catch(() => {});
 }

@@ -250,9 +250,10 @@ export class SeparatedAudio extends EventTarget {
    * otherHold(): dublajın kendi başlangıç bekletmesi sürüyor mu (app.js _hold) — iki bekletme birbirinin videosunu
    * erken sürdürmesin.
    */
-  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, backend = 'auto', quality = 'high' } = {}) {
+  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, backend = 'auto', quality = 'high', gpuPreference = 'high-performance' } = {}) {
     super();
     this.quality = quality;
+    this.gpuPreference = gpuPreference;
     this.backendChoice = backendChoice(backend); // ayar: deneysel WebNN (common/webnn.js)
     this.video = video;
     this.mode = mode;
@@ -373,7 +374,7 @@ export class SeparatedAudio extends EventTarget {
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
       // model kendiliğinden: WebGPU'da Kim Vocal 2, yoksa hafif model daha az örtüşmeyle (engines/sep/worker.js)
-      .then(() => h.load({ model: 'auto', backend: this.backendChoice.kind, quality: this.quality, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...((h.gpu || this.backendChoice.kind === 'webnn') && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
+      .then(() => h.load({ model: 'auto', backend: this.backendChoice.kind, quality: this.quality, gpuPreference: this.gpuPreference, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...((h.gpu || this.backendChoice.kind === 'webnn') && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;

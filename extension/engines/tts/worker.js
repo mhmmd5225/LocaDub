@@ -15,6 +15,7 @@
 
 import * as ort from '../../lib/ort/ort.webgpu.min.mjs';
 import { packOf, voiceById } from './voices.js';
+import { pickAdapter } from '../../common/gpu.js';
 import { loadVoice, releaseVoice, synthesizeText } from './core.js';
 
 ort.env.wasm.wasmPaths = new URL('../../lib/ort/', import.meta.url).href;
@@ -39,8 +40,12 @@ function configure(options = {}) {
 
 async function providersFor(requested) {
   if (requested === 'webgpu' && self.navigator?.gpu) {
-    const adapter = await navigator.gpu.requestAdapter().catch(() => null);
-    if (adapter) return ['webgpu', 'wasm'];
+    // hibrit dizüstünde ORT'nin kendi tercihsiz isteği dahili kartı seçer: yüksek performanslı adaptörü kendimiz verelim
+    const adapter = await pickAdapter('high-performance');
+    if (adapter) {
+      try { ort.env.webgpu.powerPreference = 'high-performance'; ort.env.webgpu.adapter = adapter; } catch { /* eski ort */ }
+      return ['webgpu', 'wasm'];
+    }
   }
   return ['wasm'];
 }

@@ -2,6 +2,7 @@
 
 import { DEFAULT_STYLE, DEFAULT_QUALITY, normalizeStyle, normalizePitch, normalizeQuality, normalizeBlend, normalizeTone } from '../engines/tts/styles.js';
 import { normalizeSepBackend, normalizeSepQuality } from './webnn.js';
+import { normalizeGpuPreference } from './gpu.js';
 import { DEFAULT_VOICE, VOICES, voiceById } from '../engines/tts/voices.js';
 
 export const DEFAULTS = Object.freeze({
@@ -35,6 +36,7 @@ export const DEFAULTS = Object.freeze({
   lookaheadSec: 30,        // ileri-bakış penceresi
   separation: 'auto',      // gerçek dublaj: orijinal sesten konuşma ayrılır, yalnız müzik + efekt kalır ('auto' | 'off'; engines/sep)
   sepBackend: 'auto',      // DENEYSEL ses ayırma arka ucu: 'auto' (WebGPU, yoksa WASM) | 'webgpu' | 'webnn-npu' | 'wasm' (common/webnn.js)
+  gpuPreference: 'high-performance', // WebGPU kartı: 'high-performance' (harici kart) | 'low-power' (dahili); hibrit dizüstü (common/gpu.js)
   sepQuality: 'high',      // ses ayırma modeli: 'high' (Kim Vocal 2) | 'fast' (hafif model, ≈ 3–5× hızlı; yavaş GPU/NPU'suz cihazlar için seçenek)
   prebufferSec: 20,        // ayırma için başta en çok bu kadar beklenir (5–60 sn); ayırma yetişmezse video bekletilir
   holdStart: true,         // dublaj başlarken video, ilk cümlenin sesi hazır olana kadar bekletilir (en fazla 25 sn)
@@ -78,6 +80,7 @@ export function normalizeSettings(raw = {}) {
   s.matchVoices = !!s.matchVoices;
   s.sepBackend = normalizeSepBackend(s.sepBackend);
   s.sepQuality = normalizeSepQuality(s.sepQuality);
+  s.gpuPreference = normalizeGpuPreference(s.gpuPreference);
   s.favFemale = normalizeFavorite(s.favFemale, 'female');
   s.favMale = normalizeFavorite(s.favMale, 'male');
   s.speakerCount = clamp(Math.round(Number(s.speakerCount)) || 2, ...LIMITS.speakerCount);

@@ -251,6 +251,11 @@
             <option value="webgpu">Yalnız WebGPU</option>
             <option value="wasm">Yalnız işlemci (WASM)</option>
           </select>
+          <select id="gpuPreference" aria-label="Ekran kartı" title="Hibrit dizüstünde (dahili + harici kart) yüksek performans harici kartı seçer. Hangi kartın geldiği yanda yazar.">
+            <option value="high-performance">Kart: yüksek performans (harici)</option>
+            <option value="low-power">Kart: düşük güç (dahili)</option>
+          </select>
+          <span id="gpuNote" class="note"></span>
           <select id="sepQuality" aria-label="Ses ayırma kalitesi" title="Yüksek: en temiz ayırma. Hızlı: hafif model, ≈ 3–5× daha hızlı, biraz daha az temiz; ayrı ekran kartı olmayan cihazlar için.">
             <option value="high">Ayırma: yüksek kalite</option>
             <option value="fast">Ayırma: hızlı (hafif model)</option>
