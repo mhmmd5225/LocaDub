@@ -356,3 +356,15 @@ alır (RTX varken bile ayırma 2–3× yavaş kalır). 0.5.11'den itibaren adapt
 - İki tercih de aynı (Intel) kartı veriyorsa Windows seçimi kilitlemiştir: **Ayarlar → Sistem → Ekran → Grafik → Chrome → Seçenekler →
   Yüksek performans**, NVIDIA Denetim Masası → Program ayarları → chrome.exe → Yüksek performanslı NVIDIA işlemcisi; Chrome'u yeniden başlatın.
 - Doğrulama: tanılama raporunda `ekran kartı: nvidia …`; Intel kartta ayırma yetişemiyorsa rapor `uyarı:` satırı verir.
+
+### Hibrit GPU: araştırma ve otomatik seçim (0.5.12)
+
+0.5.11'deki tercih Windows'ta işe yaramadı: **Chrome Windows'ta WebGPU `powerPreference`'ı yok sayar**, tüm tarayıcı tek kartta
+(dizüstünde genelde dahili Intel) çalışır (Chromium hata kaydı 369219127; Chrome'un WebGPU sorun giderme sayfası). Eklenti
+`chrome://flags` ayarlayamaz. WebNN ise Chrome'un WebGPU kartından bağımsız cihaz seçer (Windows'ta ONNX Runtime / Windows ML,
+GPU'da harici kartı dahiliye tercih ettiği belirtiliyor — doğrulanmadı). Bu yüzden 0.5.12:
+- WebGPU kartı **Intel** ve WebNN varsa, ilk yüklemede aynı modelle WebGPU ile **WebNN-GPU** (`powerPreference: high-performance`)
+  2'şer pencere ölçülür; WebNN ≥ %15 hızlıysa seçilir. Karar 14 gün saklanır (`sepAutoPick`, Chrome sürümü değişince yeniden ölçülür).
+- Rapor: `otomatik kart seçimi:` satırı (iki süre). İkisi de yavaşsa önerilen tek kullanıcı adımı:
+  `chrome://flags/#force-high-performance-gpu` → Etkin → Chrome'u yeniden başlat.
+- Kaynaklar: https://issues.chromium.org/issues/369219127 · https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips

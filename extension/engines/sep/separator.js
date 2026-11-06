@@ -26,7 +26,7 @@
 // o.final: girdi sonrası sıfır sayılıp her şey kesinleştirilir (video sonu / önceden ayrılmış parçaya varış), akış biter.
 // Ölçüm: docs/SES-AYIRMA.md.
 
-import { pickAdapter, describeAdapter } from '../../common/gpu.js';
+import { pickAdapter, describeAdapter, shouldAutoPick, chooseFaster } from '../../common/gpu.js';
 import { probeWebNN, webnnProvider } from '../../common/webnn.js';
 import { sepModelById, chunkSamples, WASM_SEP_MODEL } from './models.js';
 import { stftPair, istftPair, hann } from './stft.js';
@@ -76,6 +76,7 @@ export function createSeparator(opts = {}) {
   let fallbackReason = null; // WebGPU kurulamayıp yedeğe düşüldüyse nedeni (tanılama: worker 'loaded' → içerik betiği)
   let webnnInfo = opts.backend === 'webnn' ? { requested: true, used: false, device: opts.webnnDevice || 'npu', step: null, reason: null } : null; // WebNN denemesi (tanılama)
   let adapterInfo = null; // alınan ekran kartının özeti (tanılama)
+  let autoPick = null; // hibrit dizüstü otomatik kart seçimi: { webgpu, webnn, chosen, cached, reason } (tanılama)
   let loading = null;
   let queue = Promise.resolve();
   let stream = null;
@@ -130,10 +131,10 @@ export function createSeparator(opts = {}) {
     return 'wasm';
   }
 
-  async function createSession(o, bytes, be) {
+  async function createSession(o, bytes, be, dev = opts.webnnDevice || 'npu') {
     const so = {
       graphOptimizationLevel: 'all',
-      executionProviders: [be === 'webnn' ? webnnProvider(opts.webnnDevice || 'npu') : be],
+      executionProviders: [be === 'webnn' ? webnnProvider(dev, dev === 'gpu' ? 'high-performance' : 'default') : be],
       freeDimensionOverrides: { batch_size: denoise ? 2 * batch : batch },
       ...(opts.sessionOptions || {}),
     };
@@ -167,8 +168,18 @@ export function createSeparator(opts = {}) {
             if (autoModel && wantLite(be)) { model = sepModelById(WASM_SEP_MODEL); bytes = await modelBytes(); }
           }
         }
+        // hibrit dizüstü: WebGPU Intel karttaysa WebNN-GPU'yu (harici kart olabilir) ölç, hızlı olanı kullan (common/gpu.js)
+        if (be === 'webgpu' && (opts.backend || 'auto') === 'auto' && !wantBatch && opts.autoPick !== false &&
+            shouldAutoPick(adapterInfo, !!globalThis.navigator?.ml)) {
+          try {
+            if (await tryAutoPick(o, bytes)) be = 'webnn';
+          } catch (e) {
+            session = null;
+            autoPick = { ...(autoPick || {}), chosen: 'webgpu', reason: String(e?.message || e).slice(0, 160) };
+          }
+        }
         try {
-          if (be !== 'webnn') await open(be, wantBatch || DEFAULT_BATCH[be] || 1);
+          if (be !== 'webnn' && !session) await open(be, wantBatch || DEFAULT_BATCH[be] || 1);
         } catch (e) {
           if (be !== 'webgpu') throw e;
           session = null;
@@ -192,6 +203,57 @@ export function createSeparator(opts = {}) {
       loading.catch(() => { loading = null; });
     }
     return loading;
+  }
+
+  /** Bir pencereyi `n` kez çalıştırıp ortalama ms (ısınma sonrası). */
+  async function timeRuns(n = 2) {
+    const plane = model.dimF * model.dimT;
+    const data = new Float32Array(4 * plane);
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) await runModel(data.slice(), 1);
+    return (performance.now() - t0) / n;
+  }
+
+  /**
+   * WebGPU (Intel) ile WebNN-GPU'yu karşılaştırır; kazananın oturumu `session`'da kalır. opts.preferBackend (önbellek) varsa
+   * ölçmeden onu dener. WebNN seçildiyse true döner.
+   */
+  async function tryAutoPick(o, bytes) {
+    const relNow = async () => { try { await session?.release?.(); } catch { /* yoksay */ } session = null; };
+    const openNn = async () => { batch = 1; session = await createSession(o, bytes, 'webnn', 'gpu'); await warmUp(); };
+    if (opts.preferBackend === 'webgpu') { autoPick = { chosen: 'webgpu', cached: true }; return false; }
+    if (opts.preferBackend === 'webnn') {
+      try { await openNn(); autoPick = { chosen: 'webnn', cached: true }; adapterInfo = 'WebNN gpu (otomatik)'; return true; } catch (e) {
+        await relNow();
+        autoPick = { chosen: 'webgpu', cached: true, reason: 'WebNN-GPU kurulamadı: ' + String(e?.message || e).slice(0, 140) };
+        return false;
+      }
+    }
+    // ölç: önce WebGPU
+    batch = 1;
+    session = await createSession(o, bytes, 'webgpu');
+    await warmUp();
+    const msGpu = await timeRuns();
+    const gpuSession = session;
+    session = null;
+    let msNn = null, reason = null;
+    try {
+      await openNn();
+      msNn = await timeRuns();
+    } catch (e) {
+      reason = 'WebNN-GPU kurulamadı: ' + String(e?.message || e).slice(0, 140);
+      await relNow();
+    }
+    const chosen = chooseFaster({ webgpu: msGpu, webnn: msNn });
+    autoPick = { webgpu: Math.round(msGpu), webnn: msNn == null ? null : Math.round(msNn), chosen, reason };
+    if (chosen === 'webnn') {
+      try { await gpuSession.release?.(); } catch { /* yoksay */ }
+      adapterInfo = 'WebNN gpu (otomatik)';
+      return true;
+    }
+    if (session) await relNow();
+    session = gpuSession;
+    return false;
   }
 
   // ilk çalıştırma bellek ayırır, WebGPU'da gölgelendiricileri derler
@@ -468,6 +530,7 @@ export function createSeparator(opts = {}) {
     get fallbackReason() { return fallbackReason; },
     get adapter() { return adapterInfo; },
     get webnn() { return webnnInfo; },
+    get autoPick() { return autoPick; },
     get batch() { return batch; },
     get overlap() { return overlap; },
     contextSec: CONTEXT_SEC,

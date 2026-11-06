@@ -60,7 +60,12 @@ export function separationLines(sep) {
   const out = [a.join(' · '), b.join(' · '), c.join(' · ')];
   if (sep.gpuAdapter) out.push(`ekran kartı: ${scrub(sep.gpuAdapter)}`);
   if (num(sep.rtf) > 1.2 && sep.status !== 'error') out.push(`öneri: ayırma yetişemiyor (${sep.rtf.toFixed(1)} rtf); ayarlarda 'Hızlı' ayırma kalitesini ya da WebNN (NPU/GPU) arka ucunu deneyin`);
-  if (sep.backend === 'webgpu' && integratedHint(sep.gpuAdapter, num(sep.rtf))) out.push('uyarı: Intel ekran kartı kullanılıyor ve ayırma yetişemiyor; dizüstünüzde harici kart varsa Windows Ayarlar → Ekran → Grafik\'te Chrome\'u Yüksek performansa alın ve Chrome\'u yeniden başlatın');
+  if (sep.backend === 'webgpu' && integratedHint(sep.gpuAdapter, num(sep.rtf))) out.push('uyarı: Intel ekran kartı kullanılıyor ve ayırma yetişemiyor; dizüstünüzde harici kart varsa chrome://flags/#force-high-performance-gpu bayrağını Etkin yapıp Chrome\'u yeniden başlatın (Chrome Windows\'ta WebGPU kart tercihini yok sayar)');
+  if (sep.autoPick) {
+    const a = sep.autoPick;
+    const ms = a.cached ? 'önceki ölçüm' : `WebGPU ${a.webgpu ?? '?'} ms/pencere · WebNN-GPU ${a.webnn ?? 'kurulamadı'}${a.webnn != null ? ' ms/pencere' : ''}`;
+    out.push(`otomatik kart seçimi: ${a.chosen === 'webnn' ? 'WebNN-GPU (harici kart olabilir)' : 'WebGPU'} (${ms})${a.reason ? ' — ' + scrub(a.reason) : ''}`);
+  }
   if (sep.webnn?.requested) {
     const w = sep.webnn;
     out.push(`webnn (${scrub(w.device || 'npu')}): ${w.used ? 'kullanıldı' : `kullanılamadı${w.step ? ` (${scrub(w.step)} adımı)` : ''}${w.reason ? ' — ' + scrub(w.reason) : ''}`}`);
