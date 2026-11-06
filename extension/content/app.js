@@ -331,7 +331,7 @@ class Session {
     }
     if (this.separation) this.separation.setPrebuffer(settings.prebufferSec);
     if (!want || this.separation) return;
-    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, backend: settings.sepBackend, quality: settings.sepQuality, otherHold: () => this._hold.active });
+    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, backend: settings.sepBackend, quality: settings.sepQuality, gpuPreference: settings.gpuPreference, otherHold: () => this._hold.active });
     sep.addEventListener('state', (ev) => this._onSepState(ev.detail));
     this.separation = sep.start();
   }
@@ -1271,7 +1271,7 @@ function onSettings(prev, keys) {
     session?.syncSeparation();
     disposeSeparation();
   }
-  if ((has('sepBackend') || has('sepQuality')) && session) {
+  if ((has('sepBackend') || has('sepQuality') || has('gpuPreference')) && session) {
     // deneysel arka uç değişti: işçi yeni ayarla yeniden yüklensin
     session.separation?.destroy();
     session.separation = null;

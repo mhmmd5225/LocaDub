@@ -346,3 +346,13 @@ Intel Core Ultra 7 265 (yalnız iGPU Xe-LPG) ölçümü: WebGPU + Kim Vocal 2 = 
 `lib/ort/ort-wasm-simd-threaded.jsep.mjs` bu kısımda yamalandı (`tools/patch-ort-csp.py`, ort yükseltilince yeniden uygulanır).
 Test: birim `ort-csp.test.mjs`, e2e `webnn-csp.e2e.cjs` (Chromium WebNN cpu ile oturum kurar; yamasız sürümde aynı hatayı verir).
 Bu yalnız engeli kaldırır; modelin NPU'da desteklenip desteklenmediği ve hızı cihazda ölçülür.
+
+## Hibrit GPU'lu dizüstü: harici kartı seçmek (0.5.11)
+
+Dahili (Intel) + harici (NVIDIA/AMD) kartlı dizüstünde ORT'nin WebGPU yürütücüsü adaptörü tercihsiz ister ve çoğu zaman dahili kartı
+alır (RTX varken bile ayırma 2–3× yavaş kalır). 0.5.11'den itibaren adaptörü eklenti seçer ve ORT'ye `env.webgpu.adapter` olarak verir.
+- **Ayarlar → Diğer → Otomatik güncelleme ve deneysel → Kart:** "yüksek performans (harici)" (varsayılan) ya da "düşük güç (dahili)".
+  Yanındaki not iki tercihin hangi kartı verdiğini gösterir (WebGPU kartları adla listelemez; yalnız bu iki tercih vardır).
+- İki tercih de aynı (Intel) kartı veriyorsa Windows seçimi kilitlemiştir: **Ayarlar → Sistem → Ekran → Grafik → Chrome → Seçenekler →
+  Yüksek performans**, NVIDIA Denetim Masası → Program ayarları → chrome.exe → Yüksek performanslı NVIDIA işlemcisi; Chrome'u yeniden başlatın.
+- Doğrulama: tanılama raporunda `ekran kartı: nvidia …`; Intel kartta ayırma yetişemiyorsa rapor `uyarı:` satırı verir.

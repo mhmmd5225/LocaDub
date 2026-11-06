@@ -26,6 +26,7 @@
 // o.final: girdi sonrası sıfır sayılıp her şey kesinleştirilir (video sonu / önceden ayrılmış parçaya varış), akış biter.
 // Ölçüm: docs/SES-AYIRMA.md.
 
+import { pickAdapter, describeAdapter } from '../../common/gpu.js';
 import { probeWebNN, webnnProvider } from '../../common/webnn.js';
 import { sepModelById, chunkSamples, WASM_SEP_MODEL } from './models.js';
 import { stftPair, istftPair, hann } from './stft.js';
@@ -114,11 +115,12 @@ export function createSeparator(opts = {}) {
     if (want === 'cpu' || want === 'wasm') return want;
     const gpu = globalThis.navigator?.gpu;
     if (gpu) {
-      const adapter = (await gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null))
-        || (await gpu.requestAdapter().catch(() => null));
+      const pref = opts.gpuPreference || 'high-performance';
+      const adapter = await pickAdapter(pref, gpu);
       if (adapter) {
-        const i = adapter.info || {};
-        adapterInfo = [i.vendor, i.architecture, i.description].filter(Boolean).join(' ').slice(0, 120) || 'bilinmiyor';
+        adapterInfo = describeAdapter(adapter);
+        // ORT kendi requestAdapter() çağrısını tercihsiz yapar (hibrit dizüstünde dahili kart): seçtiğimiz adaptörü ver
+        if (ort?.env?.webgpu) { try { ort.env.webgpu.powerPreference = pref; ort.env.webgpu.adapter = adapter; } catch { /* eski ort: yoksay */ } }
         return 'webgpu';
       }
       note('WebGPU bağdaştırıcısı alınamadı: Chrome ekran kartını eklentiye kapatmış olabilir (sürücü çökmesinden sonra). Chrome\'u tamamen kapatıp açın; chrome://gpu\'ya bakın.');
