@@ -123,7 +123,7 @@ Oynatıcı panelinde **"Tüm videoyu hazırla"** düğmesi (panel başlığında
   (WebGPU `adapter.info.vendor/architecture`, `navigator.userAgentData.platform`). Elle seçim: Ayarlar → Otomatik / RTX / Apple Silicon / Dahili kart / İşlemci.
 - Profil bir **parametre tablosu**dur; kod yolları aynı kalır:
 
-| Parametre | RTX 5060 Ti | Mac mini M4 | Dahili kart | İşlemci |
+| Parametre | RTX 5060 Ti 16 GB (masaüstü) | Mac mini M4 | Dahili kart | İşlemci |
 |---|---|---|---|---|
 | Ayırma modeli | Kim Vocal 2 | Kim Vocal 2 | hafif model | hafif model |
 | Toplu boyut | ölçümle 1–2 (TDR sınırı: tek iş < 0.8 sn) | ölçümle 1–4 (TDR yok) | 1 | 1 |
@@ -185,8 +185,9 @@ Her kilometre taşı kendi başına yayınlanabilir; kullanıcı "yükle" demede
 | Alt ajan yanlış "geçti" der | Bozuk birleştirme | Yönetici testleri kendisi çalıştırır |
 | Gizlilik metni eskir (diske ses yazılıyor) | Yanlış beyan | M4'te `site/gizlilik.html` güncellenir |
 
-## 9. Başlamadan önce kullanıcıdan
+## 9. Kullanıcı kararları (2026-11-10)
 
-1. 0.5.14 için "yükle" (ya da v1 ile birlikte çıksın kararı).
-2. RTX makinesinin tam adı (5060 mı, 5060 Ti mi; kaç GB) ve dizüstü/masaüstü olduğu — profil tablosu buna göre.
-3. Arayüz için varsa beğenilen bir örnek (uygulama ya da site); yoksa B0 site tasarım dilinden gider.
+- RTX makinesi: **RTX 5060 Ti 16 GB, masaüstü** (tek kart; hibrit GPU sorunu bu makinede yok).
+- Arayüz: **sitenin tasarım diline uygun** (`site/index.html`: siyah/beyaz bölümler, SF/Inter, tek mavi vurgu).
+- 0.5.14 ayrıca yayınlanmadı; dalda duruyor, v1 kilometre taşlarıyla birlikte "yükle" denince çıkar.
+- M0 başlatıldı: A0, B0, C1 paralel.
