@@ -1,6 +1,5 @@
 // YouTube içerik uygulaması: altyazı → çeviri → seslendirme → senkron çalma.
 
-import { backendChoice } from '../common/webnn.js';
 import { getSettings, setSettings, onSettingsChanged, chooseVoice, toneFor, voiceGender, genderVoice } from '../common/settings.js';
 import { styleSpeed } from '../engines/tts/styles.js';
 import { DEFAULT_VOICE } from '../engines/tts/voices.js';
@@ -178,7 +177,7 @@ class Session {
     this._setBtn('preparing', 'altyazılar alınıyor');
     // bekletme ve altyazı göstergesi altyazı gelmeden de çalışsın; motorlar altyazıyla aynı anda yüklenir
     this._tick = setInterval(() => this.tick(), TICK_MS);
-    this._pitchTimer = setInterval(() => this._samplePitch(), PITCH_MS);
+    this._syncPitchTimer();
     const engines = this.initEngines();
     try {
       await this.loadCaptions();
@@ -325,13 +324,13 @@ class Session {
     const want = this.alive && this.video && settings.enabled && settings.separation === 'auto' && !ad &&
       (settings.engineMode === 'mock' || settings.modelsApproved);
     const mode = settings.engineMode === 'mock' ? 'mock' : 'real';
-    if (this.separation && (!want || this.separation.mode !== mode || this.separation.backendChoice.kind !== backendChoice(settings.sepBackend).kind)) {
+    if (this.separation && (!want || this.separation.mode !== mode)) {
       this.separation.destroy();
       this.separation = null;
     }
     if (this.separation) this.separation.setPrebuffer(settings.prebufferSec);
     if (!want || this.separation) return;
-    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, backend: settings.sepBackend, quality: settings.sepQuality, gpuPreference: settings.gpuPreference, otherHold: () => this._hold.active });
+    const sep = new SeparatedAudio(this.video, { mode, prebufferSec: settings.prebufferSec, quality: settings.sepQuality, gpuPreference: settings.gpuPreference, otherHold: () => this._hold.active });
     sep.addEventListener('state', (ev) => this._onSepState(ev.detail));
     this.separation = sep.start();
   }
@@ -900,6 +899,13 @@ class Session {
     this._regender(t);
   }
 
+  /** Eski perde yolu (ayırma kapalıyken kadın/erkek) dışında 50 ms'lik örnekleme zamanlayıcısı çalışmaz. */
+  _syncPitchTimer() {
+    const need = this.alive && this._genderOn() && !this._spkOn();
+    if (need && !this._pitchTimer) this._pitchTimer = setInterval(() => this._samplePitch(), PITCH_MS);
+    else if (!need && this._pitchTimer) { clearInterval(this._pitchTimer); this._pitchTimer = null; }
+  }
+
   _samplePitch() {
     if (!this._genderOn() || this.inAd || this._spkOn()) return;
     const v = this.video;
@@ -1022,6 +1028,7 @@ class Session {
   tick() {
     if (!this.alive) return;
     this.syncSeparation(); // ayar, motor ve reklam durumuna göre kur / kaldır
+    this._syncPitchTimer();
     this._tickHold();
     if (panel && session === this && performance.now() - (this._panelAt || 0) >= 200) {
       this._panelAt = performance.now();
@@ -1271,8 +1278,8 @@ function onSettings(prev, keys) {
     session?.syncSeparation();
     disposeSeparation();
   }
-  if ((has('sepBackend') || has('sepQuality') || has('gpuPreference')) && session) {
-    // deneysel arka uç değişti: işçi yeni ayarla yeniden yüklensin
+  if ((has('sepQuality') || has('gpuPreference')) && session) {
+    // ayırma kalitesi / kart tercihi değişti: işçi yeni ayarla yeniden yüklensin
     session.separation?.destroy();
     session.separation = null;
     disposeSeparation();

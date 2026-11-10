@@ -193,13 +193,16 @@ let applying = false;
 // manual: açılır penceredeki "Şimdi güncelle" (kullanıcı istedi: açık YouTube sekmesi beklenmez). Dönen: 'started' | neden.
 async function autoApply(latest, { manual = false } = {}) {
   const installed = chrome.runtime.getManifest().version;
-  if (applying) return 'busy';
+  // servis çalışanı yeniden başlarsa bellek bayrağı kaybolur: oturum deposunda zaman damgalı kilit (5 dk)
+  const { updateApplying } = await chrome.storage.session.get('updateApplying').catch(() => ({}));
+  if (applying || Date.now() - (updateApplying || 0) < 5 * 60000) return 'busy';
   if (!latest || compareVersions(latest.version, installed) <= 0) return 'current';
   const dir = await getDirHandle();
   if (!dir) return 'no-dir';
   if (!(await permission(dir))) return 'no-permission';
   if (!manual && (await chrome.tabs.query({ url: ['https://www.youtube.com/*', 'https://www.youtube-nocookie.com/*'] })).length) return 'busy-tabs';
   applying = true;
+  await chrome.storage.session.set({ updateApplying: Date.now() }).catch(() => {});
   try {
     const r = await applyUpdate(dir, latest, installed);
     await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), ...r } });
@@ -209,7 +212,7 @@ async function autoApply(latest, { manual = false } = {}) {
     const error = String(e?.message || e).slice(0, 200);
     await chrome.storage.local.set({ updateApply: { version: latest.version, at: Date.now(), error } });
     return 'error: ' + error;
-  } finally { applying = false; }
+  } finally { applying = false; await chrome.storage.session.remove('updateApplying').catch(() => {}); }
 }
 
 function scheduleUpdateCheck() {
@@ -313,5 +316,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.session.remove('progress').catch(() => {});
+  // kaldırılan deneysel WebNN arka ucundan (0.5.8–0.5.13) kalan kayıtlar
+  chrome.storage.local.remove(['sepBackend', 'sepAutoPick', 'webnnProbe']).catch(() => {});
   scheduleUpdateCheck();
 });

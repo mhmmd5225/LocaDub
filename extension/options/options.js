@@ -209,11 +209,11 @@ function renderBasics() {
   $('speakerVoices').checked = settings.speakerVoices;
   if (settings.speakerVoices && !speakerOpened) { $('speakerBlock').open = true; speakerOpened = true; }
   $('enabled').checked = settings.enabled;
-  $('enabledLabel').textContent = settings.enabled ? 'Dublaj açık' : 'Dublaj kapalı';
+  // dublaj durumu sekmeye özeldir (content/app.js setEnabled): bu anahtar yalnız yeni açılan sekmenin başlangıç değeridir
+  $('enabledLabel').textContent = settings.enabled ? 'Yeni sekmede açık' : 'Yeni sekmede kapalı';
   $('showSubtitles').checked = settings.showSubtitles;
   $('checkUpdates').checked = settings.checkUpdates;
   $('holdStart').checked = settings.holdStart;
-  $('sepBackend').value = settings.sepBackend;
   $('sepQuality').value = settings.sepQuality;
   $('gpuPreference').value = settings.gpuPreference;
   $('separation').checked = settings.separation !== 'off';
@@ -229,16 +229,8 @@ function renderBasics() {
 $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
-$('sepBackend').addEventListener('change', (e) => setSettings({ sepBackend: e.target.value }));
 $('gpuPreference').addEventListener('change', (e) => setSettings({ gpuPreference: e.target.value }));
 $('sepQuality').addEventListener('change', (e) => setSettings({ sepQuality: e.target.value }));
-$('webnnProbe').addEventListener('click', async () => {
-  const { probeWebNNAll, formatProbeAll } = await import('../common/webnn.js');
-  const all = await probeWebNNAll();
-  const text = formatProbeAll(all);
-  $('webnnResult').textContent = text;
-  chrome.storage.local.set({ webnnProbe: { at: Date.now(), text } }).catch(() => {}); // tanılama raporuna girer
-});
 $('holdStart').addEventListener('change', (e) => setSettings({ holdStart: e.target.checked }));
 $('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
 $('mock').addEventListener('change', async (e) => {
@@ -969,7 +961,7 @@ async function browserInfo() {
 async function diagnosticsReport() {
   const [status, errors, timings, info, sep, benchSaved] = await Promise.all([
     bg({ type: 'engine.status' }), bg({ type: 'diag.errors' }), bg({ type: 'diag.timings' }), browserInfo(), bg({ type: 'diag.separation' }),
-    chrome.storage.local.get(['benchLast', 'webnnProbe']).then((o) => ({ ...o.benchLast, probe: o.webnnProbe })).catch(() => null),
+    chrome.storage.local.get('benchLast').then((o) => o.benchLast).catch(() => null),
   ]);
   const models = [];
   const seen = new Set();
@@ -986,7 +978,7 @@ async function diagnosticsReport() {
   return buildReport({
     version: chrome.runtime.getManifest().version, ...info, settings,
     status: status.ok ? status.result : null, separation: sep.ok ? sep.result : null, models, errors: errors.ok ? errors.result : [],
-    timings: timings.ok ? timings.result : [], bench: [...(benchSaved?.lines || []), ...(benchSaved?.probe ? [`WebNN denemesi (${new Date(benchSaved.probe.at).toISOString()}): ${benchSaved.probe.text}`] : [])], benchAt: benchSaved?.at,
+    timings: timings.ok ? timings.result : [], bench: benchSaved?.lines, benchAt: benchSaved?.at,
     glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
   });
 }
@@ -1037,7 +1029,6 @@ async function startBench() {
     const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
     const result = await runBench({
       sep: { createClient: () => createSepClient({ mock: isMock() }), guard: benchGuard },
-      sepNpu: String(settings.sepBackend).startsWith('webnn') || (settings.sepBackend === 'auto' && navigator.ml) ? { webnnDevice: settings.sepBackend === 'webnn-npu' ? 'npu' : 'gpu', createClient: () => createSepClient({ mock: isMock() }) } : null, // WebNN karşılaştırması (otomatikte GPU: hibrit dizüstünde harici kart olabilir)
       tts: {
         synth: async (text) => {
           if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };
@@ -1141,7 +1132,7 @@ renderStatus();
   const { probeGpuPreferences } = await import('../common/gpu.js');
   probeGpuPreferences().then((r) => {
     $('gpuNote').textContent = !r.high ? 'WebGPU kartı alınamadı'
-      : r.same ? `iki tercih de aynı kartı veriyor: ${r.high}. Chrome Windows'ta tek kart kullanır; harici kart için eklenti WebNN'i kendisi dener, olmazsa chrome://flags/#force-high-performance-gpu`
+      : r.same ? `iki tercih de aynı kartı veriyor: ${r.high}. Chrome Windows'ta tek kart kullanır; harici kart için chrome://flags/#force-high-performance-gpu bayrağını Etkin yapıp Chrome'u yeniden başlatın`
         : `yüksek performans → ${r.high} · düşük güç → ${r.low}`;
   }).catch(() => {});
 }

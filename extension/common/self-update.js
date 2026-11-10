@@ -118,6 +118,43 @@ export function targetPath(name) {
 
 // ---------- uygulama ----------
 
+/**
+ * Yazım sırası: Chrome paketlenmemiş eklentiyi diskten canlı okur; yazım yarıda kalırsa yeni giriş noktası eski yardımcılarla
+ * çalışmasın diye önce yaprak dosyalar (alt klasörler), sonra kökteki giriş noktaları, en son manifest.json yazılır.
+ */
+export function writeOrder(rel) {
+  if (rel === 'manifest.json') return 2;
+  return rel.includes('/') ? 0 : 1;
+}
+
+const STALE_EXT = /\.(js|mjs|cjs|html|css|json|wasm|png|svg|md|txt)$/i;
+
+/**
+ * Pakette artık olmayan dosyalar: yalnız paketin kendi alt klasörleri içinde ve bilinen uzantılarda. Kökteki dosyalara ve
+ * pakette adı geçmeyen klasörlere (kullanıcının koymuş olabileceği şeyler) dokunulmaz. existing/packaged: göreli yol listeleri.
+ */
+export function staleFiles(existing, packaged) {
+  const keep = new Set(packaged);
+  const tops = new Set(packaged.filter((r) => r.includes('/')).map((r) => r.split('/')[0]));
+  return existing.filter((r) => r.includes('/') && tops.has(r.split('/')[0]) && !keep.has(r) && STALE_EXT.test(r));
+}
+
+async function listFiles(dir, prefix = '', out = [], depth = 0) {
+  if (depth > 8 || typeof dir.entries !== 'function') return out;
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind === 'directory') await listFiles(h, prefix + name + '/', out, depth + 1);
+    else out.push(prefix + name);
+  }
+  return out;
+}
+
+async function removeAt(dir, rel) {
+  const parts = rel.split('/');
+  let d = dir;
+  for (const x of parts.slice(0, -1)) d = await d.getDirectoryHandle(x);
+  await d.removeEntry(parts.at(-1));
+}
+
 async function fileAt(dir, rel, create) {
   const parts = rel.split('/');
   let d = dir;
@@ -134,7 +171,7 @@ async function sameContent(dir, rel, entry) {
 }
 
 /**
- * Paketi indirir, doğrular ve klasöre yazar. latest: { version, downloadUrl }. Dönen: { written, skipped }.
+ * Paketi indirir, doğrular ve klasöre yazar. latest: { version, downloadUrl }. Dönen: { written, skipped, removed }.
  * Hata olursa (indirme, sürüm uyuşmazlığı, bozuk dosya) hiçbir şey yazılmadan fırlatır; yazım başladıktan sonraki
  * hatada manifest.json güncellenmemiş kalır (eski sürüm olarak görünür, bir sonraki denemede tamamlanır).
  */
@@ -163,7 +200,8 @@ export async function applyUpdate(dir, latest, installedVersion, { fetchFn = fet
     todo.push({ rel: f.rel, data: await f.en.read() });
   }
   const skipped = files.length - 1 - todo.length;
-  todo.push({ rel: 'manifest.json', data: await man.en.read() }); // en sona
+  todo.push({ rel: 'manifest.json', data: await man.en.read() });
+  todo.sort((a, b) => writeOrder(a.rel) - writeOrder(b.rel)); // manifest en sona (writeOrder)
   let i = 0;
   for (const t of todo) {
     const w = await (await fileAt(dir, t.rel, true)).createWritable();
@@ -171,5 +209,18 @@ export async function applyUpdate(dir, latest, installedVersion, { fetchFn = fet
     await w.close();
     onProgress?.(++i, todo.length);
   }
-  return { written: todo.length, skipped };
+  // yeni sürümde kaldırılan dosyalar (eski modüller birikmesin); hata olursa güncelleme yine başarılıdır
+  let removed = 0;
+  try {
+    const only = files.filter((f) => f.rel.includes('/')).map((f) => f.rel.split('/')[0]);
+    const existing = [];
+    for (const top of new Set(only)) {
+      const sub = await dir.getDirectoryHandle(top).catch(() => null);
+      if (sub) await listFiles(sub, top + '/', existing);
+    }
+    for (const rel of staleFiles(existing, files.map((f) => f.rel))) {
+      try { await removeAt(dir, rel); removed++; } catch { /* kilitli / silinmiş: atla */ }
+    }
+  } catch { /* listeleme desteklenmiyor: atla */ }
+  return { written: todo.length, skipped, removed };
 }
