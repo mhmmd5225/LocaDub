@@ -225,6 +225,26 @@
       <section class="sec" id="ayirma" aria-labelledby="h-ayirma">
         <h2 id="h-ayirma" tabindex="-1">Ses ayırma ve performans</h2>
         <p class="lead">Konuşmayı müzikten ayırma ve bu cihaza göre hız ayarları.</p>
+        <div class="grp" id="profileGrp">
+          <h3 id="profLabel">Cihaz profili</h3>
+          <div class="list">
+            <div class="profiles" id="deviceProfile" role="radiogroup" aria-labelledby="profLabel">
+              <label class="prof"><input type="radio" name="deviceProfile" value="auto"><b>Otomatik</b><small id="profAutoHint">Algılanıyor…</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="rtx"><b>Ayrı ekran kartı</b><small>NVIDIA, AMD</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="apple"><b>Apple Silicon</b><small>M1–M4</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="igpu"><b>Dahili kart</b><small>Intel</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="cpu"><b>İşlemci</b><small>WebGPU yok</small></label>
+            </div>
+            <div class="ptable" aria-label="Profilin ayarladıkları">
+              <div><small>Ayırma kalitesi</small><b id="profQuality">—</b></div>
+              <div><small>Ön tampon</small><b id="profPrebuffer">—</b></div>
+              <div><small>Önceden hazırlama</small><b id="profLookahead">—</b></div>
+            </div>
+          </div>
+          <p class="note grp-note" id="profNote"></p>
+          <p class="note grp-note">Profil, aşağıdaki ayarların başlangıç değerlerini belirler; her birini ayrıca değiştirebilirsiniz.</p>
+        </div>
+
         <div class="list" id="mixGroup">
           <label class="item">
             <span class="item-text"><span class="item-title">Gerçek dublaj (ses ayırma)</span><span class="item-help" id="separationHelp">Orijinal sesten konuşma ayrılır; müzik ve efektler kalır. Ekran kartı (WebGPU) ile çalışır.</span></span>

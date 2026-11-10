@@ -176,3 +176,33 @@ dialog p { margin: 0 0 6px; }
   .sec > h2 { font-size: 24px; }
   .strip-text { white-space: normal; }
 }
+
+/* Cihaz profili seçici (beş seçenek; dar ekranda sarar) */
+.profiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.prof { position: relative; padding: 14px 8px; text-align: center; cursor: pointer; border-left: 1px solid var(--line-2); min-width: 0; }
+.prof:first-child { border-left: 0; }
+.prof input { position: absolute; opacity: 0; }
+.prof b { display: block; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.prof small { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; overflow-wrap: anywhere; }
+.prof:has(input:checked) { background: var(--accent-tint); }
+.prof:has(input:checked) b { color: var(--accent-text); font-weight: 600; }
+.prof:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: -3px; }
+.ptable { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line-2); }
+.ptable div { padding: 12px 16px; min-width: 0; }
+.ptable div + div { border-left: 1px solid var(--line-2); }
+.ptable small { display: block; font-size: 12px; color: var(--ink-2); }
+.ptable b { font-weight: 500; font-size: 14px; }
+@media (max-width: 860px) {
+  .profiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .prof:nth-child(4) { border-left: 0; }
+  .prof:nth-child(n+4) { border-top: 1px solid var(--line-2); }
+}
+@media (max-width: 600px) {
+  .profiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prof:nth-child(n) { border-left: 1px solid var(--line-2); border-top: 1px solid var(--line-2); }
+  .prof:nth-child(odd) { border-left: 0; }
+  .prof:first-child { grid-column: 1 / -1; border-top: 0; border-left: 0; }
+  .prof:nth-child(even) { border-left: 0; }
+  .prof:nth-child(odd):not(:first-child) { border-left: 1px solid var(--line-2); }
+  .ptable div { padding: 10px 10px; }
+}

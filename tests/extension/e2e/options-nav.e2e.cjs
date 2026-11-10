@@ -277,6 +277,16 @@ const overflowX = (page) => page.evaluate(() => document.documentElement.scrollW
     await page.click('.diag:not(#benchBlock) summary');
     await page.waitForFunction(() => /\[Hız testi \(/.test(document.getElementById('diagText').textContent), null, { timeout: 15000 });
 
+    // cihaz profili: seçici var, seçim ilgili ayarları depoya yazar ve sayfada yansır
+    await page.goto(url('', '#ayirma'));
+    await page.waitForSelector('#deviceProfile input[name="deviceProfile"]', { state: 'attached' });
+    assert.equal(await page.locator('#deviceProfile input').count(), 5, 'beş profil seçeneği');
+    await page.locator('#deviceProfile label:has(input[value="cpu"])').click();
+    await page.waitForFunction(() => chrome.storage.local.get(null).then((s) => s.deviceProfile === 'cpu' && s.sepQuality === 'fast' && s.prebufferSec === 45 && s.lookaheadSec === 60));
+    await page.waitForFunction(() => document.getElementById('sepQuality').value === 'fast' && document.getElementById('profPrebuffer').textContent === '45 sn');
+    assert.equal(await page.isChecked('#deviceProfile input[value="cpu"]'), true);
+    assert.ok(await overflowX(page) <= 0, 'profil seçicisiyle yatay taşma yok');
+
     // (1) konsolda hata yok
     assert.deepEqual(problems, [], 'konsol/pageerror: ' + problems.join(' | '));
     console.log('ok — options-nav');

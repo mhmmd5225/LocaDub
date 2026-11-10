@@ -12,6 +12,7 @@ import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 import { parseGlossary } from '../common/glossary.js';
 import { buildReport } from '../common/diagnostics.js';
+import { PROFILES, resolveProfile, profileDefaults, normalizeDeviceProfile } from '../common/device-profile.js';
 import { runBench, formatBench, collectEnv } from '../common/bench.js';
 import { createSepClient } from '../engines/sep/client.js';
 
@@ -274,6 +275,7 @@ function renderBasics() {
   $('checkUpdates').checked = settings.checkUpdates;
   $('holdStart').checked = settings.holdStart;
   $('sepQuality').value = settings.sepQuality;
+  renderProfile();
   $('gpuPreference').value = settings.gpuPreference;
   $('separation').checked = settings.separation !== 'off';
   $('prebufferSec').disabled = settings.separation === 'off';
@@ -290,6 +292,35 @@ $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.c
 $('showSubtitles').addEventListener('change', (e) => setSettings({ showSubtitles: e.target.checked }));
 $('checkUpdates').addEventListener('change', (e) => setSettings({ checkUpdates: e.target.checked }));
 $('gpuPreference').addEventListener('change', (e) => setSettings({ gpuPreference: e.target.value }));
+// ---------- Cihaz profili (common/device-profile.js) ----------
+// Algılanan kart: #gpuNote ile aynı pickAdapter sonucu. Profil ayarların üzerine yazmaz; yalnız seçici değişince değerleri yazar.
+let gpuAdapter = null, gpuProbed = false;
+function renderProfile() {
+  const sel = normalizeDeviceProfile(settings.deviceProfile);
+  for (const r of document.querySelectorAll('input[name="deviceProfile"]')) r.checked = r.value === sel;
+  const p = resolveProfile(sel, { adapter: gpuAdapter });
+  const det = resolveProfile('auto', { adapter: gpuAdapter });
+  $('profAutoHint').textContent = gpuProbed ? `${det.label.replace(/ \(.*\)/, '')} algılandı` : 'Algılanıyor…';
+  $('profQuality').textContent = p.sepQuality === 'fast' ? 'Hızlı' : 'Yüksek';
+  $('profPrebuffer').textContent = `${p.prebufferSec} sn`;
+  $('profLookahead').textContent = `${p.lookaheadSec} sn`;
+  $('profNote').textContent = gpuProbed ? `Algılanan: ${gpuAdapter || 'WebGPU kartı yok'} → ${det.label}` : '';
+}
+$('deviceProfile').addEventListener('change', (e) => {
+  const v = normalizeDeviceProfile(e.target.value);
+  const id = resolveProfile(v, { adapter: gpuAdapter }).id;
+  setSettings({ deviceProfile: v, ...profileDefaults(id) });
+});
+(async () => {
+  try {
+    const { pickAdapter, describeAdapter } = await import('../common/gpu.js');
+    const a = await pickAdapter(settings.gpuPreference);
+    if (a) gpuAdapter = describeAdapter(a);
+  } catch { /* WebGPU yok → işlemci */ }
+  gpuProbed = true;
+  renderProfile();
+})();
+
 $('sepQuality').addEventListener('change', (e) => setSettings({ sepQuality: e.target.value }));
 $('holdStart').addEventListener('change', (e) => setSettings({ holdStart: e.target.checked }));
 $('separation').addEventListener('change', (e) => setSettings({ separation: e.target.checked ? 'auto' : 'off' }));
@@ -1040,6 +1071,7 @@ async function diagnosticsReport() {
     version: chrome.runtime.getManifest().version, ...info, settings,
     status: status.ok ? status.result : null, separation: sep.ok ? sep.result : null, models, errors: errors.ok ? errors.result : [],
     timings: timings.ok ? timings.result : [], bench: benchSaved?.lines, benchAt: benchSaved?.at,
+    profile: (() => { const r = resolveProfile(settings.deviceProfile, { adapter: gpuAdapter }); return { id: r.id, auto: r.auto, adapter: gpuAdapter }; })(),
     glossary: { mt: parseGlossary(settings.glossaryMt).length, tts: parseGlossary(settings.glossaryTts).length },
   });
 }
