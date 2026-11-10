@@ -4,66 +4,75 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LocaDub</title>
-  <link rel="stylesheet" href="../common/theme.css">
+  <link rel="stylesheet" href="../common/ui/tokens.css">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
-    <div class="brand"><img src="../icons/icon-32.png" alt="" title="LocaDub" width="20" height="20"></div>
-    <select id="voice" aria-label="Seslendirme"></select>
-    <label class="switch-wrap" title="Dublajı aç/kapa">
-      <span class="switch-text">Dublaj</span>
-      <span class="switch">
-        <input type="checkbox" id="enabled">
-        <span class="slider" aria-hidden="true"></span>
-      </span>
-    </label>
+  <header class="pop-head">
+    <span class="pmark" aria-hidden="true">TR</span>
+    <strong>LocaDub</strong>
+    <span class="ver" id="ver"></span>
   </header>
 
-  <section class="update" id="update" hidden>
-    <div class="update-title" id="updateTitle"></div>
-    <div class="state-detail" id="updateHint">İndirdiğiniz klasörü eskisinin yerine koyup <b>chrome://extensions</b> sayfasında eklentiyi yenileyin. Modeller ve ayarlar korunur.</div>
-    <div class="update-actions">
-      <button type="button" id="updateNow" hidden>Şimdi güncelle</button>
-      <button type="button" id="updateDownload">İndir</button>
-      <button type="button" id="updateHow" class="secondary">Nasıl?</button>
-      <button type="button" id="updateLater" class="secondary">Sonra</button>
+  <main class="pop-body">
+    <section class="update" id="update" aria-label="Güncelleme" hidden>
+      <div>
+        <b id="updateTitle"></b>
+        <p id="updateHint">İndirdiğiniz klasörü eskisinin yerine koyup <b>chrome://extensions</b> sayfasında eklentiyi yenileyin. Modeller ve ayarlar korunur.</p>
+      </div>
+      <div class="row">
+        <button type="button" id="updateNow" class="btn btn-sm btn-primary" hidden>Şimdi güncelle</button>
+        <button type="button" id="updateDownload" class="btn btn-sm btn-primary">İndir</button>
+        <button type="button" id="updateHow" class="btn btn-sm">Nasıl?</button>
+        <button type="button" id="updateLater" class="btn btn-sm btn-plain">Sonra</button>
+      </div>
+    </section>
+
+    <section class="status" id="state" data-kind="info" aria-label="Durum">
+      <div class="status-top" role="status">
+        <span class="dot" id="stateDot" aria-hidden="true"></span>
+        <div>
+          <b id="stateTitle">Durum okunuyor…</b>
+          <p id="stateDetail"></p>
+        </div>
+      </div>
+      <div class="progress" id="stateBar" aria-hidden="true" hidden><i></i></div>
+      <button type="button" id="stateAction" class="btn btn-sm" hidden></button>
+      <label class="tab">
+        <span>Bu sekmede dublaj<small id="tabHint">Yalnız bu sekmeyi etkiler</small></span>
+        <input type="checkbox" class="switch" role="switch" id="enabled">
+      </label>
+    </section>
+
+    <div class="group">
+      <label class="glabel" for="voice">Ses</label>
+      <select id="voice" class="select" aria-label="Seslendirme"></select>
     </div>
-  </section>
 
-  <section class="state" id="state" data-kind="info">
-    <div class="state-title" id="stateTitle">Durum okunuyor…</div>
-    <div class="state-detail" id="stateDetail"></div>
-    <div class="pbar" id="stateBar" hidden><div></div></div>
-    <button type="button" id="stateAction" hidden></button>
-  </section>
+    <div class="group">
+      <div class="slider">
+        <label for="ttsVolume">Dublaj</label>
+        <output id="ttsVolumeOut" for="ttsVolume"></output>
+        <input class="range" type="range" id="ttsVolume" min="0" max="2" step="0.05">
+      </div>
+      <div class="slider">
+        <label for="originalVolume">Orijinal ses, konuşurken</label>
+        <output id="originalVolumeOut" for="originalVolume"></output>
+        <input class="range" type="range" id="originalVolume" min="0" max="1" step="0.05">
+      </div>
+    </div>
 
-  <section>
-    <label class="row range">
-      <span>Dublaj ses seviyesi <output id="ttsVolumeOut"></output></span>
-      <input type="range" id="ttsVolume" min="0" max="2" step="0.05">
+    <hr>
+    <label class="line" title="Orijinal sesten konuşmayı ayırıp müzik ve efektleri korur (GPU gerekir)">
+      <span>Ses ayırma<small>Müzik kalır, yalnız konuşma değişir</small></span>
+      <input type="checkbox" class="switch" role="switch" id="separation">
     </label>
-    <label class="row range">
-      <span>Orijinal ses (konuşurken) <output id="originalVolumeOut"></output></span>
-      <input type="range" id="originalVolume" min="0" max="1" step="0.05">
-    </label>
-  </section>
+  </main>
 
-  <section class="quick">
-    <label class="opt-line" title="Orijinal sesten konuşmayı ayırıp müzik ve efektleri korur (GPU gerekir)">
-      <span>Gerçek dublaj <small>ses ayırma</small></span>
-      <span class="switch">
-        <input type="checkbox" id="separation">
-        <span class="slider" aria-hidden="true"></span>
-      </span>
-    </label>
-  </section>
-
-  <section>
-    <button type="button" id="openOptions" class="secondary wide">Tüm ayarlar ve modeller</button>
-  </section>
-
-  <footer>Çeviri ve seslendirme bu bilgisayarda yapılır.</footer>
+  <footer class="pop-foot">
+    <button type="button" id="openOptions" class="more">Ayarlar <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></button>
+    <span>Her şey bu bilgisayarda işlenir</span>
+  </footer>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

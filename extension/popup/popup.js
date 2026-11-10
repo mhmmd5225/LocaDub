@@ -7,6 +7,7 @@ import { DOWNLOAD_URL, INSTALL_URL, updateFrom } from '../common/version.js';
 let shownUpdate = null; // renderUpdate'in gösterdiği güncelleme (indirme / kurulum bağlantıları kaynağa göre)
 
 const $ = (id) => document.getElementById(id);
+$('ver').textContent = chrome.runtime.getManifest().version;
 let settings = await getSettings();
 let lists = null; // engine.list sonucu (model adları için)
 const progress = { mt: null, tts: null };
@@ -38,10 +39,10 @@ async function renderUpdate() {
   // otomatik güncelleme klasörü seçiliyse tek tıkla güncelle (common/self-update.js; Ayarlar → Diğer)
   const dir = u ? await getDirHandle().catch(() => null) : null;
   $('updateNow').hidden = !dir;
-  $('updateDownload').classList.toggle('secondary', !!dir);
+  $('updateDownload').classList.toggle('btn-primary', !dir);
   $('updateHint').textContent = dir
     ? 'Şimdi güncelle: yeni sürüm indirilip eklenti klasörüne yazılır ve eklenti yeniden başlar (açık dublaj durur). Modeller ve ayarlar korunur.'
-    : 'İndirdiğiniz klasörü eskisinin yerine koyup chrome://extensions sayfasında eklentiyi yenileyin. Modeller ve ayarlar korunur. Ayarlar → Diğer\'den eklenti klasörünü seçerseniz tek tıkla güncellenir.';
+    : 'İndirdiğiniz klasörü eskisinin yerine koyup chrome://extensions sayfasında eklentiyi yenileyin. Modeller ve ayarlar korunur. Ayarlar → Güncelleme\'den eklenti klasörünü seçerseniz tek tıkla güncellenir.';
   return update;
 }
 
@@ -82,7 +83,10 @@ renderUpdate().then((update) => {
 
 function bindRange(id, fmt) {
   const input = $(id), out = $(id + 'Out');
-  const show = () => { out.textContent = fmt(Number(input.value)); };
+  const show = () => {
+    out.textContent = fmt(Number(input.value));
+    input.style.setProperty('--v', `${((Number(input.value) - Number(input.min)) / (Number(input.max) - Number(input.min))) * 100}%`);
+  };
   input.value = settings[id];
   show();
   input.addEventListener('input', show);
@@ -207,13 +211,16 @@ function modelNames() {
   return [b && `Çeviri: ${short(b.label)}`, v && `Ses: ${short(v.label)}`].filter(Boolean).join(' · ');
 }
 
+const DOT = { ok: 'ok', info: 'prep', warn: 'warn', err: 'err', off: '' };
+
 function show(kind, title, detail = '', action = null, pct = null) {
   $('state').dataset.kind = kind;
+  $('stateDot').className = `dot ${DOT[kind] || ''}`.trim();
   $('stateTitle').textContent = title;
   $('stateDetail').textContent = detail;
   const bar = $('stateBar');
   bar.hidden = pct === null;
-  if (pct !== null) bar.firstElementChild.style.width = `${pct}%`;
+  if (pct !== null) bar.style.setProperty('--v', `${pct}%`);
   const btn = $('stateAction');
   btn.hidden = !action;
   if (action) { btn.textContent = action.label; btn.onclick = action.run; }
@@ -223,6 +230,7 @@ async function render() {
   await refreshTab();
   const on = tabEnabled ?? settings.enabled;
   $('enabled').checked = on;
+  $('tabHint').textContent = tabEnabled === null ? 'Bu sekmede video yok; genel ayar' : 'Yalnız bu sekmeyi etkiler';
   const res = await bg({ type: 'engine.status' });
   const st = res.ok ? res.result : null;
   const dl = Object.values(progress).filter((p) => p && !p.done && !p.error && !p.cached && p.total);
