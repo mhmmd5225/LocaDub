@@ -12,7 +12,7 @@ import { PUNCT_MODEL, punctUrl, punctBytes } from '../engines/mt/punct.js';
 import { clearTranscripts, transcriptStats } from '../common/transcript-store.js';
 import { parseGlossary } from '../common/glossary.js';
 import { buildReport } from '../common/diagnostics.js';
-import { runBench, formatBench } from '../common/bench.js';
+import { runBench, formatBench, collectEnv } from '../common/bench.js';
 import { createSepClient } from '../engines/sep/client.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1013,6 +1013,30 @@ const benchGuard = {
   setCap: (b) => chrome.storage.local.set({ benchCap: { batch: b, at: Date.now() } }),
 };
 
+/** Hız testi başlığı: ekran kartı, çekirdek, bellek, yalıtım, platform, Chrome ve eklenti sürümü. */
+async function benchEnv() {
+  let adapter = null;
+  try {
+    const { pickAdapter, describeAdapter } = await import('../common/gpu.js');
+    const a = await pickAdapter(settings.gpuPreference);
+    if (a) adapter = describeAdapter(a);
+  } catch { /* WebGPU yoksa başlıkta "WebGPU yok" */ }
+  return collectEnv({ nav: navigator, adapter, coi: globalThis.crossOriginIsolated, version: chrome.runtime.getManifest().version });
+}
+
+/**
+ * Seslendirmenin çalıştığı aygıt. Arka plan motoru (offscreen.js) aygıt seçmez: engines/tts/index.js varsayılanı 'wasm'.
+ * İş parçacığı index.js threadsFor ile aynı kural: ses kataloğundaki ipucu, yalıtılmış sayfada çekirdek − 1 ile sınırlı.
+ */
+async function ttsDevice(voice) {
+  const st = await bg({ type: 'engine.status' });
+  if (!st.ok) return null;
+  const want = VOICES.find((v) => v.id === voice)?.threads || 1;
+  const hc = st.result.hardwareConcurrency || 2;
+  const threads = st.result.crossOriginIsolated && want > 1 ? Math.max(1, Math.min(want, hc - 1)) : 1;
+  return { device: 'wasm', threads };
+}
+
 let benchRunning = false;
 let benchText = '';
 
@@ -1027,8 +1051,16 @@ async function startBench() {
   try {
     const voice = effectiveVoiceId();
     const tone = { style: settings.style, pitch: settings.pitch, quality: settings.quality, blend: settings.voiceBlend };
+    note('Ortam bilgisi okunuyor…');
+    const env = await benchEnv();
+    // ayırma istemcisi kullanıcının ekran kartı tercihiyle yüklenir (videodaki gibi)
+    const createClient = () => {
+      const c = createSepClient({ mock: isMock() });
+      return { ...c, load: (o) => c.load({ ...o, gpuPreference: settings.gpuPreference }) };
+    };
     const result = await runBench({
-      sep: { createClient: () => createSepClient({ mock: isMock() }), guard: benchGuard },
+      env,
+      sep: { createClient, guard: benchGuard },
       tts: {
         synth: async (text) => {
           if (voice === 'system') return { skipped: 'sistem sesi ölçülemez' };
@@ -1038,6 +1070,7 @@ async function startBench() {
           const { samples, sampleRate } = res.result;
           return { ms: performance.now() - t0, audioSec: samples / sampleRate };
         },
+        device: () => ttsDevice(voice),
       },
       mt: {
         translate: async (sentences) => {

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oynatıcı paneli — LocaDub maketi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <script src="maket.js"></script>
+  <style>
+    body { background: var(--bg); }
+    .wrap { width: min(1180px, 100% - 32px); margin-inline: auto; }
+    .intro { padding: 56px 0 28px; display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 20px 32px; }
+    .intro h1 { font: 700 var(--t-3xl)/1.08 var(--font-display); letter-spacing: var(--track-display); }
+    .intro p { color: var(--ink-2); font-size: var(--t-lg); margin-top: 6px; }
+    .states { flex-wrap: wrap; }
+    .states label { flex: 0 0 auto; }
+    .states span { padding: 6px 14px; }
+
+    /* ---------- Sahte oynatıcı ---------- */
+    .player { position: relative; margin: 0; border-radius: 14px; overflow: hidden; background: #0f0f0f; aspect-ratio: 16 / 9; }
+    .video { position: absolute; inset: 0;
+      background:
+        radial-gradient(70% 90% at 78% 30%, rgba(255, 170, 90, .5), transparent 60%),
+        radial-gradient(60% 80% at 15% 85%, rgba(40, 90, 160, .6), transparent 60%),
+        linear-gradient(160deg, #1b2a3c, #3b2a2a 60%, #1a1416); }
+    .person { position: absolute; bottom: 0; left: 34%; transform: translateX(-50%); width: 24%; aspect-ratio: 1 / 1.1; }
+    .person::before { content: ""; position: absolute; left: 32%; top: 2%; width: 36%; aspect-ratio: 1; border-radius: 50%; background: linear-gradient(#1c1c1e, #0c0c0d); }
+    .person::after { content: ""; position: absolute; left: 3%; right: 3%; bottom: 0; height: 52%; border-radius: 50% 50% 0 0; background: linear-gradient(#1c1c1e, #0c0c0d); }
+    .cap { position: absolute; left: 4%; right: 4%; bottom: 76px; text-align: center; }
+    .player.panel-open .cap { right: 380px; }
+    .cap span { background: rgba(8, 8, 8, .75); color: #fff; font-size: clamp(13px, 1.6vw, 20px); line-height: 1.6; padding: .15em .5em; border-radius: 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+
+    .ctrl { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; padding: 14px 16px 0; display: flex; align-items: center; gap: 14px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); font-size: 13px; }
+    .track { position: absolute; left: 16px; right: 16px; top: 4px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); }
+    .track .buf { position: absolute; inset: 0 auto 0 0; width: 48%; background: rgba(255,255,255,.3); border-radius: 2px; }
+    .track .rd { position: absolute; top: -5px; height: 3px; border-radius: 2px; background: #30d158; }
+    .track .played { position: absolute; inset: 0 auto 0 0; width: 43.5%; background: #ff0033; border-radius: 2px; }
+    .track .played::after { content: ""; position: absolute; right: -6px; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: #ff0033; }
+    .yt-play { width: 0; height: 0; border-left: 13px solid #fff; border-top: 8px solid transparent; border-bottom: 8px solid transparent; flex: none; }
+    .yt-vol { width: 18px; height: 12px; border-radius: 2px 6px 6px 2px; background: rgba(255,255,255,.85); flex: none; }
+    .time { color: #e8e8ed; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .spacer { margin-left: auto; }
+    .yt-ic { width: 22px; height: 16px; border: 2px solid rgba(255,255,255,.85); border-radius: 4px; flex: none; }
+    .yt-ic.round { width: 18px; height: 18px; border-radius: 50%; }
+
+    /* LocaDub hapı (oynatıcı denetimlerinde) */
+    .pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 4px; border-radius: var(--r-pill); border: 0; cursor: pointer; background: rgba(255,255,255,.14); color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; flex: none; position: relative; overflow: hidden; }
+    .pill:hover { background: rgba(255,255,255,.2); }
+    .pill:focus-visible { outline: 3px solid #2997ff; outline-offset: 2px; border-radius: var(--r-pill); }
+    .mark { display: inline-grid; place-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 700; letter-spacing: .02em; background: #48484a; color: #f5f5f7; }
+    .pill .bar { position: absolute; left: 12px; right: 12px; bottom: 3px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; }
+    .pill .bar i { position: absolute; inset: 0 auto 0 0; width: var(--v, 0%); background: #2997ff; }
+    .wave { display: inline-flex; align-items: center; gap: 2px; height: 12px; }
+    .wave i { width: 2px; border-radius: 1px; background: currentColor; height: 40%; animation: wv 1s ease-in-out infinite; }
+    .wave i:nth-child(2) { animation-delay: -.3s; } .wave i:nth-child(3) { animation-delay: -.6s; } .wave i:nth-child(4) { animation-delay: -.15s; }
+    @keyframes wv { 50% { height: 100%; } }
+
+    [data-state="prep"] .mark, [data-state="full"] .mark { background: #0071e3; color: #fff; }
+    [data-state="play"] .mark { background: #30d158; color: #032a10; }
+    [data-state="warn"] .mark { background: #ff9f0a; color: #2b1a00; }
+
+    /* ---------- Panel (video üstünde, her zaman koyu cam) ---------- */
+    .ldp { position: absolute; right: 16px; bottom: 64px; width: 348px; max-height: calc(100% - 80px); overflow: auto; overscroll-behavior: contain;
+      border-radius: var(--r-lg); background: rgba(22, 22, 23, .86); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.12) inset, 0 12px 40px rgba(0,0,0,.45); color: var(--ink); font-size: 14px; scrollbar-width: thin; }
+    .ldp-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; padding: 12px 12px 10px 16px; background: rgba(22, 22, 23, .92); }
+    .ldp-head .mark { height: 26px; padding: 0 9px; font-size: 12px; }
+    .ldp-title { flex: 1; min-width: 0; line-height: 1.25; }
+    .ldp-title strong { display: block; font-size: 15px; font-weight: 600; }
+    .ldp-title span { font-size: 12px; color: var(--ink-2); }
+    .ldp-close { background: transparent; color: var(--ink-2); }
+    .ldp-close:hover { background: var(--fill); color: var(--ink); }
+    .ldp-sec { padding: 12px 16px 14px; border-top: 1px solid rgba(255,255,255,.08); }
+    .ldp-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; margin-bottom: 8px; }
+    .ldp-h span { font-weight: 400; font-variant-numeric: tabular-nums; }
+    .ldp-status { display: flex; align-items: flex-start; gap: 10px; }
+    .ldp-status .dot, .ldp-status .spinner { margin-top: 5px; }
+    .ldp-status b { font-weight: 600; }
+    .ldp-status p { color: var(--ink-2); font-size: 13px; margin-top: 1px; }
+    .ldp-status + .progress { margin-top: 12px; }
+    .steps { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+    .steps li { display: flex; align-items: center; gap: 10px; }
+    .steps .v { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    details.more-d { margin-top: 6px; }
+    details.more-d summary { cursor: pointer; font-size: 13px; color: var(--accent-text); list-style: none; display: inline-flex; align-items: center; gap: 4px; }
+    details.more-d summary::-webkit-details-marker { display: none; }
+    details.more-d summary::after { content: ""; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg) translateY(-2px); }
+    details.more-d[open] summary::after { transform: rotate(-135deg) translateY(-1px); }
+    .ldp .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .ldp-warn { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--warn-tint); font-size: 13px; }
+
+    .ldp .slider { grid-template-columns: 104px minmax(0, 1fr) 40px; gap: 0 10px; margin-bottom: 6px; }
+    .ldp .slider > .range { grid-column: 2; grid-row: 1; }
+    .ldp .slider > label { font-size: 13px; line-height: 1.25; }
+    .ldp .slider small { display: block; color: var(--ink-2); font-size: 11px; }
+    .voice { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .voice .select { flex: 1; min-width: 0; min-height: 30px; font-size: 13px; background-color: var(--fill-2); border-color: var(--line-2); }
+    .voice .seg span { padding: 4px 10px; }
+    .voice .btn-icon { background: var(--fill); width: 30px; min-height: 30px; }
+    .voice .btn-icon svg { width: 11px; height: 11px; }
+
+    .spk { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+    .spk-h { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+    .spk-h a { font-weight: 400; font-size: 12px; }
+    .spk li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 8px; margin: 0 -8px; border-radius: 10px; font-size: 13px; }
+    .spk li.now { background: rgba(255,255,255,.06); }
+    .av { width: 22px; height: 22px; font-size: 11px !important; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--fill); color: var(--ink); }
+    .now .av { background: #f5f5f7; color: #000; }
+    .spk .who small { color: var(--ink-2); font-size: 12px; margin-left: 4px; }
+    .spk .to { color: var(--ink-2); font-size: 12px; text-align: right; display: inline-flex; align-items: center; gap: 6px; }
+    .now .to { color: var(--accent-text); }
+
+    .map { position: relative; height: 6px; border-radius: 3px; background: var(--fill); margin: 2px 0 8px; }
+    .map i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--ok); }
+    .map b { position: absolute; top: -3px; width: 2px; height: 12px; border-radius: 1px; background: #fff; }
+    .map-legend { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-2); }
+    .wide { width: 100%; margin-top: 12px; }
+    .help { font-size: 12px; color: var(--ink-2); margin-top: 8px; text-align: center; }
+    .prow { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; margin-bottom: 10px; }
+    .prow .v { color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; min-width: 92px; }
+    .prows { margin-top: 14px; }
+    .prows .prow:last-child { margin-bottom: 0; }
+    .eta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; }
+    .opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; }
+    .ldp-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 14px; border-top: 1px solid rgba(255,255,255,.08); font-size: 13px; }
+    .ldp-foot span { color: var(--ink-2); font-size: 12px; }
+
+    .caption { margin: 14px 0 64px; color: var(--ink-2); font-size: 14px; max-width: 60em; }
+    .caption b { color: var(--ink); font-weight: 600; }
+
+    /* Dar ekran: panel videonun altına iner */
+    @media (max-width: 960px) {
+      .player { overflow: visible; aspect-ratio: auto; background: transparent; border-radius: 0; }
+      .screen { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #0f0f0f; }
+      .player.panel-open .cap { right: 4%; }
+      .ldp { position: relative; right: auto; bottom: auto; width: auto; max-width: 420px; max-height: none; margin: 12px 0 0; background: rgba(22,22,23,1); }
+      .ldp-head { background: rgba(22,22,23,1); }
+    }
+    @media (min-width: 961px) { .screen { position: absolute; inset: 0; } }
+    @media (max-width: 640px) {
+      .intro { padding-top: 36px; }
+      .intro h1 { font-size: 32px; }
+      .cap { bottom: 48px; } .cap span { font-size: 12px; }
+      .ctrl { height: 44px; padding: 10px 10px 0; gap: 10px; }
+      .track { left: 10px; right: 10px; }
+      .yt-vol, .yt-ic, .time { display: none; }
+      .pill { height: 26px; font-size: 12px; }
+      .mark { height: 18px; padding: 0 6px; font-size: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .wave i { animation: none; height: 70%; } }
+  </style>
+</head>
+<body>
+  <header class="mk-top">
+    <div class="in">
+      <a class="logo" href="index.html">LocaDub <span class="crumb">/ Oynatıcı paneli</span></a>
+      <div class="mk-theme" role="group" aria-label="Tema"><button type="button" data-t="system">Sistem</button><button type="button" data-t="light">Açık</button><button type="button" data-t="dark">Koyu</button></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="intro">
+      <div>
+        <h1>Oynatıcı paneli</h1>
+        <p>Hap videonun denetimlerinde. Panel üç bölüm: Durum, Ses, Hazırlık.</p>
+      </div>
+      <div class="seg states" role="radiogroup" aria-label="Gösterilen durum">
+        <label><input type="radio" name="st" value="prep" checked><span>Hazırlanıyor</span></label>
+        <label><input type="radio" name="st" value="play"><span>Oynuyor</span></label>
+        <label><input type="radio" name="st" value="full"><span>Tümünü hazırla</span></label>
+        <label><input type="radio" name="st" value="warn"><span>Uyarı</span></label>
+        <label><input type="radio" name="st" value="off"><span>Kapalı</span></label>
+      </div>
+    </div>
+
+    <figure class="player panel-open" id="player" data-state="prep" aria-label="Sahte YouTube oynatıcısı ve LocaDub paneli">
+      <div class="screen">
+        <div class="video" aria-hidden="true"><div class="person"></div></div>
+        <div class="cap" data-show="prep play full warn"><span>Yaklaşık otuz dakikamız kaldı, size sonuçları göstereyim.</span></div>
+        <div class="cap" data-show="off" hidden><span>We have about thirty minutes left, let me show you the results.</span></div>
+
+        <div class="ctrl">
+          <div class="track" aria-hidden="true">
+            <span class="buf"></span>
+            <span data-show="prep"><i class="rd" style="left:43.5%;width:1.2%"></i></span>
+            <span data-show="play warn" hidden><i class="rd" style="left:0;width:8.7%"></i><i class="rd" style="left:28.8%;width:4.4%"></i><i class="rd" style="left:40%;width:12.5%"></i></span>
+            <span data-show="full" hidden><i class="rd" style="left:0;width:56%"></i><i class="rd" style="left:61%;width:9%"></i></span>
+            <span class="played"></span>
+          </div>
+          <span class="yt-play" aria-hidden="true"></span>
+          <span class="yt-vol" aria-hidden="true"></span>
+          <span class="time">18:20 / 42:10</span>
+          <span class="spacer"></span>
+          <button type="button" class="pill" aria-expanded="true" aria-controls="ldp" aria-label="LocaDub paneli">
+            <span class="mark">TR</span>
+            <span data-show="prep">Hazırlanıyor</span>
+            <span data-show="play" hidden>Konuşmacı 2</span><span class="wave" data-show="play" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <span data-show="full" hidden>Hazırlanıyor · 6 dk</span>
+            <span data-show="warn" hidden>Ayırma geride</span>
+            <span data-show="off" hidden>Dublaj kapalı</span>
+            <span class="bar" data-show="prep full" aria-hidden="true"><i data-show="prep" style="--v:40%"></i><i data-show="full" hidden style="--v:52%"></i></span>
+          </button>
+          <span class="yt-ic" aria-hidden="true"></span>
+          <span class="yt-ic round" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <!-- Panel -->
+      <section class="ldp scheme-dark" id="ldp" role="dialog" aria-label="LocaDub dublaj paneli">
+        <div class="ldp-head">
+          <span class="mark" aria-hidden="true">TR</span>
+          <div class="ldp-title">
+            <strong>Türkçe dublaj</strong>
+            <span data-show="prep">Bu videoda açık</span>
+            <span data-show="play full warn" hidden>Bu videoda açık</span>
+            <span data-show="off" hidden>Bu videoda kapalı</span>
+          </div>
+          <input type="checkbox" class="switch" role="switch" id="mainSw" aria-label="Bu videoda Türkçe dublaj" checked>
+          <button type="button" class="btn btn-icon ldp-close" aria-label="Paneli kapat (Esc)"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m3 3 8 8M11 3l-8 8"/></svg></button>
+        </div>
+
+        <!-- Durum -->
+        <div class="ldp-sec" aria-labelledby="h-durum">
+          <h3 class="ldp-h" id="h-durum">Durum</h3>
+
+          <div data-show="prep">
+            <div class="ldp-status" role="status"><span class="spinner" style="color:var(--prep)" aria-hidden="true"></span><div><b>Hazırlanıyor</b><p>İlk Türkçe cümle yaklaşık 8 sn içinde.</p></div></div>
+            <div class="progress" aria-hidden="true"><i style="--v:40%"></i></div>
+            <ol class="steps">
+              <li><span class="dot ok"></span>Çeviri<span class="v">Hazır</span></li>
+              <li><span class="dot prep"></span>Ses<span class="v">3 / 12 cümle</span></li>
+              <li><span class="dot"></span>Ses ayırma<span class="v">Model yükleniyor</span></li>
+            </ol>
+          </div>
+
+          <div data-show="play" hidden>
+            <div class="ldp-status" role="status"><span class="dot ok" aria-hidden="true"></span><div><b>Dublaj açık</b><p>İleride 3 dk 40 sn hazır.</p></div></div>
+            <details class="more-d">
+              <summary>Ayrıntı</summary>
+              <ol class="steps">
+                <li><span class="dot ok"></span>Çeviri<span class="v">OPUS-MT · hazır</span></li>
+                <li><span class="dot ok"></span>Ses<span class="v">Gerçek zamanın 2,1 katı</span></li>
+                <li><span class="dot ok"></span>Ses ayırma<span class="v">Kim Vocal 2 · WebGPU</span></li>
+              </ol>
+            </details>
+          </div>
+
+          <div data-show="full" hidden>
+            <div class="ldp-status" role="status"><span class="spinner" style="color:var(--prep)" aria-hidden="true"></span><div><b>Tüm video hazırlanıyor</b><p>Tahmini 6 dk. İzlemeye devam edebilirsiniz.</p></div></div>
+            <div class="prows">
+            <div class="prow"><span>Çeviri</span><div class="progress ok"><i style="--v:84%"></i></div><span class="v">412 / 493</span></div>
+            <div class="prow"><span>Ses</span><div class="progress"><i style="--v:43%"></i></div><span class="v">18:20 / 42:10</span></div>
+            <div class="prow"><span>Ayırma</span><div class="progress"><i style="--v:29%"></i></div><span class="v">12:05 / 42:10</span></div>
+            </div>
+          </div>
+
+          <div data-show="warn" hidden>
+            <div class="ldp-status" role="status"><span class="dot warn" aria-hidden="true"></span><div><b>Ses ayırma geride kalıyor</b><p>Bu cihazda ayırma oynatmadan yavaş. Video kısa aralarla bekleyebilir.</p></div></div>
+            <div class="actions">
+              <button type="button" class="btn btn-sm btn-primary">Hızlı modele geç</button>
+              <button type="button" class="btn btn-sm">Ayırmayı kapat</button>
+            </div>
+          </div>
+
+          <div data-show="off" hidden>
+            <div class="ldp-status"><span class="dot" aria-hidden="true"></span><div><b>Dublaj kapalı</b><p>Videonun kendi sesi çalıyor. Açmak için yukarıdaki anahtar.</p></div></div>
+          </div>
+        </div>
+
+        <!-- Ses -->
+        <div class="ldp-sec" aria-labelledby="h-ses" data-show="prep play full warn">
+          <h3 class="ldp-h" id="h-ses">Ses</h3>
+          <div class="slider">
+            <label for="pDub">Dublaj</label><output for="pDub"></output>
+            <input class="range" type="range" id="pDub" min="0" max="2" step="0.05" value="1" data-unit="%">
+          </div>
+          <div class="slider">
+            <label for="pOrig">Orijinal ses <small>konuşurken</small></label><output for="pOrig"></output>
+            <input class="range" type="range" id="pOrig" min="0" max="1" step="0.05" value="0.25" data-unit="%">
+          </div>
+          <div class="voice">
+            <div class="seg" role="radiogroup" aria-label="Ana ses">
+              <label><input type="radio" name="g" checked><span>Kadın</span></label>
+              <label><input type="radio" name="g"><span>Erkek</span></label>
+            </div>
+            <select class="select" aria-label="Kadın sesi">
+              <option>Ahenk Cep</option><option>EMA Lightning</option><option>Supertonic Kadın 2</option><option>Sistem sesi</option>
+            </select>
+            <button type="button" class="btn btn-icon" aria-label="Ahenk Cep sesini dinle"><svg viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M3 1.5v9l7.5-4.5z"/></svg></button>
+          </div>
+
+          <div data-show="play full warn" hidden>
+            <div class="spk-h"><span>Konuşmacılar</span><span class="num">3 kişi</span></div>
+            <ul class="spk">
+              <li><span class="av">1</span><span class="who">Erkek<small>132 Hz</small></span><span class="to">Antalia Mini</span></li>
+              <li class="now"><span class="av">2</span><span class="who">Kadın<small>205 Hz</small></span><span class="to"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Supertonic Kadın 2</span></li>
+              <li><span class="av">3</span><span class="who">Erkek<small>95 Hz</small></span><span class="to">Supertonic Erkek 2</span></li>
+            </ul>
+          </div>
+          <p class="help" style="text-align:left" data-show="prep">Konuşmacılar ses ayırma başlayınca tanınır.</p>
+        </div>
+
+        <!-- Hazırlık -->
+        <div class="ldp-sec" aria-labelledby="h-haz" data-show="prep play full warn">
+          <h3 class="ldp-h" id="h-haz">Hazırlık <span data-show="play warn" hidden>9 dk 35 sn hazır · 42:10</span><span data-show="prep">30 sn hazır · 42:10</span><span data-show="full" hidden>Tahmini kalan 6 dk</span></h3>
+
+          <div data-show="prep play warn">
+            <div class="map" role="img" aria-label="Hazır aralıklar: 0:00–3:40, 12:10–14:00, 16:50–22:05">
+              <i style="left:0;width:8.7%" data-show="play warn" hidden></i><i style="left:28.8%;width:4.4%" data-show="play warn" hidden></i><i style="left:40%;width:12.5%" data-show="play warn" hidden></i>
+              <i style="left:43.5%;width:1.2%" data-show="prep"></i>
+              <b style="left:43.5%"></b>
+            </div>
+            <button type="button" class="btn wide" title="Arka planda baştan sona hazırlar; video durmaz.">Tüm videoyu hazırla</button>
+          </div>
+
+          <div data-show="full" hidden>
+            <label class="opt" style="margin-top:0"><span>Hazır olunca baştan başlat</span><input type="checkbox" class="switch" role="switch"></label>
+            <button type="button" class="btn wide">Hazırlamayı durdur</button>
+            <p class="help">Hazırlananlar silinmez.</p>
+          </div>
+        </div>
+
+        <div class="ldp-foot">
+          <a class="more" href="ayarlar.html">Tüm ayarlar <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></a>
+          <span>Esc kapatır</span>
+        </div>
+      </section>
+    </figure>
+
+    <p class="caption" id="caption" aria-live="polite"></p>
+  </main>
+
+  <script>
+    // Yalnız maket: durum seçici [data-show] öğelerini açar/kapatır.
+    const CAP = {
+      prep: '<b>Hazırlanıyor.</b> Dublaj yeni açıldı; üç adım tek satırda, ayrıntı altında. Hapın altında ince ilerleme.',
+      play: '<b>Oynuyor.</b> Hap konuşan kişiyi gösterir. Durum tek satır; ayrıntı isteyene açılır. Çubukta yeşil çizgiler hazır kısımlar.',
+      full: '<b>Tüm videoyu hazırla.</b> Üç adım ayrı ilerler; tahmin tek sayı. Durdurmak hazırlananları silmez.',
+      warn: '<b>Uyarı.</b> Kehribar yalnız bu durumda. Çözüm düğmeyle önerilir; hata metni gösterilmez.',
+      off: '<b>Kapalı.</b> Panel yalnız anahtarı ve tek satır durumu gösterir. Hap gri.',
+    };
+    const player = document.getElementById('player');
+    const set = (st) => {
+      player.dataset.state = st;
+      document.querySelectorAll('[data-show]').forEach((el) => { el.hidden = !el.dataset.show.split(' ').includes(st); });
+      document.getElementById('mainSw').checked = st !== 'off';
+      document.getElementById('caption').innerHTML = CAP[st];
+      const r = document.querySelector(`input[name="st"][value="${st}"]`); if (r) r.checked = true;
+    };
+    document.querySelectorAll('input[name="st"]').forEach((r) => r.addEventListener('change', () => set(r.value)));
+    document.getElementById('mainSw').addEventListener('change', (e) => set(e.target.checked ? 'play' : 'off'));
+    set(new URLSearchParams(location.search).get('durum') || 'prep');
+  </script>
+</body>
+</html>
