@@ -1,5 +1,5 @@
-// Ayarlar sayfası: dört menü (İndirme, Seslendirme, AI Model, Diğer). Tüm paneller DOM'da kalır (hidden),
-// böylece her id'ye bağlanan kod ve motor ilerleme mesajları hangi menü açık olursa olsun çalışır.
+// Ayarlar sayfası: tek sayfa, yedi bölüm (Genel, Sesler, Modeller ve indirme, Ses ayırma ve performans, Sözlük,
+// Güncelleme, Tanılama). Sol gezinme bölüme kaydırır; kaydırınca etkin bölüm gezinmede işaretlenir.
 
 import { DEFAULTS, getSettings, setSettings, onSettingsChanged, speakerVoice, voicesInUse, genderVoice } from '../common/settings.js';
 import { decodePcmBase64ToInt16, int16ToWav } from '../common/pcm.js';
@@ -63,43 +63,104 @@ function confirmBox(text, yesLabel = 'Tamam') {
   });
 }
 
-// ---------- Menüler ----------
+// ---------- Bölümler ve gezinme ----------
 
-const TABS = ['indirme', 'seslendirme', 'ai-model', 'diger'];
-// Eski bölüm adları yeni menülere eşlenir.
-const ALIASES = { modeller: 'indirme', depolama: 'indirme', ses: 'seslendirme', genel: 'diger', sozluk: 'diger', durum: 'diger', gelistirici: 'diger' };
-const devMode = () => new URLSearchParams(location.search).get('dev') === '1' || location.hash === '#gelistirici';
+const SECTIONS = ['genel', 'sesler', 'modeller', 'ayirma', 'sozluk', 'guncelleme', 'tanilama'];
+// Eski menü ve bölüm adları yeni bölümlere eşlenir.
+const ALIASES = {
+  indirme: 'modeller', depolama: 'modeller', 'ai-model': 'modeller', seslendirme: 'sesler', ses: 'sesler',
+  diger: 'genel', performans: 'ayirma', durum: 'tanilama', gelistirici: 'tanilama',
+};
+// Geliştirici kipi (#gelistirici / ?dev=1) sayfa açık kaldıkça sürer: başka bölüme gidince test motoru satırı kaybolmaz.
+let devSeen = false;
+const devMode = () => (devSeen ||= new URLSearchParams(location.search).get('dev') === '1' || location.hash === '#gelistirici');
 
-function tabFromHash() {
+function sectionFromHash() {
   const h = decodeURIComponent(location.hash.slice(1));
-  return TABS.includes(h) ? h : ALIASES[h] || null;
+  return SECTIONS.includes(h) ? h : ALIASES[h] || null;
 }
 
-function selectTab(name, { focus = false, updateHash = false } = {}) {
-  for (const t of TABS) {
-    const on = t === name;
-    const tab = $('tab-' + t);
-    tab.setAttribute('aria-selected', String(on));
-    tab.tabIndex = on ? 0 : -1;
-    $(t).hidden = !on;
-    if (on && focus) tab.focus();
+const navLinks = [...document.querySelectorAll('#nav a[data-sec]')];
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function markNav(name) {
+  for (const a of navLinks) {
+    if (a.dataset.sec === name) a.setAttribute('aria-current', 'true');
+    else a.removeAttribute('aria-current');
   }
-  // Geçmişi şişirmemek için replaceState; geliştirici bağlantısı korunur.
-  if (updateHash) history.replaceState(null, '', location.pathname + location.search + '#' + (name === 'diger' && devMode() ? 'gelistirici' : name));
+  // dar ekranda yatay şeritte etkin öğe görünür kalsın
+  const cur = navLinks.find((a) => a.dataset.sec === name);
+  const ul = cur?.closest('ul');
+  if (ul && ul.scrollWidth > ul.clientWidth) {
+    const left = cur.offsetLeft - 16, right = cur.offsetLeft + cur.offsetWidth + 16 - ul.clientWidth;
+    if (ul.scrollLeft > left) ul.scrollLeft = left;
+    else if (ul.scrollLeft < right) ul.scrollLeft = right;
+  }
+}
+
+// Gezinmeyle kaydırırken kaydırma izleyicisi etkin öğeyi değiştirmesin.
+let spyLock = 0, spyTarget = null;
+function goSection(name, { smooth = true, updateHash = false, focus = false } = {}) {
+  const sec = $(name);
+  if (!sec) return;
+  markNav(name);
+  spyLock = Date.now() + 1500;
+  spyTarget = name;
+  sec.scrollIntoView({ behavior: smooth && !reduceMotion() ? 'smooth' : 'auto', block: 'start' });
+  // Geçmişi şişirmemek için replaceState
+  if (updateHash) history.replaceState(null, '', location.pathname + location.search + '#' + name);
+  if (focus) sec.querySelector('h2')?.focus({ preventScroll: true });
   renderMockRow();
 }
 
-for (const t of TABS) $('tab-' + t).addEventListener('click', () => selectTab(t, { updateHash: true }));
-$('tab-indirme').parentElement.addEventListener('keydown', (e) => {
-  const i = TABS.indexOf(document.activeElement?.dataset?.tab);
+for (const a of navLinks) {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    goSection(a.dataset.sec, { updateHash: true, focus: e.detail === 0 }); // klavyeyle (Enter) seçilince odak bölüme geçer
+  });
+}
+// Ok tuşları, Home/End gezinme öğeleri arasında odağı taşır; Enter bölümü açar.
+$('nav').addEventListener('keydown', (e) => {
+  const i = navLinks.indexOf(document.activeElement);
   if (i < 0) return;
-  const next = { ArrowRight: (i + 1) % TABS.length, ArrowLeft: (i + TABS.length - 1) % TABS.length, Home: 0, End: TABS.length - 1 }[e.key];
+  const n = navLinks.length;
+  const next = { ArrowDown: (i + 1) % n, ArrowRight: (i + 1) % n, ArrowUp: (i + n - 1) % n, ArrowLeft: (i + n - 1) % n, Home: 0, End: n - 1 }[e.key];
   if (next === undefined) return;
   e.preventDefault();
-  selectTab(TABS[next], { focus: true, updateHash: true });
+  navLinks[next].focus();
 });
-window.addEventListener('hashchange', () => { const t = tabFromHash(); if (t) selectTab(t); });
-// Menü içindeki ve şeritteki bağlantılar (#diger, #indirme) hashchange ile çalışır.
+window.addEventListener('hashchange', () => { const s = sectionFromHash(); if (s) goSection(s); });
+// Kaydırma hedefe varınca (ya da kullanıcı kendisi kaydırınca) izleyici yeniden çalışır.
+function arrived(name) {
+  const d = document.documentElement;
+  const top = $(name).getBoundingClientRect().top;
+  const margin = parseFloat(getComputedStyle($(name)).scrollMarginTop) || 0;
+  return Math.abs(top - margin) < 4 || innerHeight + d.scrollTop >= d.scrollHeight - 2;
+}
+window.addEventListener('scrollend', () => { if (spyTarget && arrived(spyTarget)) { spyLock = 0; spyTarget = null; } });
+for (const ev of ['wheel', 'touchstart']) addEventListener(ev, () => { spyLock = 0; spyTarget = null; }, { passive: true });
+
+// Kaydırma izleyicisi: üst kısmı geçen son bölüm etkindir; sayfa sonunda son bölüm.
+let spyQueued = false;
+function spy() {
+  spyQueued = false;
+  if (Date.now() < spyLock) return;
+  const line = Math.min(innerHeight * 0.3, 160);
+  let cur = SECTIONS[0];
+  for (const s of SECTIONS) if ($(s).getBoundingClientRect().top <= line) cur = s;
+  const d = document.documentElement;
+  if (d.scrollTop > 0 && innerHeight + d.scrollTop >= d.scrollHeight - 2) cur = SECTIONS[SECTIONS.length - 1];
+  markNav(cur);
+}
+window.addEventListener('scroll', () => { if (!spyQueued) { spyQueued = true; requestAnimationFrame(spy); } }, { passive: true });
+
+// Kaydırıcı dolgusu (tokens.css .range --v)
+function paintRange(r) {
+  const min = Number(r.min) || 0, max = Number(r.max) || 1;
+  r.style.setProperty('--v', `${((Number(r.value) - min) / (max - min || 1)) * 100}%`);
+}
+const paintRanges = () => document.querySelectorAll('input.range').forEach(paintRange);
+document.addEventListener('input', (e) => { if (e.target.classList?.contains('range')) paintRange(e.target); });
 
 // ---------- Genel ve ses ayarları ----------
 
@@ -195,7 +256,6 @@ $('genderVoices').addEventListener('change', (e) => setSettings({ genderVoices: 
 $('matchVoices').addEventListener('change', (e) => setSettings({ matchVoices: e.target.checked }));
 $('speakerCount').addEventListener('change', (e) => setSettings({ speakerCount: Number(e.target.value) }));
 
-let speakerOpened = false; // konuşmacı bloğu, anahtar açıksa ilk çizimde açılır
 // Test motoru gizlidir: #gelistirici / ?dev=1 ile ya da motor zaten test modundaysa (kapatılabilsin) görünür.
 function renderMockRow() {
   $('mockRow').hidden = !(devMode() || settings.engineMode === 'mock');
@@ -207,7 +267,6 @@ function renderBasics() {
   for (const id of ['glossaryMt', 'glossaryTts']) if (document.activeElement !== $(id)) $(id).value = settings[id];
   renderGlossaryNote();
   $('speakerVoices').checked = settings.speakerVoices;
-  if (settings.speakerVoices && !speakerOpened) { $('speakerBlock').open = true; speakerOpened = true; }
   $('enabled').checked = settings.enabled;
   // dublaj durumu sekmeye özeldir (content/app.js setEnabled): bu anahtar yalnız yeni açılan sekmenin başlangıç değeridir
   $('enabledLabel').textContent = settings.enabled ? 'Yeni sekmede açık' : 'Yeni sekmede kapalı';
@@ -224,6 +283,7 @@ function renderBasics() {
     if (document.activeElement !== $(id)) $(id).value = settings[id];
     $(id + 'Out').textContent = fmt(Number(settings[id]));
   }
+  paintRanges();
 }
 
 $('enabled').addEventListener('change', (e) => setSettings({ enabled: e.target.checked }));
@@ -300,8 +360,8 @@ const subtitle = (m) => {
   return t ? t[0].toLocaleUpperCase('tr') + t.slice(1) : '';
 };
 
-// "İndirme menüsünden indirin." bağlantısı (hashchange menüyü açar).
-const downloadHint = () => [el('a', { href: '#indirme', textContent: 'İndirme menüsünden indirin.' })];
+// "Modeller bölümünden indirin." bağlantısı (hashchange bölüme kaydırır).
+const downloadHint = () => [el('a', { href: '#modeller', textContent: 'Modeller bölümünden indirin.' })];
 
 // Kompakt model satırı: ad + rozetler | boyut | İndir / Sil.
 function modelRow({ engine, id, name, kind, prefix, downloaded, sizeMB, inUse, canDownload = true, title }) {
@@ -622,6 +682,7 @@ function renderBlend() {
   const amount = b && b.with !== v.preset ? b.amount : 0;
   if (document.activeElement !== $('blendAmount')) $('blendAmount').value = String(amount);
   $('blendAmountOut').textContent = `%${Math.round(amount * 100)}`;
+  paintRange($('blendAmount'));
 }
 $('blendAmount').max = String(BLEND_MAX);
 $('blendAmount').addEventListener('input', (e) => { $('blendAmountOut').textContent = `%${Math.round(Number(e.target.value) * 100)}`; });
@@ -1114,9 +1175,16 @@ onSettingsChanged((s, keys) => {
   if (keys.some((k) => ['voice', 'mtBackend', 'engineMode', 'modelsApproved'].includes(k))) renderStatus();
 });
 $('aboutVersion').textContent = 'Sürüm ' + chrome.runtime.getManifest().version;
-selectTab(tabFromHash() || 'indirme');
+$('navVersion').textContent = 'LocaDub ' + chrome.runtime.getManifest().version;
 renderBasics();
-refreshModels();
+{
+  // Açılışta adres bölüm gösteriyorsa oraya git; modeller yüklenince içerik uzar, kullanıcı kaydırmadıysa yeniden hizala.
+  const start = sectionFromHash();
+  let moved = false;
+  for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) addEventListener(ev, () => { moved = true; }, { once: true, passive: true });
+  if (start) goSection(start, { smooth: false }); else markNav(SECTIONS[0]);
+  refreshModels().then(() => { if (start && !moved) goSection(start, { smooth: false }); });
+}
 renderStatus();
 
 

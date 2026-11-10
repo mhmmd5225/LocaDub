@@ -236,7 +236,7 @@ async function render() {
   const dl = Object.values(progress).filter((p) => p && !p.done && !p.error && !p.cached && p.total);
 
   if (settings.engineMode === 'mock') {
-    show('warn', 'Test motoru açık', 'Sahte çeviri ve bip sesi kullanılıyor.', { label: 'Ayarlara git', run: () => openOptions('#diger') });
+    show('warn', 'Test motoru açık', 'Sahte çeviri ve bip sesi kullanılıyor.', { label: 'Ayarlara git', run: () => openOptions('#tanilama') });
   } else if (dl.length) {
     const L = dl.reduce((n, p) => n + p.loaded, 0), T = dl.reduce((n, p) => n + p.total, 0);
     const pct = Math.floor((L / T) * 100);

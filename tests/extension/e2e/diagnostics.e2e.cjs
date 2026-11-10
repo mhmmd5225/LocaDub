@@ -18,7 +18,7 @@ const { launch } = require('./common.cjs');
     await opt.waitForFunction(() => chrome.runtime.sendMessage({ type: 'diag.errors' }).then((r) => r.result.some((e) => e.source === 'altyazı indirme')));
     await opt.reload();
     await opt.waitForTimeout(1500);
-    await opt.click('#tab-diger');
+    await opt.click('#nav-tanilama');
     await opt.click('#copyDiag');
     await opt.waitForFunction(() => document.getElementById('diagNote').textContent);
     const text = await opt.textContent('#diagText');
