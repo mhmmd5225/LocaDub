@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Açılır pencere — LocaDub maketi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <script src="maket.js"></script>
+  <style>
+    body { background: var(--bg-2); }
+    .wrap { width: min(1180px, 100% - 32px); margin-inline: auto; }
+    .intro { padding: 56px 0 32px; }
+    .intro h1 { font: 700 var(--t-3xl)/1.08 var(--font-display); letter-spacing: var(--track-display); }
+    .intro p { color: var(--ink-2); font-size: var(--t-lg); margin-top: 6px; }
+    .frames { display: flex; flex-wrap: wrap; gap: 40px 32px; align-items: flex-start; padding-bottom: 72px; }
+    .frame figcaption { font-size: 13px; color: var(--ink-2); margin: 0 0 10px 4px; }
+    .frame { margin: 0; max-width: 100%; }
+
+    /* Açılır pencere: Chrome 360 px genişlik verir */
+    .pop { width: 360px; max-width: 100%; background: var(--bg); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow-2), 0 0 0 .5px var(--line); overflow: hidden; }
+    .pop-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; }
+    .pmark { display: inline-grid; place-items: center; height: 24px; padding: 0 8px; border-radius: var(--r-pill); background: var(--ink); color: var(--bg); font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+    .pop-head strong { font-size: 15px; font-weight: 600; margin-right: auto; }
+    .pop-head .ver { font-size: 12px; color: var(--ink-2); }
+    .pop-body { padding: 0 16px 16px; display: grid; gap: 12px; }
+
+    .update { display: grid; gap: 10px; padding: 14px; border-radius: var(--r-md); background: var(--accent-tint); }
+    .update b { font-weight: 600; }
+    .update p { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+    .update .row { display: flex; gap: 8px; align-items: center; }
+
+    .status { padding: 14px; border-radius: var(--r-md); background: var(--bg-2); }
+    .pop .status { background: var(--fill-2); }
+    .status-top { display: flex; align-items: flex-start; gap: 10px; }
+    .status-top .dot, .status-top .spinner { margin-top: 6px; }
+    .status-top b { font-weight: 600; display: block; }
+    .status-top p { font-size: 13px; color: var(--ink-2); }
+    .status .progress { margin-top: 12px; }
+    .tab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--line-2); font-size: 14px; }
+    .tab small { display: block; color: var(--ink-2); font-size: 12px; }
+
+    .group { display: grid; gap: 10px; }
+    .glabel { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+    .voice { display: flex; gap: 8px; align-items: center; }
+    .voice .select { flex: 1; min-width: 0; }
+    .voice .seg span { padding: 6px 12px; }
+    .pop .slider > label { font-size: 14px; }
+    .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+    .line small { display: block; color: var(--ink-2); font-size: 12px; }
+    hr { border: 0; border-top: 1px solid var(--line-2); margin: 2px 0; }
+    .pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line-2); font-size: 13px; }
+    .pop-foot span { color: var(--ink-2); font-size: 12px; }
+    .off .group, .off .line { opacity: .45; pointer-events: none; }
+
+    @media (max-width: 640px) { .intro { padding-top: 36px; } .intro h1 { font-size: 32px; } .frames { gap: 32px; } }
+  </style>
+</head>
+<body>
+  <header class="mk-top">
+    <div class="in">
+      <a class="logo" href="index.html">LocaDub <span class="crumb">/ Açılır pencere</span></a>
+      <div class="mk-theme" role="group" aria-label="Tema"><button type="button" data-t="system">Sistem</button><button type="button" data-t="light">Açık</button><button type="button" data-t="dark">Koyu</button></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="intro">
+      <h1>Açılır pencere</h1>
+      <p>Araç çubuğundaki simge. Durum, bu sekme, ses. Gerisi Ayarlar'da.</p>
+    </div>
+
+    <div class="frames">
+      <!-- 1. Normal -->
+      <figure class="frame">
+        <figcaption>Dublaj açık, oynuyor</figcaption>
+        <div class="pop">
+          <div class="pop-head"><span class="pmark" aria-hidden="true">TR</span><strong>LocaDub</strong><span class="ver">1.0.0</span></div>
+          <div class="pop-body">
+            <section class="status" aria-label="Durum">
+              <div class="status-top" role="status"><span class="dot ok" aria-hidden="true"></span><div><b>Dublaj açık</b><p>İleride 3 dk 40 sn hazır · Konuşmacı 2</p></div></div>
+              <label class="tab"><span>Bu sekmede dublaj<small>youtube.com · How rockets land</small></span><input type="checkbox" class="switch" role="switch" checked></label>
+            </section>
+
+            <div class="group">
+              <span class="glabel" id="g1">Ses</span>
+              <div class="voice">
+                <div class="seg" role="radiogroup" aria-labelledby="g1">
+                  <label><input type="radio" name="a" checked><span>Kadın</span></label>
+                  <label><input type="radio" name="a"><span>Erkek</span></label>
+                </div>
+                <select class="select" aria-label="Kadın sesi"><option>Ahenk Cep</option><option>EMA Lightning</option><option>Supertonic Kadın 2</option></select>
+              </div>
+            </div>
+
+            <div class="group">
+              <div class="slider"><label for="a1">Dublaj</label><output for="a1"></output><input class="range" type="range" id="a1" min="0" max="2" step="0.05" value="1" data-unit="%"></div>
+              <div class="slider"><label for="a2">Orijinal ses, konuşurken</label><output for="a2"></output><input class="range" type="range" id="a2" min="0" max="1" step="0.05" value="0.25" data-unit="%"></div>
+            </div>
+
+            <hr>
+            <label class="line"><span>Ses ayırma<small>Müzik kalır, yalnız konuşma değişir</small></span><input type="checkbox" class="switch" role="switch" checked></label>
+          </div>
+          <div class="pop-foot"><a class="more" href="ayarlar.html">Ayarlar <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></a><span>Her şey bu bilgisayarda işlenir</span></div>
+        </div>
+      </figure>
+
+      <!-- 2. Güncelleme şeridi + hazırlanıyor -->
+      <figure class="frame">
+        <figcaption>Yeni sürüm var, hazırlanıyor</figcaption>
+        <div class="pop">
+          <div class="pop-head"><span class="pmark" aria-hidden="true">TR</span><strong>LocaDub</strong><span class="ver">0.5.14</span></div>
+          <div class="pop-body">
+            <section class="update" aria-label="Güncelleme">
+              <div><b>Yeni sürüm: LocaDub 1.0.0</b><p>Tüm videoyu önceden hazırlama ve yeni panel. Modeller ve ayarlar korunur.</p></div>
+              <div class="row"><button type="button" class="btn btn-sm btn-primary">Şimdi güncelle</button><button type="button" class="btn btn-sm btn-plain">Sonra</button></div>
+            </section>
+
+            <section class="status" aria-label="Durum">
+              <div class="status-top" role="status"><span class="spinner" style="color:var(--prep)" aria-hidden="true"></span><div><b>Hazırlanıyor</b><p>Ses 3 / 12 cümle · ilk cümle yaklaşık 8 sn</p></div></div>
+              <div class="progress" aria-hidden="true"><i style="--v:40%"></i></div>
+              <label class="tab"><span>Bu sekmede dublaj<small>youtube.com · Lecture 4: Entropy</small></span><input type="checkbox" class="switch" role="switch" checked></label>
+            </section>
+
+            <div class="group">
+              <span class="glabel" id="g2">Ses</span>
+              <div class="voice">
+                <div class="seg" role="radiogroup" aria-labelledby="g2">
+                  <label><input type="radio" name="b"><span>Kadın</span></label>
+                  <label><input type="radio" name="b" checked><span>Erkek</span></label>
+                </div>
+                <select class="select" aria-label="Erkek sesi"><option>Antalia Mini</option><option>Supertonic Erkek 2</option></select>
+              </div>
+            </div>
+            <div class="group">
+              <div class="slider"><label for="b1">Dublaj</label><output for="b1"></output><input class="range" type="range" id="b1" min="0" max="2" step="0.05" value="1.2" data-unit="%"></div>
+              <div class="slider"><label for="b2">Orijinal ses, konuşurken</label><output for="b2"></output><input class="range" type="range" id="b2" min="0" max="1" step="0.05" value="0.15" data-unit="%"></div>
+            </div>
+            <hr>
+            <label class="line"><span>Ses ayırma<small>Müzik kalır, yalnız konuşma değişir</small></span><input type="checkbox" class="switch" role="switch" checked></label>
+          </div>
+          <div class="pop-foot"><a class="more" href="ayarlar.html">Ayarlar <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></a><span>Her şey bu bilgisayarda işlenir</span></div>
+        </div>
+      </figure>
+
+      <!-- 3. YouTube dışı / kapalı -->
+      <figure class="frame">
+        <figcaption>YouTube dışında bir sekme</figcaption>
+        <div class="pop off">
+          <div class="pop-head"><span class="pmark" aria-hidden="true">TR</span><strong>LocaDub</strong><span class="ver">1.0.0</span></div>
+          <div class="pop-body">
+            <section class="status" aria-label="Durum">
+              <div class="status-top" role="status"><span class="dot" aria-hidden="true"></span><div><b>Bu sekmede video yok</b><p>Bir YouTube videosu açın; oynatıcıdaki TR düğmesi dublajı başlatır.</p></div></div>
+            </section>
+            <div class="group">
+              <span class="glabel" id="g3">Ses</span>
+              <div class="voice">
+                <div class="seg" role="radiogroup" aria-labelledby="g3">
+                  <label><input type="radio" name="c" checked><span>Kadın</span></label>
+                  <label><input type="radio" name="c"><span>Erkek</span></label>
+                </div>
+                <select class="select" aria-label="Kadın sesi"><option>Ahenk Cep</option></select>
+              </div>
+            </div>
+            <div class="group">
+              <div class="slider"><label for="c1">Dublaj</label><output for="c1"></output><input class="range" type="range" id="c1" min="0" max="2" step="0.05" value="1" data-unit="%"></div>
+              <div class="slider"><label for="c2">Orijinal ses, konuşurken</label><output for="c2"></output><input class="range" type="range" id="c2" min="0" max="1" step="0.05" value="0.25" data-unit="%"></div>
+            </div>
+          </div>
+          <div class="pop-foot"><a class="more" href="ayarlar.html">Ayarlar <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></a><span>Her şey bu bilgisayarda işlenir</span></div>
+        </div>
+      </figure>
+    </div>
+  </main>
+</body>
+</html>

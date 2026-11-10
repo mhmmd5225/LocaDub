@@ -64,3 +64,12 @@ Kullanıcı sorusu: "diğer videoları oynatırken performans düşüşü için 
 ## Öncelik (kişisel kullanım, sağlamlık)
 **Önce ölç** (Hız testi + zaman kırılımı), **sonra görünür kıl** (hata günlüğü, bellek), **sonra düzelt** (boşta CPU, güncelleme adresi, kalite ayarı,
 batch otomasyonu). Mağaza hazırlığı en sona.
+
+## Ek: Hız testi çıktısı nasıl okunur
+Ayarlar → Diğer → Hız testi → "Sonucu kopyala" tek metin verir (aynı satırlar Tanılama raporunda `[Hız testi]` altında). Satırlar:
+- **ortam / ekran kartı / işlemci:** platform, Chrome ve eklenti sürümü; WebGPU adaptörü (ekran kartı tercihine göre); çekirdek, bellek (tarayıcı en çok "≥8 GB" söyler), crossOriginIsolated (WASM iş parçacıkları için gerekli).
+- **toplu N: X rtf (Y× gerçek zaman) · pencere A ms · GPU işi B ms:** rtf = işlem süresi / ses süresi (< 1 gerçek zamandan hızlı; ilk parça ısınma, sayılmaz). Pencere = ölçülen iş / model penceresi; GPU işi = pencere × toplu = tek GPU çağrısının süresi. Windows'ta bu ≈ 2 sn'yi geçerse sürücü sıfırlanır (TDR); test 0.8 sn'yi aşacak toplu boyutu denemez ("denenmedi" satırı).
+- **hız sınırı 0.6: X rtf · bekleme Y sn:** en hızlı güvenli toplu boyutta, videoda oynarken kullanılan sınırla (SEP.pacePlay); X ≈ 0.60 ise GPU sınıra yetişiyor, bekleme GPU'nun boş bırakıldığı toplam süre (2 ölçülen parça, 16 sn ses).
+- **hafif model: X rtf · model …:** hızlı kalite (`quality: 'fast'`) toplu 1'de; tam modelle farkı cihaz profilinde kalite/hız seçimi için.
+- **seslendirme + TTS aygıtı:** seçili sesin rtf'si ve çalıştığı aygıt (arka plan motoru bugün yalnız WASM; iş parçacığı sayısı yalıtım ve çekirdeğe bağlı).
+- Hız sınırı ve hafif model yalnız WebGPU'da ölçülür; çökme koruması bunları da kapsar (yarım kalan deneme bir sonraki testte o toplu boyutu ve üstünü kapatır).

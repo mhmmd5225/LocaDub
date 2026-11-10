@@ -31,7 +31,7 @@ export function pushError(list, { source, message, at = Date.now() }) {
 }
 
 const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2', 'voice3', 'voice4',
-  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'sepBackend', 'sepQuality', 'gpuPreference', 'prebufferSec',
+  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'sepQuality', 'gpuPreference', 'prebufferSec',
   'ttsSpeed', 'ttsVolume', 'originalVolume', 'lookaheadSec', 'showSubtitles', 'modelsApproved', 'checkUpdates'];
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -59,17 +59,8 @@ export function separationLines(sep) {
   c.push(`son hata: ${sep.lastError ? scrub(sep.lastError) : 'yok'}`);
   const out = [a.join(' · '), b.join(' · '), c.join(' · ')];
   if (sep.gpuAdapter) out.push(`ekran kartı: ${scrub(sep.gpuAdapter)}`);
-  if (num(sep.rtf) > 1.2 && sep.status !== 'error') out.push(`öneri: ayırma yetişemiyor (${sep.rtf.toFixed(1)} rtf); ayarlarda 'Hızlı' ayırma kalitesini ya da WebNN (NPU/GPU) arka ucunu deneyin`);
+  if (num(sep.rtf) > 1.2 && sep.status !== 'error') out.push(`öneri: ayırma yetişemiyor (${sep.rtf.toFixed(1)} rtf); ayarlarda 'Hızlı' ayırma kalitesini deneyin`);
   if (sep.backend === 'webgpu' && integratedHint(sep.gpuAdapter, num(sep.rtf))) out.push('uyarı: Intel ekran kartı kullanılıyor ve ayırma yetişemiyor; dizüstünüzde harici kart varsa chrome://flags/#force-high-performance-gpu bayrağını Etkin yapıp Chrome\'u yeniden başlatın (Chrome Windows\'ta WebGPU kart tercihini yok sayar)');
-  if (sep.autoPick) {
-    const a = sep.autoPick;
-    const ms = a.cached ? 'önceki ölçüm' : `WebGPU ${a.webgpu ?? '?'} ms/pencere · WebNN-GPU ${a.webnn ?? 'kurulamadı'}${a.webnn != null ? ' ms/pencere' : ''}`;
-    out.push(`otomatik kart seçimi: ${a.chosen === 'webnn' ? 'WebNN-GPU (harici kart olabilir)' : 'WebGPU'} (${ms})${a.reason ? ' — ' + scrub(a.reason) : ''}`);
-  }
-  if (sep.webnn?.requested) {
-    const w = sep.webnn;
-    out.push(`webnn (${scrub(w.device || 'npu')}): ${w.used ? 'kullanıldı' : `kullanılamadı${w.step ? ` (${scrub(w.step)} adımı)` : ''}${w.reason ? ' — ' + scrub(w.reason) : ''}`}`);
-  }
   if (sep.fallbackReason) out.push(`ekran kartı sorunu: ${scrub(sep.fallbackReason)}`);
   return out;
 }
@@ -107,7 +98,7 @@ export function buildReport(d) {
   L.push(`LocaDub ${d.version} · ${d.browser} · ${d.platform}`);
   L.push(`Rapor: ${iso(d.now ?? Date.now())}`);
   L.push('', '[Ayarlar]');
-  for (const k of SETTING_KEYS) if (d.settings && k in d.settings) L.push(`${k}: ${JSON.stringify(d.settings[k])}`);
+  for (const k of SETTING_KEYS) if (d.settings && k in d.settings) L.push(`${k === 'enabled' ? 'enabled (yeni sekme)' : k}: ${JSON.stringify(d.settings[k])}`);
   if (d.glossary) L.push(`sözlük: ${d.glossary.mt} çeviri düzeltmesi, ${d.glossary.tts} okunuş`);
   L.push('', '[Motorlar]');
   const st = d.status;
@@ -116,7 +107,7 @@ export function buildReport(d) {
     const one = (name, s) => `${name}: ${s?.ready ? 'hazır' : s?.loading ? 'yükleniyor' : 'yüklü değil'}` +
       `${s?.backend || s?.voice ? ` (${s.backend || s.voice})` : ''}${s?.error ? ` — hata: ${scrub(s.error)}` : ''}`;
     L.push(one('çeviri', st.mt), one('ses', st.tts));
-    L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU API: ${st.webgpu ? 'var' : 'yok'} · WebNN API: ${st.webnn ? 'var' : 'yok'} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
+    L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU API: ${st.webgpu ? 'var' : 'yok'} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
   L.push('', '[Bellek]', ...memoryLines(d.separation));

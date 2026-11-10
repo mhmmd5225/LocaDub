@@ -314,57 +314,32 @@ Ayırma bu durumda sessizce WASM'a düşer ve gerçek zamandan yavaş kalır. 0.
 (`ekran kartı sorunu:`) ve panelde görünür; alınan kartın özeti `ekran kartı:` satırındadır. Çözüm: Chrome'u tamamen
 kapatıp açmak; `chrome://gpu` sayfasında WebGPU'nun "Hardware accelerated" olduğunu doğrulamak.
 
-## Deneysel: WebNN (NPU) arka ucu (0.5.8)
-
-Ayarlar → Diğer → *Otomatik güncelleme ve deneysel* → **Deneysel ses ayırma arka ucu** → "WebNN — NPU". Varsayılan
-"Otomatik"tir (WebNN hiç denenmez). Yalnız ses ayırma bu yolu kullanır; çeviri ve seslendirme modelleri dinamik şekilli
-olduğundan WebNN'e uygun değildir.
-
-- **Gerekenler:** `chrome://flags/#web-machine-learning-neural-network` açık, Chrome yeniden başlatılmış, güncel NPU sürücüsü
-  (Intel Core Ultra: *Intel AI Boost* sürücüsü). "NPU'yu dene" düğmesi bağlam kurulabiliyor mu diye bakar.
-- **Güvenli geri dönüş:** WebNN yoksa ya da oturum kurulamazsa (ör. modelde NPU'nun desteklemediği bir işlem) ayırma kendiliğinden
-  WebGPU'ya, o da yoksa WASM'a düşer; neden tanılama raporunda `ekran kartı sorunu:` satırında yazar.
-- **Ölçüm:** NPU seçiliyken *Hız testi* ek olarak "ses ayırma (WebNN NPU)" satırı verir (toplu 1, WebGPU ölçümünün yanında).
-- **Beklenti:** hız garantisi yoktur; NPU'nun amacı çoğunlukla GPU'yu/işlemciyi boşaltmak ve güç tasarrufudur.
-
-| Cihaz | WebGPU rtf | WebNN NPU rtf | WASM rtf |
-|---|---|---|---|
-| Intel Core Ultra 7 265 | _ölçülecek_ | _ölçülecek_ | _ölçülecek_ |
-
-### Ayrı ekran kartı olmayan cihazlar (0.5.9)
+## Ayrı ekran kartı olmayan cihazlar (0.5.9)
 
 Intel Core Ultra 7 265 (yalnız iGPU Xe-LPG) ölçümü: WebGPU + Kim Vocal 2 = 3.27 rtf (gerçek zamandan ≈ 3× yavaş), video sık bekler.
 Çözümler seçenektir, otomatik değildir (varsayılan kalite yüksek kalır):
-- **Ayarlar → Diğer → Otomatik güncelleme ve deneysel → "Ayırma: hızlı (hafif model)"**: `mdxnet-lite`, WebGPU'da da (≈ 3–5× hızlı).
-- **WebNN — NPU / WebNN — GPU** arka uçları (deneysel); "NPU'yu dene" üç cihazı da sınar.
+- **Ayarlar → Diğer → Otomatik güncelleme ve ayırma → "Ayırma: hızlı (hafif model)"**: `mdxnet-lite`, WebGPU'da da (≈ 3–5× hızlı).
 - Ayırma yetişemiyorsa (rtf > 1.2) panel ve tanılama raporu (`öneri:` satırı) bu seçenekleri önerir.
-
-### WebNN ve eklenti CSP'si (0.5.10)
-
-0.5.9'da "WebNN — NPU" `Evaluating a string as JavaScript violates … 'unsafe-eval'` hatasıyla kuruluyordu: ORT'nin WebNN yürütücüsü
-`emscripten::val` kullanır ve embind her çağrı biçimi için `new Function` ile kod derler; MV3 eklenti sayfalarında `'unsafe-eval'` yasaktır.
-`lib/ort/ort-wasm-simd-threaded.jsep.mjs` bu kısımda yamalandı (`tools/patch-ort-csp.py`, ort yükseltilince yeniden uygulanır).
-Test: birim `ort-csp.test.mjs`, e2e `webnn-csp.e2e.cjs` (Chromium WebNN cpu ile oturum kurar; yamasız sürümde aynı hatayı verir).
-Bu yalnız engeli kaldırır; modelin NPU'da desteklenip desteklenmediği ve hızı cihazda ölçülür.
 
 ## Hibrit GPU'lu dizüstü: harici kartı seçmek (0.5.11)
 
 Dahili (Intel) + harici (NVIDIA/AMD) kartlı dizüstünde ORT'nin WebGPU yürütücüsü adaptörü tercihsiz ister ve çoğu zaman dahili kartı
 alır (RTX varken bile ayırma 2–3× yavaş kalır). 0.5.11'den itibaren adaptörü eklenti seçer ve ORT'ye `env.webgpu.adapter` olarak verir.
-- **Ayarlar → Diğer → Otomatik güncelleme ve deneysel → Kart:** "yüksek performans (harici)" (varsayılan) ya da "düşük güç (dahili)".
+- **Ayarlar → Diğer → Otomatik güncelleme ve ayırma → Kart:** "yüksek performans (harici)" (varsayılan) ya da "düşük güç (dahili)".
   Yanındaki not iki tercihin hangi kartı verdiğini gösterir (WebGPU kartları adla listelemez; yalnız bu iki tercih vardır).
 - İki tercih de aynı (Intel) kartı veriyorsa Windows seçimi kilitlemiştir: **Ayarlar → Sistem → Ekran → Grafik → Chrome → Seçenekler →
   Yüksek performans**, NVIDIA Denetim Masası → Program ayarları → chrome.exe → Yüksek performanslı NVIDIA işlemcisi; Chrome'u yeniden başlatın.
 - Doğrulama: tanılama raporunda `ekran kartı: nvidia …`; Intel kartta ayırma yetişemiyorsa rapor `uyarı:` satırı verir.
 
-### Hibrit GPU: araştırma ve otomatik seçim (0.5.12)
+**Windows'ta sınır:** Chrome Windows'ta WebGPU `powerPreference`'ı yok sayar; tüm tarayıcı tek kartta (dizüstünde genelde dahili Intel)
+çalışır (Chromium hata kaydı 369219127). Eklentideki tercih bu yüzden Windows'ta etkisizdir; harici kart için tek yol
+`chrome://flags/#force-high-performance-gpu` → Etkin → Chrome'u yeniden başlat (eklenti bu bayrağı ayarlayamaz). Intel kartta ayırma
+yetişemiyorsa tanılama raporu bunu `uyarı:` satırıyla söyler.
+Kaynaklar: https://issues.chromium.org/issues/369219127 · https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips
 
-0.5.11'deki tercih Windows'ta işe yaramadı: **Chrome Windows'ta WebGPU `powerPreference`'ı yok sayar**, tüm tarayıcı tek kartta
-(dizüstünde genelde dahili Intel) çalışır (Chromium hata kaydı 369219127; Chrome'un WebGPU sorun giderme sayfası). Eklenti
-`chrome://flags` ayarlayamaz. WebNN ise Chrome'un WebGPU kartından bağımsız cihaz seçer (Windows'ta ONNX Runtime / Windows ML,
-GPU'da harici kartı dahiliye tercih ettiği belirtiliyor — doğrulanmadı). Bu yüzden 0.5.12:
-- WebGPU kartı **Intel** ve WebNN varsa, ilk yüklemede aynı modelle WebGPU ile **WebNN-GPU** (`powerPreference: high-performance`)
-  2'şer pencere ölçülür; WebNN ≥ %15 hızlıysa seçilir. Karar 14 gün saklanır (`sepAutoPick`, Chrome sürümü değişince yeniden ölçülür).
-- Rapor: `otomatik kart seçimi:` satırı (iki süre). İkisi de yavaşsa önerilen tek kullanıcı adımı:
-  `chrome://flags/#force-high-performance-gpu` → Etkin → Chrome'u yeniden başlat.
-- Kaynaklar: https://issues.chromium.org/issues/369219127 · https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips
+## Denendi, kaldırıldı: WebNN (0.5.8–0.5.13)
+
+Ses ayırma için deneysel WebNN (NPU / GPU) arka ucu ve hibrit dizüstünde "WebGPU ile WebNN-GPU'yu ölç, hızlı olanı seç" otomatiği
+denendi, 0.5.14'te tümüyle kaldırıldı. Nedenler: (1) ORT'nin WebNN yürütücüsü `new Function` ile kod derler, MV3 eklenti CSP'si engeller
+(ORT yapıştırıcısını yamalamak gerekti); (2) Intel Core Ultra 7 265'te NPU hiç devreye girmedi; (3) harici karta ulaştığı doğrulanamadı;
+(4) önbelleğe alınan karar bozulursa ayırmayı kapatabilen yeni hata yolları getirdi. Ayırma yeniden yalnız WebGPU → WASM; `lib/ort` özgün.

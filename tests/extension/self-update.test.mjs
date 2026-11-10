@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import zlib from 'node:zlib';
-import { readZip, crc32, targetPath, applyUpdate } from '../../extension/common/self-update.js';
+import { readZip, crc32, targetPath, applyUpdate, writeOrder, staleFiles } from '../../extension/common/self-update.js';
 
 // küçük zip üretici (deflate / depolama)
 function makeZip(files) {
@@ -37,6 +37,18 @@ function fakeDir(init = {}) {
       };
     },
     async getDirectoryHandle(n) { return handle(prefix + n + '/'); },
+    async removeEntry(n) { if (!files.delete(prefix + n)) throw new Error('yok'); },
+    async *entries() {
+      const seen = new Set();
+      for (const k of [...files.keys()]) {
+        if (!k.startsWith(prefix)) continue;
+        const rest = k.slice(prefix.length), i = rest.indexOf('/');
+        const name = i < 0 ? rest : rest.slice(0, i);
+        if (seen.has(name)) continue;
+        seen.add(name);
+        yield [name, i < 0 ? { kind: 'file' } : Object.assign(handle(prefix + name + '/'), { kind: 'directory' })];
+      }
+    },
   });
   return Object.assign(handle(''), { files });
 }
@@ -69,7 +81,7 @@ test('applyUpdate: yazar, değişmeyeni atlar, manifest en sonda', async () => {
   const order = [];
   const r = await applyUpdate(dir, { version: '0.5.7', downloadUrl: U }, '0.5.6',
     { fetchFn: async () => ({ ok: true, arrayBuffer: async () => zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.length) }), onProgress: (i) => order.push(i) });
-  assert.deepEqual(r, { written: 3, skipped: 1 });
+  assert.deepEqual(r, { written: 3, skipped: 1, removed: 0 });
   assert.equal(dir.files.get('old.txt'), 'yeni');
   assert.equal(dir.files.get('lib/n.js'), 'x');
   assert.equal(JSON.parse(dir.files.get('manifest.json')).version, '0.5.7');
@@ -83,4 +95,31 @@ test('applyUpdate: sürüm uyuşmazlığı ve yabancı adres reddedilir, hiçbir
   await assert.rejects(applyUpdate(dir, { version: '0.5.7', downloadUrl: 'https://evil.example/x.zip' }, '0.5.6', { fetchFn }), /adres/);
   await assert.rejects(applyUpdate(dir, { version: '0.5.6', downloadUrl: U }, '0.5.6', { fetchFn }), /güncel/);
   assert.equal(dir.files.size, 1);
+});
+
+test('writeOrder: alt klasörler → kök dosyalar → manifest', () => {
+  const order = ['manifest.json', 'background.js', 'lib/a.js', 'popup/popup.html'].sort((a, b) => writeOrder(a) - writeOrder(b));
+  assert.deepEqual(order.slice(0, 2).sort(), ['lib/a.js', 'popup/popup.html']);
+  assert.deepEqual(order.slice(2), ['background.js', 'manifest.json']);
+});
+
+test('staleFiles: yalnız paketin klasörlerindeki bilinen uzantılı artıklar', () => {
+  const packaged = ['manifest.json', 'background.js', 'common/a.js', 'lib/ort/x.wasm'];
+  const existing = ['common/a.js', 'common/eski.js', 'common/notlar.docx', 'lib/ort/x.wasm', 'lib/ort/eski.wasm', 'benim/dosya.js', 'kok-eski.js'];
+  assert.deepEqual(staleFiles(existing, packaged).sort(), ['common/eski.js', 'lib/ort/eski.wasm']);
+});
+
+test('applyUpdate: kaldırılan modül silinir, kullanıcı dosyaları ve kök dosyalar korunur; manifest en son yazılır', async () => {
+  const dir = fakeDir({ 'manifest.json': man('0.5.6'), 'common/a.js': '1', 'common/webnn.js': 'eski', 'benim/not.js': 'x', 'kok.js': 'y' });
+  const zip = makeZip([['LocaDub/manifest.json', man('0.5.7')], ['LocaDub/background.js', 'bg'], ['LocaDub/common/a.js', '2']]);
+  const wrote = [];
+  const set = dir.files.set.bind(dir.files);
+  dir.files.set = (k, v) => { wrote.push(k); return set(k, v); };
+  const r = await applyUpdate(dir, { version: '0.5.7', downloadUrl: U }, '0.5.6',
+    { fetchFn: async () => ({ ok: true, arrayBuffer: async () => zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.length) }) });
+  assert.deepEqual(r, { written: 3, skipped: 0, removed: 1 });
+  assert.deepEqual(wrote, ['common/a.js', 'background.js', 'manifest.json']);
+  assert.equal(dir.files.has('common/webnn.js'), false);
+  assert.equal(dir.files.get('benim/not.js'), 'x');
+  assert.equal(dir.files.get('kok.js'), 'y');
 });

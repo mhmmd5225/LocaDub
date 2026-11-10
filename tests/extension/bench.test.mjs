@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BENCH, mean, rtf, benchSignal, runSepBench, runTtsBench, runMtBench, runBench, fastestBatch, formatBench,
+  estJobSec, collectEnv, formatEnv,
 } from '../../extension/common/bench.js';
 import { buildReport } from '../../extension/common/diagnostics.js';
 import { normalizeSettings } from '../../extension/common/settings.js';
@@ -28,15 +29,29 @@ test('benchSignal: belirleyici, doğru uzunluk, parçalar mutlak zamana göre bi
 });
 
 // sahte istemci: arka uç ve her işlem için sabit süre (now() sahte saatle ilerler)
-function fakeClients({ backend = 'webgpu', msPerSecAudio = { 1: 100, 2: 90, 4: 80 }, failBatch = null, stepSec = 2.96 } = {}) {
+function fakeClients({ backend = 'webgpu', msPerSecAudio = { 1: 100, 2: 90, 4: 80 }, failBatch = null, stepSec = 2.96,
+  windows = false, liteMs = 40, failLite = false } = {}) {
   let clock = 0;
   const made = [];
   const createClient = () => {
-    let batch = 1;
+    let batch = 1, lite = false;
     const c = {
       calls: [],
-      async load(o) { batch = o.batch; c.calls.push(['load', o]); clock += 100; if (failBatch === batch) throw new Error('bellek yetmedi'); return { backend, model: 'kim-vocal-2', stepSec }; },
-      async process(l, r, rate, o) { c.calls.push(['process', l.length / rate, o]); clock += (l.length / rate) * (msPerSecAudio[batch] || 100); return {}; },
+      async load(o) {
+        batch = o.batch; lite = o.quality === 'fast'; c.calls.push(['load', o]); clock += 100;
+        if (failBatch === batch && !lite) throw new Error('bellek yetmedi');
+        if (failLite && lite) throw new Error('hafif model yok');
+        return { backend, model: lite ? 'mdxnet-lite' : 'kim-vocal-2', stepSec };
+      },
+      async process(l, r, rate, o) {
+        const sec = l.length / rate;
+        c.calls.push(['process', sec, o]);
+        const work = sec * (lite ? liteMs : (msPerSecAudio[batch] || 100));
+        // hız sınırı: iş en az ses süresi × targetRtf sürer, fark bekleme
+        const idle = o?.pace ? Math.max(0, sec * 1000 * o.pace.targetRtf - work) : 0;
+        clock += work + idle;
+        return windows ? { windows: Math.round(sec / stepSec * 1000) / 1000, idleMs: idle } : {};
+      },
       async dispose() { c.disposed = true; },
     };
     made.push(c);
@@ -101,7 +116,7 @@ test('çökme koruması: her deneme önce işaretlenir, bitince silinir; yarım 
   const g = fakeGuard();
   const f = fakeClients({ msPerSecAudio: { 1: 20, 2: 18, 4: 16 } });
   await runSepBench({ createClient: f.createClient, now: f.now, guard: g });
-  assert.deepEqual(g.st.marks, [1, 2, 4]);
+  assert.deepEqual(g.st.marks, [1, 2, 4, 4, 1], 'ek ölçümler de işaretlenir (hız sınırı en hızlı toplulukta, hafif model toplu 1)');
   assert.equal(g.st.inflight, null, 'başarılı bitişte işaret silinir');
   // sayfa toplu 2'de gitmiş: işaret kalmış
   const crashed = fakeGuard({ inflight: 2 });
@@ -185,4 +200,155 @@ test('tanılama raporu: [Hız testi] bölümü yalnız veri varsa', () => {
   assert.ok(!buildReport(base).includes('[Hız testi]'));
   const text = buildReport({ ...base, bench: ['ses ayırma: arka uç webgpu', 'çeviri: 8 cümle, 6.1 cümle/sn'], benchAt: 0 });
   assert.match(text, /\[Hız testi \(1970-01-01T00:00:00Z\)\]\nses ayırma: arka uç webgpu\nçeviri: 8 cümle, 6\.1 cümle\/sn/);
+});
+
+test('pencere ve tek GPU işi süresi: ölçülen iş / pencere, × toplu; bekleme düşülür', async () => {
+  const f = fakeClients({ windows: true, msPerSecAudio: { 1: 20, 2: 18, 4: 16 } });
+  const r = await runSepBench({ createClient: f.createClient, now: f.now, extras: false });
+  // toplu 2: 18 ms/sn ses × 2.96 sn adım ≈ 53 ms pencere, × 2 ≈ 107 ms GPU işi
+  const b2 = r.runs.find((x) => x.batch === 2);
+  assert.ok(Math.abs(b2.windowMs - 18 * 2.96) < 0.5, String(b2.windowMs));
+  assert.ok(Math.abs(b2.jobMs - 2 * b2.windowMs) < 1e-9);
+  const L = formatBench({ sep: r });
+  assert.ok(L.includes('  toplu 2: 0.02 rtf (55.6× gerçek zaman) · pencere 53 ms · GPU işi 107 ms'), L.join('\n'));
+  // pencere sayısı yoksa satır eski biçimde kalır
+  const g = fakeClients();
+  const Lg = formatBench({ sep: await runSepBench({ createClient: g.createClient, now: g.now, extras: false }) });
+  assert.ok(Lg.includes('  toplu 1: 0.10 rtf (10.0× gerçek zaman)'), Lg.join('\n'));
+  // hız sınırlı ölçümde pencere süresi beklemeyi saymaz
+  const p = fakeClients({ windows: true, msPerSecAudio: { 1: 20, 2: 18, 4: 16 } });
+  const rp = await runSepBench({ createClient: p.createClient, now: p.now });
+  assert.ok(Math.abs(rp.paced.windowMs - 16 * 2.96) < 0.5, String(rp.paced.windowMs));
+});
+
+test('estJobSec: pencere süresi ve rtf × adımdan büyüğü; ölçülen pencere uzunsa sonraki toplu denenmez', () => {
+  assert.equal(estJobSec(null, 2), 0);
+  assert.ok(Math.abs(estJobSec({ rtf: 0.1, stepSec: 2.96 }, 2) - 0.592) < 1e-9);
+  assert.equal(estJobSec({ rtf: 0.1, stepSec: 2.96, windowMs: 500 }, 2), 1);
+});
+
+test('hız sınırı ve hafif model: yalnız WebGPU\'da, en hızlı güvenli toplu boyutta; satır biçimleri', async () => {
+  const f = fakeClients({ windows: true, msPerSecAudio: { 1: 20, 2: 18, 4: 16 } });
+  const steps = [];
+  const r = await runSepBench({ createClient: f.createClient, now: f.now, onStep: (x) => steps.push(x) });
+  assert.equal(r.paced.batch, 4);
+  assert.equal(r.paced.targetRtf, BENCH.paceRtf);
+  assert.ok(Math.abs(r.paced.rtf - 0.6) < 1e-9, 'sınırla gerçek zamanın 0.6\'sı');
+  // 2 ölçülen parça × 8 sn × (0.6 − 0.016) sn bekleme
+  assert.ok(Math.abs(r.paced.idleMs - 2 * 8 * (600 - 16)) < 1, String(r.paced.idleMs));
+  const pacedCalls = f.made[3].calls.filter((c) => c[0] === 'process');
+  assert.ok(pacedCalls.every((c) => c[2].pace?.targetRtf === 0.6), 'pace işçiye gider');
+  assert.equal(f.made[4].calls[0][1].quality, 'fast');
+  assert.equal(f.made[4].calls[0][1].batch, 1);
+  assert.equal(r.lite.model, 'mdxnet-lite');
+  assert.ok(steps.some((x) => /hız sınırı 0\.6 \(toplu 4\), parça 2\/3/.test(x)), steps.join('\n'));
+  assert.ok(steps.some((x) => /hafif model \(toplu 1\) yükleniyor/.test(x)), steps.join('\n'));
+  const L = formatBench({ sep: r });
+  assert.ok(L.includes('  hız sınırı 0.6: 0.60 rtf · bekleme 9.3 sn (toplu 4)'), L.join('\n'));
+  assert.ok(L.some((l) => /^ {2}hafif model: 0\.04 rtf \(25\.0× gerçek zaman\) · model mdxnet-lite · pencere 118 ms · GPU işi 118 ms$/.test(l)), L.join('\n'));
+  // WASM'da ek ölçüm yok (hafif model zaten kullanılıyor; hız sınırı yalnız GPU'da)
+  const w = fakeClients({ backend: 'wasm' });
+  const rw = await runSepBench({ createClient: w.createClient, now: w.now });
+  assert.equal(rw.paced, undefined);
+  assert.equal(rw.lite, undefined);
+  assert.equal(w.made.length, 1);
+});
+
+test('0.8 sn kuralı ek ölçümlerde de: ölçülen GPU işi sınırı aşan toplu boyutta hız sınırı ölçülmez; çökme sınırı ek ölçümleri de keser', async () => {
+  // toplu 1 pencere 30 ms/sn × 2.96 ≈ 89 ms; toplu 2'de işçi yavaşlıyor: 400 ms/sn → GPU işi ≈ 2.4 sn (ölçüldü ama güvensiz)
+  const f = fakeClients({ windows: true, msPerSecAudio: { 1: 30, 2: 400 } });
+  const r = await runSepBench({ createClient: f.createClient, now: f.now });
+  assert.ok(r.runs[1].jobMs > 800);
+  assert.ok(r.stopped && r.stopped.batch === 4, 'toplu 4 tahminle durur');
+  assert.equal(r.paced.batch, 1, 'hız sınırı güvenli toplu 1\'de');
+  // yavaş GPU: toplu 1 bile sınırı aşıyorsa hız sınırı ölçülmez; hafif model (daha hafif) toplu 1'de yine ölçülür
+  const s = fakeClients({ windows: true, msPerSecAudio: { 1: 400 } });
+  const rs = await runSepBench({ createClient: s.createClient, now: s.now });
+  assert.equal(rs.paced, undefined);
+  assert.ok(rs.lite.rtf > 0);
+  // önceki test toplu 1'de yarım kaldı: hiçbir ölçüm yapılmaz
+  const g = fakeGuard({ inflight: 1 });
+  const c = fakeClients({ windows: true });
+  const rc = await runSepBench({ createClient: c.createClient, now: c.now, guard: g, nowMs: () => 5000 });
+  assert.equal(c.made.length, 0);
+  assert.equal(rc.paced, undefined);
+  assert.equal(rc.lite, undefined);
+  // hafif model ölçümünde çökme: işaret toplu 1 kalır → sonraki test hepsini atlar
+  const g2 = fakeGuard();
+  const c2 = fakeClients({ windows: true });
+  let hang;
+  const crashing = () => {
+    const cl = c2.createClient();
+    const load = cl.load;
+    cl.load = async (o) => (o.quality === 'fast' ? new Promise((_, rej) => { hang = rej; }) : load(o));
+    return cl;
+  };
+  const pending = runSepBench({ createClient: crashing, now: c2.now, guard: g2 });
+  while (!hang) await new Promise((res) => setTimeout(res, 10));
+  assert.equal(g2.st.inflight, 1, 'hafif model denemesi işaretli (sayfa burada giderse toplu 1 sınır olur)');
+  hang(new Error('kesildi'));
+  await pending;
+  assert.equal(g2.st.inflight, null);
+});
+
+test('bir adım hata verince diğerleri sürer (ek ölçüm, aşama fırlatsa bile)', async () => {
+  const f = fakeClients({ windows: true, msPerSecAudio: { 1: 20, 2: 18, 4: 16 }, failLite: true });
+  const res = await runBench({
+    sep: { createClient: f.createClient, now: f.now },
+    tts: { synth: async () => { throw new Error('ses yok'); }, device: async () => ({ device: 'wasm', threads: 4 }) },
+    mt: { translate: async () => {} },
+    now: (() => { let t = 0; return () => (t += 61000); })(),
+  });
+  assert.match(res.sep.lite.error, /hafif model yok/);
+  assert.ok(res.sep.paced.rtf > 0, 'hafif model hatası hız sınırını etkilemez');
+  const L = formatBench(res);
+  assert.ok(L.includes('  hafif model: hata — hafif model yok'), L.join('\n'));
+  assert.ok(L.includes('seslendirme: hata — ses yok'));
+  assert.ok(L.includes('  TTS aygıtı: wasm (4 iş parçacığı)'), L.join('\n'));
+  assert.ok(/^çeviri: 8 cümle/.test(L.find((l) => l.startsWith('çeviri'))));
+  assert.equal(L.at(-1), 'toplam süre: 61 sn');
+  // aşamanın kendisi fırlatırsa (ör. createClient) yine diğerleri çalışır
+  const r2 = await runBench({
+    sep: { createClient: () => { throw new Error('işçi açılamadı'); } },
+    mt: { translate: async () => {} },
+  });
+  assert.match(formatBench(r2).join('\n'), /toplu 1: hata — işçi açılamadı/);
+  const r3 = await runBench({ sep: { get createClient() { throw new Error('bozuk'); } }, mt: { translate: async () => {} } });
+  assert.equal(formatBench(r3)[0], 'ses ayırma: hata — bozuk');
+  assert.ok(r3.mt.perSec > 0);
+});
+
+test('TTS aygıtı: seçili sesin aygıtı raporda; aygıt bilgisi alınamazsa satır yok', async () => {
+  const r = await runTtsBench({ synth: async () => ({ ms: 500, audioSec: 2 }), device: async () => ({ device: 'webgpu' }) });
+  assert.deepEqual(r.device, { device: 'webgpu' });
+  assert.ok(formatBench({ tts: r }).includes('  TTS aygıtı: webgpu'));
+  const r2 = await runTtsBench({ synth: async () => ({ ms: 500, audioSec: 2 }), device: async () => { throw new Error('x'); } });
+  assert.equal(r2.device, undefined);
+  assert.ok(!formatBench({ tts: r2 }).some((l) => /TTS aygıtı/.test(l)));
+  const sk = await runTtsBench({ synth: async () => ({ skipped: 'sistem sesi' }), device: async () => ({ device: 'wasm', threads: 1 }) });
+  assert.ok(!formatBench({ tts: sk }).some((l) => /TTS aygıtı/.test(l)), 'sistem sesinde aygıt yok');
+});
+
+test('ortam başlığı: platform, Chrome ve eklenti sürümü, ekran kartı, çekirdek, bellek, yalıtım', async () => {
+  const win = {
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+    userAgentData: { platform: 'Windows', brands: [{ brand: 'Not A Brand', version: '99' }, { brand: 'Google Chrome', version: '141' }] },
+    hardwareConcurrency: 16, deviceMemory: 8,
+  };
+  const e = collectEnv({ nav: win, adapter: 'nvidia blackwell', coi: true, version: '0.5.14' });
+  assert.deepEqual(formatEnv(e), [
+    'ortam: Windows · Chrome 141 · LocaDub 0.5.14',
+    'ekran kartı: nvidia blackwell (WebGPU)',
+    'işlemci: 16 çekirdek · bellek ≥8 GB · crossOriginIsolated evet',
+  ]);
+  // userAgentData yoksa userAgent'tan; bellek bilinmiyorsa yazılmaz; WebGPU yoksa söylenir
+  const mac = collectEnv({ nav: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.1.2 Safari/537.36', hardwareConcurrency: 10 } });
+  assert.deepEqual(formatEnv(mac), ['ortam: macOS · Chrome 140 · LocaDub ?', 'ekran kartı: WebGPU yok', 'işlemci: 10 çekirdek · crossOriginIsolated hayır']);
+  assert.equal(collectEnv({ nav: { deviceMemory: 4 } }).memoryGb, 4);
+  assert.equal(collectEnv().platform, 'bilinmiyor');
+  // başlık çıktının ilk satırları
+  const res = await runBench({ env: e, mt: { translate: async () => {} } });
+  const L = formatBench(res);
+  assert.equal(L[0], 'ortam: Windows · Chrome 141 · LocaDub 0.5.14');
+  assert.equal(L[3], 'ses ayırma: çalıştırılmadı');
 });

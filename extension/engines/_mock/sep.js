@@ -7,6 +7,8 @@
 // Yavaşlatma (e2e): process'e mockRtf (gerçek zaman oranı) eklenirse işlem girdi süresi × mockRtf kadar sürer;
 // { type: 'mock-rtf', rtf } süren işin hızını da değiştirir. Yavaşlatma yokken yanıt hemen (eşzamanlı) gelir.
 // { type: 'cancel', ids } sıradaki işleri 'cancelled' hatasıyla bırakır.
+// Ölçüm (Hız testi): akış sonucunda windows = kesinleşen aralığın adım sayısı; pace.targetRtf verilirse beklemeden
+// idleMs = ses süresi × targetRtf − iş süresi bildirilir (gerçek bekleme yok); quality 'fast' → model 'mock-lite'.
 
 export const MOCK_GAIN = 0.5;
 const CONTEXT_SEC = 1;
@@ -27,7 +29,7 @@ export function handleMessage(msg, post) {
   try {
     if (msg.type === 'load') {
       post({ type: 'progress', id, loaded: 1, total: 1 });
-      loaded = { model: msg.model || 'mock', backend: 'mock' };
+      loaded = { model: msg.quality === 'fast' ? 'mock-lite' : (msg.model || 'mock'), backend: 'mock' };
       post({
         type: 'loaded', id, backend: loaded.backend, model: loaded.model, contextSec: CONTEXT_SEC, chunkSec: CHUNK_SEC,
         stepSec: STEP_SEC, batch: 1, overlap: 0.5, streaming: true,
@@ -81,9 +83,12 @@ function result(msg, post, ms) {
   const outStart = S.outPos;
   S.outPos += n;
   if (msg.final) stream = null;
+  const windows = Math.round(n / (STEP_SEC * sr));
+  const pace = Number(msg.pace?.targetRtf) > 0 ? Number(msg.pace.targetRtf) : 0;
+  const idleMs = pace ? Math.max(0, Math.round((n / sr) * pace * 1000 - ms)) : 0;
   post({
     type: 'result', id: msg.id, left, right, ms, backend: loaded?.backend || 'mock',
-    startSample: outStart, windows: 0, reset, final: !!msg.final,
+    startSample: outStart, windows, idleMs, reset, final: !!msg.final,
   }, [left.buffer, right.buffer]);
 }
 

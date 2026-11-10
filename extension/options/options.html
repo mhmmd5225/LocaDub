@@ -17,8 +17,8 @@
         <button type="button" role="tab" id="tab-ai-model" data-tab="ai-model" aria-controls="ai-model" aria-selected="false" tabindex="-1">AI Model</button>
         <button type="button" role="tab" id="tab-diger" data-tab="diger" aria-controls="diger" aria-selected="false" tabindex="-1">Diğer</button>
       </nav>
-      <label class="switch-row">
-        <span id="enabledLabel">Dublaj kapalı</span>
+      <label class="switch-row" title="Dublaj her sekmede ayrı açılıp kapanır (videodaki TR düğmesi). Bu anahtar yeni açılan YouTube sekmesinin nasıl başlayacağını belirler; açık sekmeleri değiştirmez.">
+        <span id="enabledLabel">Yeni sekmede kapalı</span>
         <span class="switch">
           <input type="checkbox" id="enabled">
           <span class="slider" aria-hidden="true"></span>
@@ -235,7 +235,7 @@
       </div>
 
       <details class="group" id="autoUpdateGroup" title="Eklenti klasörden yüklü olduğu için Chrome onu kendiliğinden güncellemez. Klasörü bir kez seçerseniz yeni sürüm indirilir, bu klasöre yazılır ve eklenti yeniden yüklenir (açık YouTube sekmesi yokken).">
-        <summary><b>Otomatik güncelleme ve deneysel</b> <span class="note" id="autoUpdateNote"></span></summary>
+        <summary><b>Otomatik güncelleme ve ayırma</b> <span class="note" id="autoUpdateNote"></span></summary>
         <div class="au-row">
           <span id="autoUpdateStatus"></span>
           <button type="button" id="autoUpdatePick">Eklenti klasörünü seç</button>
@@ -243,14 +243,6 @@
           <button type="button" id="autoUpdateOff" class="secondary" hidden>Bağlantıyı kaldır</button>
         </div>
         <div class="au-row">
-          <span class="note" id="sepBackendNote">Deneysel ses ayırma arka ucu</span>
-          <select id="sepBackend" aria-label="Ses ayırma arka ucu">
-            <option value="auto">Otomatik (WebGPU, yoksa işlemci)</option>
-            <option value="webnn-npu">WebNN — NPU (deneysel)</option>
-            <option value="webnn-gpu">WebNN — GPU (deneysel)</option>
-            <option value="webgpu">Yalnız WebGPU</option>
-            <option value="wasm">Yalnız işlemci (WASM)</option>
-          </select>
           <select id="gpuPreference" aria-label="Ekran kartı" title="Hibrit dizüstünde (dahili + harici kart) yüksek performans harici kartı seçer. Hangi kartın geldiği yanda yazar.">
             <option value="high-performance">Kart: yüksek performans (harici)</option>
             <option value="low-power">Kart: düşük güç (dahili)</option>
@@ -260,8 +252,6 @@
             <option value="high">Ayırma: yüksek kalite</option>
             <option value="fast">Ayırma: hızlı (hafif model)</option>
           </select>
-          <button type="button" id="webnnProbe" class="secondary">NPU'yu dene</button>
-          <span id="webnnResult" title="WebNN: chrome://flags/#web-machine-learning-neural-network bayrağı ve güncel NPU sürücüsü gerekir; kurulamazsa ayırma kendiliğinden WebGPU'ya (yoksa işlemciye) döner."></span>
         </div>
       </details>
 
@@ -291,10 +281,10 @@
         </details>
         <details class="diag" id="benchBlock">
           <summary>Hız testi</summary>
-          <small class="hint" id="benchHelp">Bu cihazda ses ayırma (WebGPU / işlemci, toplu boyutları), seslendirme ve çeviri hızını ölçer; GPU'da bir dakikadan kısa, işlemcide 2–3 dakika sürebilir.
+          <small class="hint" id="benchHelp">Bu cihazda ses ayırma (WebGPU / işlemci, toplu boyutları; WebGPU'da ayrıca hız sınırı ve hafif model), seslendirme ve çeviri hızını ölçer; GPU'da 1–2 dakika, işlemcide 2–3 dakika sürebilir.
             Ses ayırma modeli indirilmemişse indirilir (67 MB, hafif model 30 MB). Ekran kartını yoğun kullanır; test sırasında bilgisayar kısa süre yavaşlayabilir.
           Toplu boyutlar küçükten büyüğe denenir ve sürücü sınırına yaklaşılırsa durur; test yarıda kesilirse (sürücü/sekme çökerse) bir sonraki testte o boyut atlanır.
-          Sonuç Tanılama raporuna da eklenir.</small>
+          Sonuç (cihaz bilgisiyle) Tanılama raporuna da eklenir; paylaşmak için "Sonucu kopyala".</small>
           <div class="diagrow">
             <button type="button" id="benchRun">Testi başlat</button>
             <button type="button" id="benchCopy" hidden>Sonucu kopyala</button>

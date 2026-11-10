@@ -21,8 +21,6 @@
 //   başına pencere; chunkSec: iş başına ses (sn); streaming: akış kipi.
 // speechAt(t0, t1): konuşanı cümle çalmadan önce ölçmek için temiz konuşma (orijinal − eşlik); sınıf başlığında.
 
-import { cachedPick, autoPickKey } from '../common/gpu.js';
-import { backendChoice } from '../common/webnn.js';
 import { audioContext, videoGraph } from './player.js';
 import { callMain } from './bridge.js';
 import { logError } from '../common/errlog.js';
@@ -153,19 +151,6 @@ class SepHost {
   }
 }
 
-// ---------- hibrit dizüstü otomatik kart kararı (chrome.storage.local → sepAutoPick) ----------
-// Anahtar: WebGPU kart özeti + Chrome sürümü; işçideki ilk ölçümün kartı (info.adapter Intel ise) yalnız ölçüm sırasında bilinir,
-// bu yüzden anahtar Chrome sürümüne göre tutulur ve karar AUTO_PICK_DAYS gün geçerlidir.
-async function readAutoPick() {
-  try {
-    const { sepAutoPick } = await chrome.storage.local.get('sepAutoPick');
-    return cachedPick(sepAutoPick, autoPickKey('auto'));
-  } catch { return null; }
-}
-function saveAutoPick(backend) {
-  try { chrome.storage.local.set({ sepAutoPick: { key: autoPickKey('auto'), backend, at: Date.now() } }); } catch { /* yoksay */ }
-}
-
 function sepHost() {
   return host || (host = new SepHost());
 }
@@ -264,11 +249,10 @@ export class SeparatedAudio extends EventTarget {
    * otherHold(): dublajın kendi başlangıç bekletmesi sürüyor mu (app.js _hold) — iki bekletme birbirinin videosunu
    * erken sürdürmesin.
    */
-  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, backend = 'auto', quality = 'high', gpuPreference = 'high-performance' } = {}) {
+  constructor(video, { mode = 'real', prebufferSec = 20, otherHold = () => false, quality = 'high', gpuPreference = 'high-performance' } = {}) {
     super();
     this.quality = quality;
     this.gpuPreference = gpuPreference;
-    this.backendChoice = backendChoice(backend); // ayar: deneysel WebNN (common/webnn.js)
     this.video = video;
     this.mode = mode;
     this.prebufferSec = prebufferSec;
@@ -338,8 +322,6 @@ export class SeparatedAudio extends EventTarget {
       chunkSec: Math.round(this.chunkSec * 100) / 100,
       streaming: this.streaming,
       gpuAdapter: this.gpuAdapter || null,
-      webnn: this.webnn || null,
-      autoPick: this.autoPick || null,
       fallbackReason: this.fallbackReason || null,
     };
   }
@@ -388,16 +370,12 @@ export class SeparatedAudio extends EventTarget {
     const h = sepHost();
     h.progress.add(this._onProgress);
     h.spawn(this.mode)
-      .then(() => readAutoPick()) // hibrit dizüstü: önceki otomatik kart kararı (common/gpu.js)
       // model kendiliğinden: WebGPU'da Kim Vocal 2, yoksa hafif model daha az örtüşmeyle (engines/sep/worker.js)
-      .then((prefer) => h.load({ model: 'auto', backend: this.backendChoice.kind, ...(prefer ? { preferBackend: prefer } : {}), quality: this.quality, gpuPreference: this.gpuPreference, ...(this.backendChoice.deviceType ? { webnnDevice: this.backendChoice.deviceType } : {}), ...((h.gpu || this.backendChoice.kind === 'webnn') && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
+      .then(() => h.load({ model: 'auto', backend: 'auto', quality: this.quality, gpuPreference: this.gpuPreference, ...(h.gpu && this.quality !== 'fast' ? {} : { overlap: 0.25 }) }))
       .then((info) => {
         if (!this.alive) return;
         this.backend = info.backend || null;
         this.gpuAdapter = info.adapter || null;
-        this.webnn = info.webnn || null;
-        this.autoPick = info.autoPick || null;
-        if (info.autoPick && !info.autoPick.cached && info.adapter) saveAutoPick(info.autoPick.chosen); // ölçüldü: sonraki yüklemede tekrar ölçülmez
         this.fallbackReason = info.fallbackReason || null;
         if (info.fallbackReason) logError('ayırma (WebGPU)', info.fallbackReason); // sessiz yedeğe düşme görünür olsun
         this.model = info.model || null;
@@ -839,8 +817,7 @@ export class SeparatedAudio extends EventTarget {
         (this.backend === 'wasm' ? (this.fallbackReason && /bağdaştırıcı/.test(this.fallbackReason)
           ? ' Chrome ekran kartını kapattı: Chrome\'u tamamen kapatıp açın; ayırma şimdi yavaş.'
           : ' GPU (WebGPU) yok: ayırma yavaş, video ara ara bekleyebilir.') : '') +
-        (this.rtf > 1.2 && this.status === 'playing' ? ' Ayırma yetişemiyor: Ayarlar\'nda \'Hızlı\' ayırma kalitesini ya da WebNN arka ucunu deneyin.' : '') +
-        (this.webnn?.requested && !this.webnn.used ? ` NPU (WebNN) kullanılamadı${this.webnn.reason ? ': ' + String(this.webnn.reason).slice(0, 90) : ''}.` : '');
+        (this.rtf > 1.2 && this.status === 'playing' ? ' Ayırma yetişemiyor: Ayarlar\'da \'Hızlı\' ayırma kalitesini deneyin.' : '');
       default: void t; return '';
     }
   }
