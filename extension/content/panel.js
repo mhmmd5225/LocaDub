@@ -1,5 +1,6 @@
 // LocaDub oynatıcı paneli: TR düğmesinin yanında canlı durum hapı (dublaj, konuşan ses, konuşanın cinsiyeti) ve tıklayınca açılan
-// cam panel (hazırlık adımları, kadın/erkek sesleri, karışım). Saf DOM; ayarları kendisi okur ve yazar.
+// koyu cam panel. Üç bölüm: Durum (tek satır + adımlar), Ses (düzeyler, kadın/erkek sesleri, konuşmacılar), Hazırlık.
+// Saf DOM; ayarları kendisi okur ve yazar.
 //
 // Görünüm modeli (content/app.js besler):
 //   panel.update({ enabled, state, detail })        TR düğmesiyle aynı durum: off | preparing | active | warn | error
@@ -23,7 +24,7 @@ const PREVIEW_TEXT = 'Merhaba! Bu ses size nasıl geldi? Videoları bu sesle Tü
 const SHORT = { 'antalia-mini': 'Antalia Mini', 'ahenk-cep': 'Ahenk Cep', 'ema-lightning': 'EMA Lightning', system: 'Sistem sesi' };
 const GENDER = { female: { sign: '♀', label: 'Kadın' }, male: { sign: '♂', label: 'Erkek' } };
 const STATE_TEXT = { off: 'Dublaj kapalı', preparing: 'Hazırlanıyor', active: 'Dublaj açık', warn: 'Dikkat', error: 'Hata' };
-const STEP_ICON = { done: '✓', warn: '!', error: '✕', off: '–', wait: '', active: '' };
+const DOT = { off: '', preparing: 'prep', active: 'ok', warn: 'warn', error: 'err' };
 const SEP_TEXT = {
   off: 'Kapalı', 'loading-model': 'Model yükleniyor', buffering: 'Arabellek', playing: 'Çalışıyor',
   waiting: 'Ayırma bekleniyor', error: 'Hata',
