@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocaDub v1 maketleri</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <script src="maket.js"></script>
+  <style>
+    body { background: var(--bg-2); }
+    .wrap { width: min(980px, 100% - 32px); margin-inline: auto; padding: 72px 0 96px; }
+    h1 { font: 700 clamp(40px, 7vw, 64px)/1.05 var(--font-display); letter-spacing: -0.04em; }
+    .lead { font-size: clamp(17px, 2vw, 21px); color: var(--ink-2); margin-top: 12px; max-width: 32em; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
+    .tile { display: flex; flex-direction: column; gap: 6px; min-height: 200px; padding: 28px; border-radius: var(--r-xl); background: var(--card); color: var(--ink); box-shadow: var(--shadow-1); }
+    .tile:hover { text-decoration: none; box-shadow: var(--shadow-2); }
+    .tile h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+    .tile p { color: var(--ink-2); }
+    .tile .more { margin-top: auto; }
+    .meta { margin-top: 32px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } .tile { min-height: 0; } .wrap { padding-top: 48px; } }
+  </style>
+</head>
+<body>
+  <header class="mk-top">
+    <div class="in">
+      <span class="logo">LocaDub <span class="crumb">/ v1 maketleri</span></span>
+      <div class="mk-theme" role="group" aria-label="Tema"><button type="button" data-t="system">Sistem</button><button type="button" data-t="light">Açık</button><button type="button" data-t="dark">Koyu</button></div>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1>Üç yüzey. Tek dil.</h1>
+    <p class="lead">Kodlamadan önce onay için statik maketler. Renk, yazı ve aralıklar sitenin kendisinden.</p>
+    <div class="grid">
+      <a class="tile" href="panel.html"><h2>Oynatıcı paneli</h2><p>Hap ve panel. Beş durum: hazırlanıyor, oynuyor, tümünü hazırla, uyarı, kapalı.</p><span class="more">Aç <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></span></a>
+      <a class="tile" href="popup.html"><h2>Açılır pencere</h2><p>360 px. Durum, bu sekme, ses. Güncelleme şeridiyle ayrı bir durum.</p><span class="more">Aç <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></span></a>
+      <a class="tile" href="ayarlar.html"><h2>Ayarlar</h2><p>Sol gezinme, yedi bölüm. Dar ekranda gezinme üstte.</p><span class="more">Aç <svg viewBox="0 0 9 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m1.5 1.5 5.5 5.5-5.5 5.5"/></svg></span></a>
+    </div>
+    <div class="meta">
+      <p>Ortak belirteçler ve bileşenler: <code>tokens.css</code>. Ekran görüntüleri: <code>shots/</code>.</p>
+      <p>Tema üstteki seçiciyle ya da adrese <code>?tema=acik</code> / <code>?tema=koyu</code> ekleyerek değişir.</p>
+    </div>
+  </main>
+</body>
+</html>

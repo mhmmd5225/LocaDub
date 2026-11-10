@@ -25,3 +25,4 @@ build/
 
 # E2E ekran görüntüleri
 tests/extension/e2e/out/
+docs/maket/shots/
