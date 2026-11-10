@@ -250,6 +250,7 @@ code, kbd { background: var(--fill-2); border: 1px solid var(--line-2); padding:
 /* ---------- 11. Metin alanı ---------- */
 .textarea { width: 100%; min-height: 120px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font: 13px/1.6 var(--mono); resize: vertical; }
 .pre { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--fill-2); border: 1px solid var(--line-2); font: 12px/1.6 var(--mono); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.pre.scroll { white-space: pre; overflow-x: auto; overflow-wrap: normal; }
 
 /* ---------- 12. Maket kabuğu (yalnız maket sayfaları) ---------- */
 .mk-top { position: sticky; top: 0; z-index: 50; height: 48px; background: rgba(22, 22, 23, .8); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); color: #f5f5f7; }

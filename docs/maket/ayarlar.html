@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ayarlar — LocaDub maketi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css">
+  <script src="maket.js"></script>
+  <style>
+    html { scroll-padding-top: 72px; }
+    body { background: var(--bg-2); }
+    .shell { width: min(1100px, 100% - 32px); margin-inline: auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; padding: 48px 0 96px; }
+
+    /* Sol gezinme */
+    .nav { position: sticky; top: 72px; align-self: start; }
+    .nav-brand { display: flex; align-items: center; gap: 10px; margin: 0 0 24px 10px; }
+    .nav-brand .mark { display: inline-grid; place-items: center; height: 26px; padding: 0 9px; border-radius: var(--r-pill); background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 700; }
+    .nav-brand strong { font-size: 17px; font-weight: 600; }
+    .nav-brand span { font-size: 12px; color: var(--ink-2); display: block; }
+    .nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+    .nav a { display: block; padding: 7px 10px; border-radius: 8px; color: var(--ink); font-size: 14px; white-space: nowrap; }
+    .nav a:hover { background: var(--fill); text-decoration: none; }
+    .nav a[aria-current="true"] { background: var(--fill); font-weight: 600; }
+    .nav-foot { margin: 24px 0 0 10px; font-size: 12px; color: var(--ink-2); }
+
+    /* Bölümler */
+    .sec { padding-top: 8px; margin-bottom: 72px; scroll-margin-top: 72px; }
+    .sec > h2 { font: 700 var(--t-2xl)/1.15 var(--font-display); letter-spacing: -0.03em; }
+    .sec > .lead { color: var(--ink-2); margin: 6px 0 24px; font-size: 15px; max-width: 40em; }
+    .grp { margin-top: 28px; }
+    .grp > h3 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 8px 18px; }
+    .grp > .note { font-size: 13px; color: var(--ink-2); margin: 8px 18px 0; }
+    .item .slider { flex: 1; min-width: 0; }
+    .item-ctl .range { width: 200px; }
+    .val { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+    .size { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    /* Ses kartları */
+    .voices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .vcard { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-1); cursor: pointer; }
+    .vcard input { position: absolute; opacity: 0; }
+    .vcard:has(input:checked) { box-shadow: inset 0 0 0 2px var(--accent); }
+    .vcard:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .vcard .t { flex: 1; min-width: 0; }
+    .vcard b { display: block; font-weight: 600; font-size: 15px; }
+    .vcard small { display: block; font-size: 12px; color: var(--ink-2); }
+    .vcard .btn { flex: none; }
+
+    /* Model listesi */
+    .mrow .item-title { font-weight: 500; }
+    .mrow .progress { margin-top: 8px; max-width: 280px; }
+    .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 20px; }
+    .summary .big { font: 700 32px/1 var(--font-display); letter-spacing: -0.03em; }
+    .summary .big small { font-size: 15px; font-weight: 500; color: var(--ink-2); margin-left: 6px; letter-spacing: -0.01em; }
+    .summary .acts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+
+    /* Profil */
+    .profiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; }
+    .prof { position: relative; padding: 14px 12px; text-align: center; cursor: pointer; border-left: 1px solid var(--line-2); }
+    .prof:first-child { border-left: 0; }
+    .prof input { position: absolute; opacity: 0; }
+    .prof b { display: block; font-size: 14px; font-weight: 500; }
+    .prof small { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+    .prof:has(input:checked) { background: var(--accent-tint); }
+    .prof:has(input:checked) b { color: var(--accent-text); font-weight: 600; }
+    .prof:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: -3px; }
+    .ptable { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line-2); }
+    .ptable div { padding: 12px 16px; }
+    .ptable div + div { border-left: 1px solid var(--line-2); }
+    .ptable small { display: block; font-size: 12px; color: var(--ink-2); }
+    .ptable b { font-weight: 500; font-size: 14px; }
+
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .pair .lbl { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px 8px; font-size: 14px; font-weight: 600; }
+    .pair .lbl small { font-weight: 400; color: var(--ink-2); font-size: 12px; }
+
+    .errs { list-style: none; margin: 0; padding: 0; }
+    .errs li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding: 12px 18px; font-size: 13px; }
+    .errs li + li { border-top: 1px solid var(--line-2); }
+    .errs time { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .errs b { font-weight: 600; }
+    .errs p { color: var(--ink-2); }
+
+    details.disc > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    details.disc > summary::-webkit-details-marker { display: none; }
+    details.disc > summary .chev { width: 8px; height: 8px; border: solid var(--ink-3); border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); flex: none; margin-right: 4px; }
+    details.disc[open] > summary .chev { transform: rotate(-135deg); }
+    .about { margin-top: 28px; font-size: 13px; color: var(--ink-2); display: grid; gap: 8px; padding: 0 18px; }
+    .about .links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+    /* Dar ekran: gezinme üstte yatay */
+    @media (max-width: 860px) {
+      .shell { grid-template-columns: minmax(0, 1fr); gap: 0; padding-top: 0; }
+      .nav { position: sticky; top: 48px; z-index: 10; margin: 0 -16px; padding: 10px 16px; background: color-mix(in srgb, var(--bg-2) 88%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--line-2); }
+      .nav-brand, .nav-foot { display: none; }
+      .nav ul { display: flex; overflow-x: auto; gap: 4px; scrollbar-width: none; }
+      .nav ul::-webkit-scrollbar { display: none; }
+      .nav a { padding: 6px 12px; border-radius: var(--r-pill); font-size: 13px; }
+      html { scroll-padding-top: 112px; }
+      .sec { scroll-margin-top: 112px; }
+      .shell > main { padding-top: 32px; }
+      .profiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .prof:nth-child(4) { border-left: 0; }
+      .prof:nth-child(n+4) { border-top: 1px solid var(--line-2); }
+      .ptable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ptable div:nth-child(3) { border-left: 0; }
+      .ptable div:nth-child(n+3) { border-top: 1px solid var(--line-2); }
+    }
+    @media (max-width: 600px) {
+      .voices, .pair { grid-template-columns: minmax(0, 1fr); }
+      .item.wrapctl { flex-wrap: wrap; row-gap: 10px; }
+      .item.wrapctl .item-ctl { flex: 1 1 100%; }
+      .item-ctl .range { width: auto; flex: 1; min-width: 0; }
+      .mrow { flex-wrap: wrap; row-gap: 8px; }
+      .mrow .item-ctl { margin-left: auto; }
+      .profiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .prof:nth-child(n) { border-left: 1px solid var(--line-2); border-top: 1px solid var(--line-2); }
+      .prof:nth-child(odd) { border-left: 0; }
+      .prof:first-child { grid-column: 1 / -1; border-top: 0; }
+      .prof:nth-child(even) { border-left: 0; }
+      .prof:nth-child(odd):not(:first-child) { border-left: 1px solid var(--line-2); }
+      .summary .acts { margin-left: 0; }
+      .errs li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+      .sec > h2 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="mk-top">
+    <div class="in">
+      <a class="logo" href="index.html">LocaDub <span class="crumb">/ Ayarlar</span></a>
+      <div class="mk-theme" role="group" aria-label="Tema"><button type="button" data-t="system">Sistem</button><button type="button" data-t="light">Açık</button><button type="button" data-t="dark">Koyu</button></div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="nav" aria-label="Ayar bölümleri">
+      <div class="nav-brand"><span class="mark" aria-hidden="true">TR</span><div><strong>Ayarlar</strong><span>LocaDub 1.0.0</span></div></div>
+      <ul>
+        <li><a href="#genel" aria-current="true">Genel</a></li>
+        <li><a href="#sesler">Sesler</a></li>
+        <li><a href="#modeller">Modeller ve indirme</a></li>
+        <li><a href="#performans">Ses ayırma ve performans</a></li>
+        <li><a href="#sozluk">Sözlük</a></li>
+        <li><a href="#guncelleme">Güncelleme</a></li>
+        <li><a href="#tanilama">Tanılama</a></li>
+      </ul>
+      <p class="nav-foot">Metin ve ses bu bilgisayardan çıkmaz.</p>
+    </nav>
+
+    <main>
+      <!-- 1. Genel -->
+      <section class="sec" id="genel" aria-labelledby="h1">
+        <h2 id="h1">Genel</h2>
+        <p class="lead">Dublajın nasıl başlayacağı ve ekranda ne görüneceği.</p>
+
+        <div class="list">
+          <label class="item"><span class="item-text"><span class="item-title">Yeni sekmede dublaj açık başlasın</span><span class="item-help">Açık sekmeleri değiştirmez. Her sekme oynatıcıdaki TR düğmesiyle ayrıca açılıp kapanır.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+          <label class="item"><span class="item-text"><span class="item-title">Türkçe altyazıyı göster</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+          <label class="item"><span class="item-text"><span class="item-title">İlk cümle hazır olana kadar videoyu beklet</span><span class="item-help">En fazla 25 sn. Oynat'a basarsanız beklemeden devam eder.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+          <div class="item wrapctl"><span class="item-text"><label class="item-title" for="la">Önceden hazırlama</label><span class="item-help">Oynatma konumunun ne kadar ilerisi hazır tutulur.</span></span><span class="item-ctl"><input class="range" type="range" id="la" min="10" max="120" step="5" value="30" data-unit="sn"><output class="val" for="la"></output></span></div>
+        </div>
+
+        <div class="grp">
+          <h3 id="mt">Çeviri</h3>
+          <div class="list" role="radiogroup" aria-labelledby="mt">
+            <label class="item"><span class="item-text"><span class="item-title">Otomatik</span><span class="item-help">Chrome çevirmeni hazırsa onu, değilse OPUS-MT'yi kullanır. Şu an: OPUS-MT.</span></span><span class="item-ctl"><input type="radio" name="mt" class="check" style="border-radius:50%" checked></span></label>
+            <label class="item"><span class="item-text"><span class="item-title">Chrome çevirmeni</span><span class="item-help">Chrome'un yerleşik modeli. İndirme gerekmez; bu cihazda hazır değil.</span></span><span class="item-ctl"><input type="radio" name="mt" class="check" style="border-radius:50%"></span></label>
+            <label class="item"><span class="item-text"><span class="item-title">OPUS-MT</span><span class="item-help">Çevrimdışı çalışır · 305 MB · indirildi</span></span><span class="item-ctl"><input type="radio" name="mt" class="check" style="border-radius:50%"></span></label>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h3>Otomatik altyazı</h3>
+          <div class="list">
+            <label class="item"><span class="item-text"><span class="item-title">Noktalama ve büyük harfi düzelt</span><span class="item-help">Yalnız İngilizce otomatik altyazıda. Model gerekir: 210 MB.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch"></span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Sesler -->
+      <section class="sec" id="sesler" aria-labelledby="h2">
+        <h2 id="h2">Sesler</h2>
+        <p class="lead">Ana ses, üslup ve konuşmacılara göre ses seçimi.</p>
+
+        <div class="voices" role="radiogroup" aria-label="Ana ses">
+          <label class="vcard"><input type="radio" name="v" checked><span class="t"><b>Ahenk Cep</b><small>Kadın · 17 MB · indirildi</small></span><button type="button" class="btn btn-sm">Dinle</button></label>
+          <label class="vcard"><input type="radio" name="v"><span class="t"><b>Antalia Mini</b><small>Erkek, hızlı · 23 MB · indirildi</small></span><button type="button" class="btn btn-sm">Dinle</button></label>
+          <label class="vcard"><input type="radio" name="v"><span class="t"><b>EMA Lightning</b><small>Kadın · 35 MB · indirilmedi</small></span><button type="button" class="btn btn-sm">Dinle</button></label>
+          <label class="vcard"><input type="radio" name="v"><span class="t"><b>Supertonic 3</b><small>10 ses, kadın ve erkek · 445 MB</small></span><button type="button" class="btn btn-sm">Dinle</button></label>
+          <label class="vcard"><input type="radio" name="v"><span class="t"><b>Sistem sesi</b><small>İşletim sisteminin Türkçe sesi · indirme yok</small></span><button type="button" class="btn btn-sm">Dinle</button></label>
+        </div>
+
+        <div class="grp">
+          <h3>Söyleyiş</h3>
+          <div class="list">
+            <div class="item wrapctl"><span class="item-text"><span class="item-title" id="sty">Üslup</span></span><span class="item-ctl"><span class="seg" role="radiogroup" aria-labelledby="sty"><label><input type="radio" name="s" checked><span>Doğal</span></label><label><input type="radio" name="s"><span>Canlı</span></label><label><input type="radio" name="s"><span>Sakin</span></label></span></span></div>
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="sp">Konuşma hızı</label></span><span class="item-ctl"><input class="range" type="range" id="sp" min="0.8" max="2" step="0.05" value="1.1" data-unit="x"><output class="val" for="sp"></output></span></div>
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="vd">Dublaj düzeyi</label></span><span class="item-ctl"><input class="range" type="range" id="vd" min="0" max="2" step="0.05" value="1" data-unit="%"><output class="val" for="vd"></output></span></div>
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="vo">Orijinal ses</label><span class="item-help">Dublaj konuşurken videonun kendi sesi.</span></span><span class="item-ctl"><input class="range" type="range" id="vo" min="0" max="1" step="0.05" value="0.25" data-unit="%"><output class="val" for="vo"></output></span></div>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h3>İnce ayar</h3>
+          <div class="list">
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="pt">Perde</label><span class="item-help">Yarım ton.</span></span><span class="item-ctl"><input class="range" type="range" id="pt" min="-3" max="3" step="0.5" value="0" data-unit="st"><output class="val" for="pt"></output></span></div>
+            <div class="item wrapctl"><span class="item-text"><span class="item-title" id="ql">Kalite</span><span class="item-help">Yüksek kalite daha yavaş hazırlanır.</span></span><span class="item-ctl"><span class="seg" role="radiogroup" aria-labelledby="ql"><label><input type="radio" name="q" checked><span>Hızlı</span></label><label><input type="radio" name="q"><span>Yüksek</span></label></span></span></div>
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="bl">Ses karıştırma</label><span class="item-help">Yalnız Supertonic. İkinci sesin rengi katılır; %0 karıştırmaz.</span></span><span class="item-ctl"><select class="select select-sm" aria-label="Katılacak ses"><option>Kadın 4</option><option>Kadın 1</option></select><input class="range" type="range" id="bl" min="0" max="0.9" step="0.05" value="0" data-unit="%" style="width:120px"><output class="val" for="bl"></output></span></div>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h3>Konuşmacılar</h3>
+          <div class="list">
+            <label class="item"><span class="item-text"><span class="item-title">Kadın ve erkek sesini otomatik seç</span><span class="item-help">Konuşan sesinden tanınır. Ses ayırma açıkken çalışır.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+            <label class="item"><span class="item-text"><span class="item-title">Konuşmacıya benzeyen ses</span><span class="item-help">Perdesine en yakın Türkçe ses verilir.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+            <div class="item wrapctl"><span class="item-text"><span class="item-title">Konuşmacı değişince başka sesle konuş</span><span class="item-help">Altyazıdaki &gt;&gt; işaretine göre sesler sırayla döner.</span></span><span class="item-ctl"><select class="select select-sm" aria-label="Ses sayısı"><option>2 ses</option><option>3 ses</option><option>4 ses</option></select><input type="checkbox" class="switch" role="switch" aria-label="Konuşmacı değişince başka sesle konuş"></span></div>
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="v2">İkinci ses</label></span><span class="item-ctl"><select class="select select-sm" id="v2"><option>Antalia Mini</option><option>Supertonic Erkek 2</option></select><button type="button" class="btn btn-sm">Dinle</button></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Modeller ve indirme -->
+      <section class="sec" id="modeller" aria-labelledby="h3">
+        <h2 id="h3">Modeller ve indirme</h2>
+        <p class="lead">Modeller bir kez indirilir, tarayıcıda saklanır; sonra internetsiz çalışır.</p>
+
+        <div class="card summary">
+          <div><p class="big num">1,2 GB<small>indirildi</small></p><p class="muted small" style="margin-top:6px">Dublaj için eksik: EMA Lightning, Noktalama modeli</p></div>
+          <div class="acts"><button type="button" class="btn btn-primary">Tümünü indir (245 MB)</button><button type="button" class="btn">Yalnız seçili sesi indir</button></div>
+        </div>
+
+        <div class="grp">
+          <h3>Çeviri ve metin</h3>
+          <div class="list">
+            <div class="item mrow"><span class="item-text"><span class="item-title">OPUS-MT</span><span class="item-help">İngilizce → Türkçe · CC BY 4.0</span></span><span class="item-ctl"><span class="size">305 MB</span><span class="badge ok">Kullanımda</span></span></div>
+            <div class="item mrow"><span class="item-text"><span class="item-title">Noktalama modeli</span><span class="item-help">Otomatik altyazıyı düzeltir</span></span><span class="item-ctl"><span class="size">210 MB</span><button type="button" class="btn btn-sm">İndir</button></span></div>
+          </div>
+        </div>
+        <div class="grp">
+          <h3>Ses</h3>
+          <div class="list">
+            <div class="item mrow"><span class="item-text"><span class="item-title">Ahenk Cep</span><span class="item-help">Kadın · CC BY 4.0</span></span><span class="item-ctl"><span class="size">17 MB</span><span class="badge ok">Kullanımda</span></span></div>
+            <div class="item mrow"><span class="item-text"><span class="item-title">Antalia Mini</span><span class="item-help">Erkek · Apache-2.0</span></span><span class="item-ctl"><span class="size">23 MB</span><span class="badge ok">Kullanımda</span></span></div>
+            <div class="item mrow"><span class="item-text"><span class="item-title">EMA Lightning</span><span class="item-help">Kadın · Apache-2.0</span><div class="progress" aria-label="İndiriliyor %62"><i style="--v:62%"></i></div></span><span class="item-ctl"><span class="size">22 / 35 MB</span><button type="button" class="btn btn-sm">Durdur</button></span></div>
+            <div class="item mrow"><span class="item-text"><span class="item-title">Supertonic 3 paketi</span><span class="item-help">10 ses · OpenRAIL-M</span></span><span class="item-ctl"><span class="size">445 MB</span><span class="badge plain">İndirildi</span></span></div>
+          </div>
+        </div>
+        <div class="grp">
+          <h3>Ses ayırma ve konuşmacı tanıma</h3>
+          <div class="list">
+            <div class="item mrow"><span class="item-text"><span class="item-title">Kim Vocal 2</span><span class="item-help">Yüksek kalite ayırma · MIT (UVR MDX-Net)</span></span><span class="item-ctl"><span class="size">67 MB</span><span class="badge ok">Kullanımda</span></span></div>
+            <div class="item mrow"><span class="item-text"><span class="item-title">UVR-MDX-NET 1</span><span class="item-help">Hafif model, hızlı ayırma · MIT</span></span><span class="item-ctl"><span class="size">30 MB</span><span class="badge plain">İndirildi</span></span></div>
+            <div class="item mrow"><span class="item-text"><span class="item-title">Konuşmacı tanıma</span><span class="item-help">WeSpeaker · CC BY 4.0</span></span><span class="item-ctl"><span class="size">27 MB</span><span class="badge ok">Kullanımda</span></span></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="list">
+            <div class="item"><span class="item-text"><span class="item-title">Çeviri önbelleği</span><span class="item-help">Son 50 videonun çevirisi · 12 MB</span></span><span class="item-ctl"><button type="button" class="btn btn-sm">Temizle</button></span></div>
+            <div class="item"><span class="item-text"><span class="item-title">Tüm modelleri sil</span><span class="item-help">1,2 GB boşalır. Dublaj için yeniden indirmek gerekir.</span></span><span class="item-ctl"><button type="button" class="btn btn-sm btn-danger">Sil</button></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Ses ayırma ve performans -->
+      <section class="sec" id="performans" aria-labelledby="h4">
+        <h2 id="h4">Ses ayırma ve performans</h2>
+        <p class="lead">Konuşmayı müzikten ayırma ve bu cihaza göre hız ayarları.</p>
+
+        <div class="list">
+          <label class="item"><span class="item-text"><span class="item-title">Ses ayırma</span><span class="item-help">Orijinal sesten konuşma ayrılır; müzik ve efektler kalır. Ekran kartı (WebGPU) ile çalışır.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+          <div class="item wrapctl"><span class="item-text"><span class="item-title" id="sq">Ayırma kalitesi</span><span class="item-help">Hızlı: hafif model, 3–5 kat hızlı, biraz daha az temiz.</span></span><span class="item-ctl"><span class="seg" role="radiogroup" aria-labelledby="sq"><label><input type="radio" name="sq" checked><span>Yüksek</span></label><label><input type="radio" name="sq"><span>Hızlı</span></label></span></span></div>
+          <div class="item wrapctl"><span class="item-text"><label class="item-title" for="pb">Başta ön tampon</label><span class="item-help">Ayırma için video başta en çok bu kadar bekleyebilir.</span></span><span class="item-ctl"><input class="range" type="range" id="pb" min="5" max="60" step="5" value="20" data-unit="sn"><output class="val" for="pb"></output></span></div>
+        </div>
+
+        <div class="grp">
+          <h3 id="prof">Cihaz profili</h3>
+          <div class="list">
+            <div class="profiles" role="radiogroup" aria-labelledby="prof">
+              <label class="prof"><input type="radio" name="p" checked><b>Otomatik</b><small>RTX algılandı</small></label>
+              <label class="prof"><input type="radio" name="p"><b>RTX</b><small>Harici NVIDIA</small></label>
+              <label class="prof"><input type="radio" name="p"><b>Apple Silicon</b><small>M1–M4</small></label>
+              <label class="prof"><input type="radio" name="p"><b>Dahili kart</b><small>Intel, AMD</small></label>
+              <label class="prof"><input type="radio" name="p"><b>İşlemci</b><small>WebGPU yok</small></label>
+            </div>
+            <div class="ptable" aria-label="Profilin ayarladıkları">
+              <div><small>Ayırma modeli</small><b>Kim Vocal 2</b></div>
+              <div><small>Toplu boyut</small><b>1</b></div>
+              <div><small>Parça</small><b>24 sn</b></div>
+              <div><small>Ön tampon / ileri</small><b>20 / 30 sn</b></div>
+            </div>
+          </div>
+          <p class="note">Profil yalnız sayıları değiştirir. Elle seçim otomatik algılamayı geçersiz kılar.</p>
+        </div>
+
+        <div class="grp">
+          <h3>Ekran kartı ve hız</h3>
+          <div class="list">
+            <div class="item wrapctl"><span class="item-text"><label class="item-title" for="gpu">Ekran kartı tercihi</label><span class="item-help">Gelen kart: NVIDIA GeForce RTX 5060 Ti</span></span><span class="item-ctl"><select class="select select-sm" id="gpu"><option>Yüksek performans</option><option>Düşük güç</option></select></span></div>
+            <label class="item"><span class="item-text"><span class="item-title">Tüm videoyu sınırsız hızla hazırla</span><span class="item-help">Kart tam güçte çalışır; fan sesi artabilir.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch"></span></label>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h3>Hız testi</h3>
+          <div class="list">
+            <div class="item stack">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+                <span class="item-text" style="flex:1 1 260px"><span class="item-title">Bu cihazda ayırma, ses ve çeviri hızını ölçer</span><span class="item-help">Ekran kartında 1 dakikadan kısa sürer. Sonuç Tanılama raporuna eklenir.</span></span>
+                <span class="item-ctl"><button type="button" class="btn btn-sm">Sonucu kopyala</button><button type="button" class="btn btn-sm btn-primary">Testi başlat</button></span>
+              </div>
+<pre class="pre scroll" tabindex="0" aria-label="Son test sonucu">LocaDub 1.0.0 · Hız testi · 10.11.2026 21:42
+profil: rtx (otomatik) · NVIDIA GeForce RTX 5060 Ti · Windows
+ayırma  Kim Vocal 2  WebGPU  toplu 1   rtf 0,21  pencere 0,74 sn
+ayırma  Kim Vocal 2  WebGPU  toplu 2   rtf 0,17  pencere 1,31 sn  (TDR sınırı yakın, durdu)
+ayırma  hafif        WebGPU  toplu 1   rtf 0,07
+ses     Ahenk Cep    WASM    4 iş p.   rtf 0,38
+ses     Ahenk Cep    WebGPU            rtf 0,29
+çeviri  OPUS-MT      WASM              41 cümle/sn</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Sözlük -->
+      <section class="sec" id="sozluk" aria-labelledby="h5">
+        <h2 id="h5">Sözlük</h2>
+        <p class="lead">Çeviriyi ve okunuşu kendiniz düzeltin. 6 kural etkin.</p>
+        <div class="pair">
+          <div><label class="lbl" for="g1">Çeviri düzeltmeleri <small>altyazıda ve seste</small></label>
+<textarea class="textarea" id="g1" rows="6" spellcheck="false"># Terimler
+yapay zeka => yapay zekâ
+Elma* => Apple*
+makine öğrenimi => makine öğrenmesi</textarea></div>
+          <div><label class="lbl" for="g2">Okunuşlar <small>yalnız seste</small></label>
+<textarea class="textarea" id="g2" rows="6" spellcheck="false">GPT => ci pi ti
+YouTube => yutub
+NASA => nasa</textarea></div>
+        </div>
+        <p class="muted small" style="margin:12px 4px 0">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Sonuna <code>*</code> koyarsanız ekler korunur. <code>#</code> ile başlayan satır yorumdur.</p>
+      </section>
+
+      <!-- 6. Güncelleme -->
+      <section class="sec" id="guncelleme" aria-labelledby="h6">
+        <h2 id="h6">Güncelleme</h2>
+        <p class="lead">Eklenti klasörden yüklü olduğu için Chrome onu kendisi güncellemez.</p>
+        <div class="banner" style="margin-bottom:16px">
+          <span class="banner-text"><b>LocaDub 1.0.1 hazır.</b> Ayırma geride kalınca otomatik hızlı modele geçiş.</span>
+          <span class="actions"><button type="button" class="btn btn-sm btn-primary">Şimdi güncelle</button></span>
+        </div>
+        <div class="list">
+          <label class="item"><span class="item-text"><span class="item-title">Yeni sürümleri denetle</span><span class="item-help">Günde bir kez sürüm numarasına bakılır. Başka bir şey gönderilmez.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch" checked></span></label>
+          <div class="item wrapctl"><span class="item-text"><span class="item-title">Otomatik güncelleme klasörü</span><span class="item-help" style="font-family:var(--mono);font-size:12px">C:\Users\Ayse\Uygulamalar\LocaDub</span></span><span class="item-ctl"><span class="badge ok">Bağlı</span><button type="button" class="btn btn-sm">Değiştir</button></span></div>
+          <div class="item"><span class="item-text"><span class="item-title">Klasör bağlantısını kaldır</span><span class="item-help">Güncellemeyi elle yaparsınız: ZIP'i indirip klasörün yerine koyun.</span></span><span class="item-ctl"><button type="button" class="btn btn-sm btn-danger">Kaldır</button></span></div>
+        </div>
+        <p class="muted small" style="margin:8px 18px 0">Kurulu sürüm 1.0.0. Yeni sürüm, açık YouTube sekmesi yokken klasöre yazılır ve eklenti yeniden yüklenir.</p>
+      </section>
+
+      <!-- 7. Tanılama -->
+      <section class="sec" id="tanilama" aria-labelledby="h7">
+        <h2 id="h7">Tanılama</h2>
+        <p class="lead">Sorun bildirirken bu bilgiyi ekleyin. Video adresi ve metin içermez.</p>
+        <div class="list">
+          <div class="item"><span class="item-text"><span class="item-title">Tanılama bilgisini kopyala</span><span class="item-help">Sürüm, cihaz profili, modeller, son hatalar ve hız testi.</span></span><span class="item-ctl"><button type="button" class="btn btn-sm btn-primary">Kopyala</button></span></div>
+          <details class="item stack disc">
+            <summary><span class="item-title">Kopyalanacak bilgiyi göster</span><span class="chev" aria-hidden="true"></span></summary>
+<pre class="pre">LocaDub 1.0.0 · Chrome 131 · Windows 11
+profil: rtx (otomatik) · WebGPU: NVIDIA GeForce RTX 5060 Ti
+ses: Ahenk Cep (Doğal, hızlı) · çeviri: OPUS-MT · ayırma: Kim Vocal 2
+modeller: 1,2 GB · önbellek: 12 MB · bellek: 412 MB
+son hata: 21:18 sep.timeout (1 kez)</pre>
+          </details>
+        </div>
+
+        <div class="grp">
+          <h3>Son hatalar</h3>
+          <div class="list">
+            <ul class="errs">
+              <li><time>Bugün 21:18</time><div><b>Ses ayırma zaman aşımı</b><p>Bir parça 8 sn içinde bitmedi; yeniden denendi ve geçti.</p></div></li>
+              <li><time>Bugün 20:02</time><div><b>Altyazı bulunamadı</b><p>Videoda İngilizce altyazı yok; dublaj başlatılmadı.</p></div></li>
+              <li><time>Dün 23:40</time><div><b>Model indirme kesildi</b><p>EMA Lightning, %41'de bağlantı koptu. Kaldığı yerden sürer.</p></div></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="grp">
+          <div class="list">
+            <label class="item"><span class="item-text"><span class="item-title">Test motoru</span><span class="item-help">Geliştirici: sahte çeviri ve bip sesi. Model indirmez.</span></span><span class="item-ctl"><input type="checkbox" class="switch" role="switch"></span></label>
+            <div class="item"><span class="item-text"><span class="item-title">Varsayılana döndür</span><span class="item-help">Ayarlar sıfırlanır; modeller ve sözlük kalır.</span></span><span class="item-ctl"><button type="button" class="btn btn-sm">Sıfırla</button></span></div>
+          </div>
+        </div>
+
+        <div class="about">
+          <div class="links"><a href="#">Gizlilik</a><a href="#">Üçüncü taraf bildirimleri</a><a href="#">Kaynak kod</a><span>LocaDub 1.0.0</span></div>
+          <p>Ahenk Cep sesi ozgurguler'e (CC BY 4.0), EMA Lightning canberkkkkkk'a (Apache-2.0), Supertonic 3 Supertone Inc.'e (OpenRAIL-M) aittir. Ses yapay zekâ ile üretilir.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Yalnız maket: kaydırırken etkin bölümü gezinmede işaretle.
+    const links = [...document.querySelectorAll('.nav a')];
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) {
+        links.forEach((a) => a.setAttribute('aria-current', String(a.hash === '#' + e.target.id)));
+        const cur = links.find((a) => a.hash === '#' + e.target.id);
+        if (cur && innerWidth <= 860) { const ul = cur.closest('ul'); ul.scrollLeft = cur.offsetLeft - 16; }
+      }
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    document.querySelectorAll('.sec').forEach((s) => io.observe(s));
+  </script>
+</body>
+</html>
