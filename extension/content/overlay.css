@@ -119,11 +119,12 @@
 
 .yt-tr-dub-btn[data-state="off"] .yt-tr-dub-pill { color: rgba(255, 255, 255, 0.75); }
 .yt-tr-dub-btn[data-state="preparing"] .yt-tr-dub-spin { display: inline-block; }
-.yt-tr-dub-btn[data-state="preparing"] .yt-tr-dub-badge { border-color: #3ea6ff; color: #3ea6ff; }
-.yt-tr-dub-btn[data-state="active"] .yt-tr-dub-pill { background: rgba(46, 204, 113, 0.22); }
-.yt-tr-dub-btn[data-state="active"] .yt-tr-dub-badge { background: #2ecc71; border-color: #2ecc71; color: #062b14; }
-.yt-tr-dub-btn[data-state="warn"] .yt-tr-dub-badge { border-color: #f2b01e; color: #f2b01e; }
-.yt-tr-dub-btn[data-state="error"] .yt-tr-dub-badge { border-color: #ff4e45; color: #ff4e45; }
+/* durum renkleri oynatıcı paneliyle aynı (content/panel.css: hazırlanıyor mavi, açık yeşil, uyarı kehribar, hata kırmızı) */
+.yt-tr-dub-btn[data-state="preparing"] .yt-tr-dub-badge { border-color: #2997ff; color: #2997ff; }
+.yt-tr-dub-btn[data-state="active"] .yt-tr-dub-pill { background: rgba(48, 209, 88, 0.22); }
+.yt-tr-dub-btn[data-state="active"] .yt-tr-dub-badge { background: #30d158; border-color: #30d158; color: #032a10; }
+.yt-tr-dub-btn[data-state="warn"] .yt-tr-dub-badge { border-color: #ff9f0a; color: #ff9f0a; }
+.yt-tr-dub-btn[data-state="error"] .yt-tr-dub-badge { border-color: #ff453a; color: #ff453a; }
 
 /* Dar oynatıcıda yalnızca rozet (ve dönen gösterge) kalsın. */
 .ytp-small-mode .yt-tr-dub-btn .yt-tr-dub-label { display: none; }
