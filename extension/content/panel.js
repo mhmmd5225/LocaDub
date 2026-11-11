@@ -685,7 +685,8 @@ export class Panel {
   // Tam kip: düğme (başlat/durdur), tek satır ilerleme ("Çeviri 412/493 · Ses 18:20 / 42:10"), kalan süre, not
   _renderFull(f) {
     const on = !!f?.on;
-    this.fullBtn.textContent = on ? 'Durdur' : 'Tüm videoyu hazırla';
+    // bitince düğme "Durdur" demesin: hazırlananlar kalır, basınca yalnız kip kapanır
+    this.fullBtn.textContent = on ? (f.done ? 'Hazır · kipi kapat' : 'Durdur') : 'Tüm videoyu hazırla';
     this.fullBtn.setAttribute('aria-pressed', String(on));
     this.fullBtn.disabled = !f || !f.trTotal;
     this.fullBtn.dataset.on = on ? 'true' : 'false';
