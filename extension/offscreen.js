@@ -6,6 +6,7 @@ import { encodePcmBase64, decodePcmBase64ToInt16 } from './common/pcm.js';
 import { normalizeTone } from './engines/tts/styles.js';
 import { restoreTexts, disposePunct } from './engines/mt/restore-engine.js';
 import { shouldUnload, IDLE_UNLOAD_MS, IDLE_CHECK_MS } from './common/idle.js';
+import { createAudioStore } from './content/audio-store.js';
 
 const PATHS = {
   real: { mt: './engines/mt/index.js', tts: './engines/tts/index.js' },
@@ -23,6 +24,8 @@ function newState() {
 }
 const state = { mt: newState(), tts: newState(), spk: newState() };
 const jobs = new Map(); // tag → Set<AbortController>
+// cümle sesi deposu ("Tüm videoyu hazırla", content/audio-store.js): eklenti kökeninde Cache API
+const audioStore = createAudioStore(caches);
 
 class EngineError extends Error {
   constructor(message, code) { super(message); this.code = code; }
@@ -287,8 +290,23 @@ async function handle(msg) {
       if (!r || !(r.pcm instanceof Float32Array) || !r.sampleRate) {
         throw new EngineError('Seslendirme motoru beklenmeyen sonuç döndürdü.', 'ENGINE_INVALID');
       }
-      return { pcmBase64: encodePcmBase64(r.pcm), sampleRate: r.sampleRate, format: 's16le', samples: r.pcm.length };
+      // tam kip: ses depoya da yazılır; storeOnly ise (oynatmadan uzak cümle) PCM geri gönderilmez
+      let stored = false, storeError = '';
+      const st = msg.store;
+      if (st && st.video && st.hash && Number.isInteger(st.i)) {
+        try { stored = await audioStore.put(String(st.video), st.i, String(st.hash), r.pcm, r.sampleRate); } catch (e) { storeError = e?.message || String(e); }
+      }
+      if (stored && msg.storeOnly) return { stored, sampleRate: r.sampleRate, samples: r.pcm.length };
+      return { pcmBase64: encodePcmBase64(r.pcm), sampleRate: r.sampleRate, format: 's16le', samples: r.pcm.length, ...(st ? { stored, storeError } : {}) };
     }
+    case 'audio.list':
+      return audioStore.list(String(msg.video || ''));
+    case 'audio.get': {
+      const hit = await audioStore.get(String(msg.video || ''), Number(msg.i), String(msg.hash || ''));
+      return hit || { miss: true };
+    }
+    case 'audio.stats':
+      return audioStore.stats();
     case 'spk.embed': {
       const mod = await ensureSpk(settings, { userInitiated: !!msg.userInitiated });
       const i16 = decodePcmBase64ToInt16(String(msg.pcmBase64 || ''));

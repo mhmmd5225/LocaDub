@@ -191,3 +191,15 @@ Her kilometre taşı kendi başına yayınlanabilir; kullanıcı "yükle" demede
 - Arayüz: **sitenin tasarım diline uygun** (`site/index.html`: siyah/beyaz bölümler, SF/Inter, tek mavi vurgu).
 - 0.5.14 ayrıca yayınlanmadı; dalda duruyor, v1 kilometre taşlarıyla birlikte "yükle" denince çıkar.
 - M0 başlatıldı: A0, B0, C1 paralel.
+
+## 10. v1.0.0'da ne var, ne yok (2026-11-11)
+
+**Var:** yeni arayüz (oynatıcı paneli, açılır pencere, ayarlar; `docs/maket/` onaylı tasarım) · "Tüm videoyu hazırla" (çeviri ve sesler baştan sona,
+sesler eklenti kökeninde Cache API'de, yeniden izlemede sentezsiz) · cihaz profili (algılama + seçici; yalnız ayırma kalitesi, ön tampon, önceden hazırlama)
+· genişletilmiş Hız testi · 0.5.14 düzeltmeleri.
+
+**Yok (sonraya):** ses ayırmanın tüm video için önceden hazırlanması (`docs/TAM-VIDEO.md`: ses akışının tamamı alınamıyor) · yakalanan sesi diske yazıp
+ikinci izlemede ayırmayı hazır bulma (A4/A5) · profilde toplu boyut ve GPU hız sınırı (RTX 5060 Ti ve Mac mini M4 Hız testi çıktıları bekleniyor: C3/C4)
+· WebGPU'da seslendirme ölçümü/yolu (C5).
+
+**Cihazda doğrulanmadı:** gerçek YouTube, gerçek ekran kartı, gerçek eklenti klasörüne otomatik güncelleme; hepsi sahte YouTube e2e ve birim testleriyle sınandı.

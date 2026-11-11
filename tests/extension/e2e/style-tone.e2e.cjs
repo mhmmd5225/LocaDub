@@ -69,8 +69,7 @@ const videos = { [VID]: [
     assert.ok(await o.isChecked('input[name="style"][value="lively"]'));
     await o.check('input[name="style"][value="calm"]');
     await o.waitForFunction(() => chrome.storage.local.get('style').then((s) => s.style === 'calm'));
-    // Gelişmiş: perde kaydırıcısı ve kalite
-    await o.click('#toneBlock > summary');
+    // İnce ayar: perde kaydırıcısı ve kalite (bölüm her zaman açık)
     await o.fill('#pitch', '1.5');
     await o.dispatchEvent('#pitch', 'change');
     await o.waitForFunction(() => chrome.storage.local.get('pitch').then((s) => s.pitch === 1.5));

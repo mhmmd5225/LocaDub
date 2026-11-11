@@ -31,7 +31,7 @@ export function pushError(list, { source, message, at = Date.now() }) {
 }
 
 const SETTING_KEYS = ['enabled', 'engineMode', 'mtBackend', 'voice', 'systemVoiceName', 'speakerVoices', 'voice2', 'voice3', 'voice4',
-  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'sepQuality', 'gpuPreference', 'prebufferSec',
+  'speakerCount', 'voiceBlend', 'genderVoices', 'matchVoices', 'favFemale', 'favMale', 'style', 'pitch', 'quality', 'holdStart', 'separation', 'deviceProfile', 'sepQuality', 'gpuPreference', 'prebufferSec',
   'ttsSpeed', 'ttsVolume', 'originalVolume', 'lookaheadSec', 'showSubtitles', 'modelsApproved', 'checkUpdates'];
 
 const iso = (t) => new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -93,6 +93,11 @@ export function memoryLines(sep) {
  *           timings?:{ at:number, line:string }[], separation?:object|null, bench?:string[], benchAt?:number,
  *           now?:number }} d
  */
+/** `profil: rtx (otomatik) · kart: …` */
+export function profileLine(p) {
+  return `profil: ${scrub(String(p.id))} (${p.auto ? 'otomatik' : 'elle'}) · kart: ${scrub(p.adapter || 'yok')}`;
+}
+
 export function buildReport(d) {
   const L = [];
   L.push(`LocaDub ${d.version} · ${d.browser} · ${d.platform}`);
@@ -109,6 +114,7 @@ export function buildReport(d) {
     L.push(one('çeviri', st.mt), one('ses', st.tts));
     L.push(`crossOriginIsolated: ${!!st.crossOriginIsolated} · WebGPU API: ${st.webgpu ? 'var' : 'yok'} · çekirdek: ${st.hardwareConcurrency ?? '?'}`);
   }
+  if (d.profile) L.push(profileLine(d.profile));
   L.push('', '[Ses ayırma]', ...separationLines(d.separation));
   L.push('', '[Bellek]', ...memoryLines(d.separation));
   if (d.bench?.length) L.push('', `[Hız testi${d.benchAt != null ? ` (${iso(d.benchAt)})` : ''}]`, ...d.bench.map((l) => scrub(String(l))));

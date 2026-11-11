@@ -2,6 +2,7 @@
 
 import { DEFAULT_STYLE, DEFAULT_QUALITY, normalizeStyle, normalizePitch, normalizeQuality, normalizeBlend, normalizeTone } from '../engines/tts/styles.js';
 import { normalizeGpuPreference, normalizeSepQuality } from './gpu.js';
+import { normalizeDeviceProfile } from './device-profile.js';
 import { DEFAULT_VOICE, VOICES, voiceById } from '../engines/tts/voices.js';
 
 export const DEFAULTS = Object.freeze({
@@ -35,6 +36,8 @@ export const DEFAULTS = Object.freeze({
   lookaheadSec: 30,        // ileri-bakış penceresi
   separation: 'auto',      // gerçek dublaj: orijinal sesten konuşma ayrılır, yalnız müzik + efekt kalır ('auto' | 'off'; engines/sep)
   gpuPreference: 'high-performance', // WebGPU kartı: 'high-performance' (harici kart) | 'low-power' (dahili); hibrit dizüstü (common/gpu.js)
+  deviceProfile: 'auto',   // cihaz profili: 'auto' | 'rtx' | 'apple' | 'igpu' | 'cpu' (common/device-profile.js). Ayarların ÜZERİNE YAZMAZ:
+                           // yalnız kullanıcı seçiciyi değiştirince ayarlar sayfası profilin değerlerini sepQuality/prebufferSec/lookaheadSec'e yazar
   sepQuality: 'high',      // ses ayırma modeli: 'high' (Kim Vocal 2) | 'fast' (hafif model, ≈ 3–5× hızlı; yavaş GPU/NPU'suz cihazlar için seçenek)
   prebufferSec: 20,        // ayırma için başta en çok bu kadar beklenir (5–60 sn); ayırma yetişmezse video bekletilir
   holdStart: true,         // dublaj başlarken video, ilk cümlenin sesi hazır olana kadar bekletilir (en fazla 25 sn)
@@ -76,6 +79,7 @@ export function normalizeSettings(raw = {}) {
   s.voiceBlend = normalizeBlend(s.voiceBlend);
   s.genderVoices = !!s.genderVoices;
   s.matchVoices = !!s.matchVoices;
+  s.deviceProfile = normalizeDeviceProfile(s.deviceProfile);
   s.sepQuality = normalizeSepQuality(s.sepQuality);
   s.gpuPreference = normalizeGpuPreference(s.gpuPreference);
   s.favFemale = normalizeFavorite(s.favFemale, 'female');

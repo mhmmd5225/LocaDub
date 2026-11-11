@@ -18,8 +18,9 @@ import { VoiceAssigner } from '../common/voice-match.js';
 import { pickTrack, buildJson3Url, mergeTimedTextParams, parseJson3, mergeSentences } from './captions.js';
 import {
   slotSec, chooseSynthSpeed, fitRate, activeIndex, nextDue, lastPlayedAfterSeek, windowIndices, estimateSpeechSec,
-  prepStatus, shouldHold, trBatchSize, HOLD_MAX_MS,
+  prepStatus, shouldHold, trBatchSize, HOLD_MAX_MS, fullIndices, fullProgress, fullEta, ema,
 } from './timing.js';
+import { storeHash } from './audio-store.js';
 import { callMain, sendBg } from './bridge.js';
 import { Overlay, ensureToggleButton } from './overlay.js';
 import { Panel } from './panel.js';
@@ -145,6 +146,11 @@ class Session {
     this._audioKey = audioKey(settings);
     this.btnState = 'preparing';
     this.btnDetail = '';
+    // tam kip ("Tüm videoyu hazırla"): sekmeye ve videoya özel, ayarlara yazılmaz (oturumla biter)
+    this.fullMode = false;
+    // ses deposu (content/audio-store.js, offscreen'de): cümle → kayıt özeti; broken: yazılamadı (neden)
+    this._store = { items: new Map(), listed: false, broken: '' };
+    this._rate = { trMs: null, auMs: null }; // ölçülen cümle başı süre (ms): kalan süre tahmini
   }
 
   // Oynatıcıdaki TR düğmesinin durumu (preparing | active | warn | error).
@@ -193,6 +199,7 @@ class Session {
       return;
     }
     if (!this.alive) return;
+    this._listStored();
     if (this.enginesReady) this.overlay.clearStatus();
     else if (!this.waitingApproval) {
       this._setBtn('preparing', 'motorlar yükleniyor');
@@ -214,12 +221,16 @@ class Session {
 
   // [tanılama] bellek özeti: cümle sesi blob'ları ve süreleri + ayırma paketleri/PCM (SeparatedAudio.memoryInfo)
   memoryInfo() {
-    let blobs = 0, audioSec = 0;
+    let blobs = 0, audioSec = 0, stored = 0, storedSec = 0;
     for (const s of this.sentences) {
       if (s.audio?.url) { blobs++; audioSec += s.audio.duration || 0; }
+      if (s.stored) { stored++; storedSec += s.end - s.start; }
     }
     return {
       sentences: this.sentences.length, blobs, audioSec: Math.round(audioSec * 10) / 10,
+      // ses deposu: diskte hazır cümleler (video süresi) ve tam kip
+      stored, storedSec: Math.round(storedSec), storeItems: this._store.items.size, fullMode: this.fullMode,
+      ...(this._store.broken ? { storeError: this._store.broken } : {}),
       heapMB: Math.round((performance.memory?.usedJSHeapSize || 0) / 1048576) || null,
       longTasks: { n: this.longTasks.n, ms: Math.round(this.longTasks.ms), max: Math.round(this.longTasks.max) },
       ...(this.separation?.memoryInfo?.() || {}),
@@ -585,7 +596,9 @@ class Session {
   async stepTr() {
     const S = this.sentences;
     const t = this.video.currentTime;
-    const needTr = windowIndices(S, t, settings.lookaheadSec, (s) => s.tr == null && !s.trPending);
+    const pred = (s) => s.tr == null && !s.trPending;
+    // tam kipte pencere dolunca video sonuna kadar (önce yakın pencere: oynatmanın yanıt süresi bozulmaz)
+    const needTr = this.fullMode ? fullIndices(S, t, settings.lookaheadSec, pred) : windowIndices(S, t, settings.lookaheadSec, pred);
     if (!needTr.length) return false;
     const batch = needTr.slice(0, trBatchSize(S[needTr[0]], t, { first: !this.firstBatchDone }));
     const gen = this.trGen;
@@ -606,6 +619,7 @@ class Session {
       throw new Error('Çeviri hatası: ' + res.error);
     }
     batch.forEach((i, k) => { S[i].tr = String(res.result[k] ?? '').trim(); });
+    this._rate.trMs = ema(this._rate.trMs, (performance.now() - tReq) / batch.length);
     this.firstBatchDone = true;
     if (this.timing.trReqMs == null) this.timing.trReqMs = Math.round(performance.now() - tReq); // ilk çeviri isteğinin süresi
     this._mark('firstTr');
@@ -613,28 +627,43 @@ class Session {
     return true;
   }
 
-  // Çevirisi hazır, sesi olmayan en yakın cümleyi seslendirir (sistem sesi önceden sentez gerektirmez).
+  // Çevirisi hazır, sesi olmayan en yakın cümleyi seslendirir (sistem sesi önceden sentez gerektirmez). Depoda
+  // kaydı varsa (tam kip ya da önceki açılış) sentez yerine oradan yüklenir. Tam kipte pencere dolunca video sonuna
+  // kadar seslendirip depoya yazar (bellekte yalnız pencere; uzaktaki cümle "diskte hazır" işaretlenir).
   async stepAu() {
+    if (!this._store.listed) return false; // depodaki kayıtlar öğrenilmeden sentez yapılmaz (yeniden açılışta boşa sentez)
     const t = this.video.currentTime;
-    const needAu = windowIndices(this.sentences, t, settings.lookaheadSec, (s) => s.tr && !s.audio && !s.auPending && !s.auFailed);
+    const S = this.sentences;
+    const free = (s) => s.tr && !s.audio && !s.auPending && !s.auFailed;
+    const needAu = windowIndices(S, t, settings.lookaheadSec, free);
     if (needAu.length) {
+      const i = needAu[0];
+      if (this._checkStored(S[i]) && await this._loadStored(i)) return true;
       const tSyn = performance.now();
-      await this.synth(needAu[0]);
+      await this.synth(i, { store: this.fullMode && !this._store.broken });
       if (this.timing.synthMs == null) this.timing.synthMs = Math.round(performance.now() - tSyn); // ilk sentezin süresi
-      if (this.sentences[needAu[0]]?.audio) this.sentences[needAu[0]].dubbed = true; // çubukta işaretli kalsın (bellekten atılsa da)
+      if (this.sentences[i]?.audio) this.sentences[i].dubbed = true; // çubukta işaretli kalsın (bellekten atılsa da)
       this._mark('firstAudio');
       this._prewarmVoices();
       return true;
     }
     this._evict(t);
-    return false;
+    if (!this.fullMode) return false;
+    // tam kip: depo yazılamıyorsa yalnız bellekte tutulabilen aralık (_evict sınırları)
+    const st = !this._store.broken;
+    const far = st
+      // bellekte olup depoda olmayan (tam kipten önce hazırlanmış) cümleler de yazılır: bellekten atılınca yeniden gerekmesin
+      ? fullIndices(S, t, settings.lookaheadSec, (s) => s.tr && !s.auPending && !s.auFailed && !s.noAudio && !this._checkStored(s))
+      : windowIndices(S, t, settings.lookaheadSec + KEEP_AHEAD_EXTRA_SEC, free);
+    if (!far.length) return false;
+    await this.synth(far[0], { store: st, storeOnly: st });
+    return true;
   }
 
-  async synth(i) {
+  // Sentez girdileri: metin, ses, ses kimliği (_voiceKey), ton, hız (depo anahtarı da bunlardan).
+  _synthArgs(i) {
     const S = this.sentences;
     const s = S[i];
-    const gen = this.audioGen;
-    const slot = slotSec(S, i);
     const text = spokenText(s);
     const voice = this.voiceFor(s);
     const key = this._voiceKey(s);
@@ -642,9 +671,27 @@ class Session {
     let tone = toneFor(settings, voice);
     if (m?.pitch && m.voice === voice) tone = { ...tone, pitch: tone.pitch + m.pitch };
     // üslubun hız çarpanı temel hıza katılır (sığdırma hesabı bunu bilir); favori sesin üslubu kendi tonundan
-    const speed = chooseSynthSpeed(text, slot, { base: settings.ttsSpeed * (voice === 'system' ? 1 : styleSpeed(tone.style)) });
+    const speed = chooseSynthSpeed(text, slotSec(S, i), { base: settings.ttsSpeed * (voice === 'system' ? 1 : styleSpeed(tone.style)) });
+    return { text, voice, key, tone, speed };
+  }
+
+  _storeHash(a) {
+    return storeHash({ text: a.text, voiceKey: a.key, audioKey: audioKey(settings), speed: a.speed, tone: a.tone });
+  }
+
+  async synth(i, { store = false, storeOnly = false } = {}) {
+    const S = this.sentences;
+    const s = S[i];
+    const gen = this.audioGen;
+    const a = this._synthArgs(i);
+    const { text, voice, key, tone, speed } = a;
+    const hash = store ? this._storeHash(a) : null;
     s.auPending = true;
-    const res = await sendBg({ type: 'tts.synthesize', text, voice, speed, tone, tag: this.tag });
+    const tSyn = performance.now();
+    const res = await sendBg({
+      type: 'tts.synthesize', text, voice, speed, tone, tag: this.tag,
+      ...(hash ? { store: { video: this.videoId, i, hash }, storeOnly } : {}),
+    });
     s.auPending = false;
     if (!this.alive || gen !== this.audioGen) return;
     // sentez sürerken konuşanın cinsiyeti değiştiyse bu ses atılır, döngü doğru sesle yeniden üretir
@@ -656,14 +703,109 @@ class Session {
       throw new Error('Seslendirme hatası: ' + res.error);
     }
     const r = res.result || {};
+    this._rate.auMs = ema(this._rate.auMs, performance.now() - tSyn);
     console.debug(LOG, `ses ${i}: ${voice}`);
     if (r.system) { s.audio = { system: true, speed, voice, key }; return; }
-    if (!r.pcmBase64) { s.audio = { empty: true, voice, key }; return; }
-    const sr = r.sampleRate || 22050;
-    const i16 = trimSilenceInt16(decodePcmBase64ToInt16(r.pcmBase64), sr);
-    if (!i16.length) { s.audio = { empty: true, voice, key }; return; }
+    if (hash && r.stored) {
+      this._store.items.set(i, hash);
+      s.stored = hash;
+      s.storedMeta = { speed, voice, key };
+      s.dubbed = true;
+    } else if (hash && r.storeError) this._storeFailed(r.storeError);
+    if (r.stored && !r.pcmBase64) return; // yalnız depoya (oynatmadan uzak): bellekte tutulmaz
+    this._setPcm(s, r.pcmBase64, r.sampleRate, { speed, voice, key });
+  }
+
+  // Ham PCM (base64 int16) → çalınacak ses (blob URL); sessizse boş işaretlenir.
+  _setPcm(s, pcmBase64, sampleRate, { speed, voice, key }) {
+    if (s.audio?.url && s.i !== this.playingIdx) URL.revokeObjectURL(s.audio.url);
+    if (!pcmBase64) { s.audio = { empty: true, voice, key }; s.noAudio = true; return; }
+    const sr = sampleRate || 22050;
+    const i16 = trimSilenceInt16(decodePcmBase64ToInt16(pcmBase64), sr);
+    if (!i16.length) { s.audio = { empty: true, voice, key }; s.noAudio = true; return; }
     const url = URL.createObjectURL(new Blob([int16ToWav(i16, sr)], { type: 'audio/wav' }));
     s.audio = { url, duration: i16.length / sr, speed, voice, key };
+  }
+
+  // ---- ses deposu (content/audio-store.js) ----
+
+  // Bu videonun depodaki kayıtları (bir kez; okuma tam kip kapalıyken de denenir).
+  async _listStored() {
+    const st = this._store;
+    if (st.listed || st.listing) return;
+    st.listing = true;
+    try {
+      if (settings.engineMode === 'real' && !settings.modelsApproved) return; // motor yok: offscreen açılmasın
+      const res = await Promise.race([sendBg({ type: 'audio.list', video: this.videoId }), sleep(5000).then(() => null)]);
+      if (!this.alive) return;
+      if (!res) { logError('ses deposu', 'kayıt listesi zaman aşımı'); return; }
+      if (!res.ok) { logError('ses deposu', res.error); return; }
+      const items = Object.entries(res.result?.items || {});
+      for (const [i, h] of items) if (!st.items.has(Number(i))) st.items.set(Number(i), h);
+      if (items.length) console.info(LOG, `${items.length} cümle sesi depoda`);
+    } catch (e) {
+      logError('ses deposu', e);
+    } finally {
+      st.listing = false;
+      st.listed = true;
+      this._wakeUp();
+    }
+  }
+
+  // Cümlenin geçerli (şimdiki ses/ton/çeviriyle aynı anahtarlı) depo kaydı var mı? Varsa "diskte hazır" işaretler.
+  _checkStored(s) {
+    if (s.stored) return true;
+    const h = this._store.items.get(s.i);
+    if (!h || !s.tr) return false;
+    const tag = `${h}|${this.audioGen}`;
+    if (s.storeNo === tag) return false; // bu kayıt bu ayarlarla zaten eşleşmedi
+    const a = this._synthArgs(s.i);
+    if (this._storeHash(a) !== h) { s.storeNo = tag; return false; }
+    s.stored = h;
+    s.storedMeta = { speed: a.speed, voice: a.voice, key: a.key };
+    s.dubbed = true;
+    return true;
+  }
+
+  // Depodaki sesi belleğe yükle (pencereye giren cümle). false: kayıt yok/okunamadı → sentezlenir.
+  async _loadStored(i) {
+    const s = this.sentences[i];
+    const gen = this.audioGen;
+    const hash = s.stored;
+    s.auPending = true;
+    let res;
+    try {
+      res = await sendBg({ type: 'audio.get', video: this.videoId, i, hash });
+    } finally {
+      s.auPending = false;
+    }
+    if (!this.alive || gen !== this.audioGen || s.stored !== hash) return true; // bayatladı: döngü yeniden bakar
+    const r = res.ok ? res.result : null;
+    if (!r || r.miss || r.pcmBase64 == null) {
+      if (!res.ok) logError('ses deposu', res.error);
+      s.stored = null;
+      if (this._store.items.get(i) === hash) this._store.items.delete(i);
+      return false;
+    }
+    this._setPcm(s, r.pcmBase64, r.sampleRate, s.storedMeta || {});
+    return true;
+  }
+
+  _storeFailed(msg) {
+    if (this._store.broken) return;
+    this._store.broken = String(msg || 'yazılamadı');
+    console.warn(LOG, 'ses deposu yazılamadı, sesler yalnız bellekte hazırlanacak:', this._store.broken);
+    logError('ses deposu', this._store.broken);
+  }
+
+  // Tam kip aç/kapat (panelin "Tüm videoyu hazırla" / "Durdur" düğmesi). Kapatınca hazırlananlar silinmez.
+  setFullMode(on) {
+    on = !!on;
+    if (this.fullMode === on) return;
+    this.fullMode = on;
+    console.info(LOG, `tüm video hazırlığı ${on ? 'başladı' : 'durduruldu'}`);
+    this._wakeUp();
+    if (panel && session === this) panel.update({ session: this._panelState() });
   }
 
   // ---- konuşanın cinsiyeti (settings.genderVoices) ----
@@ -961,10 +1103,14 @@ class Session {
   _regender(t) {
     let n = 0;
     for (const s of this.sentences) {
-      if (s.start <= t || s.i === this.playingIdx || !s.audio?.voice) continue;
+      if (s.start <= t || s.i === this.playingIdx) continue;
+      // yalnız diskte hazır cümle: kaydın sesi artık uymuyorsa bırakılır (tam kip yeniden hazırlar)
+      if (s.stored && !s.audio && s.storedMeta?.key !== this._voiceKey(s)) { s.stored = null; n++; continue; }
+      if (!s.audio?.voice) continue;
       if ((s.audio.key ?? s.audio.voice) === this._voiceKey(s)) continue;
       if (s.audio.url) URL.revokeObjectURL(s.audio.url);
       s.audio = null;
+      s.stored = null;
       n++;
     }
     if (n) { console.debug(LOG, `${n} cümle yeni sesle hazırlanacak`); this._wakeUp(); }
@@ -987,6 +1133,9 @@ class Session {
       s.auPending = false;
       s.auFailed = false;
       s.auFail = 0;
+      // depo kayıtları anahtarla eşleşir: yeni ayarla eşleşmeyen eski kayıt kullanılmaz (yenisi üzerine yazılır)
+      s.stored = null;
+      s.noAudio = false;
     }
   }
 
@@ -1145,6 +1294,25 @@ class Session {
       speaker: this.genders.last ? { gender: this.genders.last, hz: this.genders.hz || null } : null,
       hold: h.active ? { sec: (performance.now() - h.since) / 1000, maxSec: HOLD_MAX_MS / 1000, aheadSec: Number.isFinite(sepAhead) ? sepAhead : null } : null,
       separation: this.separation || null,
+      full: this._fullState(sys),
+    };
+  }
+
+  // Tam kip özeti (panel): { on, audio, trDone, trTotal, auSec, totalSec, etaSec, done, note }
+  _fullState(sys) {
+    const needAudio = !sys && !this.ttsBroken;
+    // tam kipte (depo yazılabiliyorsa) yalnız diskteki ses sayılır: bellektekiler atılınca kaybolur
+    const disk = this.fullMode && !this._store.broken;
+    const p = fullProgress(this.sentences, { needAudio, hasAudio: (s) => !!(s.stored || s.noAudio || (!disk && s.audio)) });
+    const etaSec = this.fullMode && !p.done
+      ? fullEta({ trLeft: p.trTotal - p.trDone, auLeft: needAudio ? p.auTotal - p.auDone : 0, trMs: this._rate.trMs, auMs: this._rate.auMs })
+      : null;
+    const note = sys ? 'Sistem sesi önceden üretilmez: yalnız çeviri hazırlanır.'
+      : this.ttsBroken ? 'Ses motoru yok: yalnız çeviri hazırlanır.'
+      : this._store.broken ? 'Sesler diske yazılamadı: yalnız oynatmanın yakınındakiler (bellekte) hazırlanır.' : '';
+    return {
+      on: this.fullMode, audio: needAudio, trDone: p.trDone, trTotal: p.trTotal,
+      auSec: p.auSec, totalSec: p.totalSec, etaSec, done: p.done, note,
     };
   }
 
@@ -1308,6 +1476,8 @@ export async function start() {
     if (keys.length) onSettings(prev, keys);
   });
   window.addEventListener('locadub-set-enabled', (e) => setEnabled(e.detail));
+  // panelin "Tüm videoyu hazırla" düğmesi: yalnız bu sekmenin şimdiki videosu
+  window.addEventListener('locadub-full-mode', (e) => session?.setFullMode(e.detail));
   chrome.runtime.onMessage.addListener((msg, _from, respond) => {
     if (msg?.type === 'engine.progress') session?.onProgress(msg);
     // açılır pencere: bu sekmenin dublaj durumu (sekmeye özel)

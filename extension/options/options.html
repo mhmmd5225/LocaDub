@@ -4,322 +4,377 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LocaDub — Ayarlar</title>
-  <link rel="stylesheet" href="../common/theme.css">
+  <link rel="stylesheet" href="../common/ui/tokens.css">
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <header class="top">
-    <div class="top-row">
-      <div class="brand"><img src="../icons/icon-48.png" alt="" width="26" height="26"> LocaDub</div>
-      <nav class="tabs" role="tablist" aria-label="Ayar menüleri">
-        <button type="button" role="tab" id="tab-indirme" data-tab="indirme" aria-controls="indirme" aria-selected="true" tabindex="0">İndirme</button>
-        <button type="button" role="tab" id="tab-seslendirme" data-tab="seslendirme" aria-controls="seslendirme" aria-selected="false" tabindex="-1">Seslendirme</button>
-        <button type="button" role="tab" id="tab-ai-model" data-tab="ai-model" aria-controls="ai-model" aria-selected="false" tabindex="-1">AI Model</button>
-        <button type="button" role="tab" id="tab-diger" data-tab="diger" aria-controls="diger" aria-selected="false" tabindex="-1">Diğer</button>
+  <div class="shell">
+    <!-- Sol gezinme; dar ekranda üstte yatay şerit -->
+    <aside class="side">
+      <div class="nav-brand">
+        <span class="mark" aria-hidden="true">TR</span>
+        <div><h1>Ayarlar</h1><span id="navVersion">LocaDub</span></div>
+      </div>
+      <nav class="nav" id="nav" aria-label="Ayar bölümleri">
+        <ul>
+          <li><a href="#genel" data-sec="genel" id="nav-genel">Genel</a></li>
+          <li><a href="#sesler" data-sec="sesler" id="nav-sesler">Sesler</a></li>
+          <li><a href="#modeller" data-sec="modeller" id="nav-modeller">Modeller ve indirme</a></li>
+          <li><a href="#ayirma" data-sec="ayirma" id="nav-ayirma">Ses ayırma ve performans</a></li>
+          <li><a href="#sozluk" data-sec="sozluk" id="nav-sozluk">Sözlük</a></li>
+          <li><a href="#guncelleme" data-sec="guncelleme" id="nav-guncelleme">Güncelleme</a></li>
+          <li><a href="#tanilama" data-sec="tanilama" id="nav-tanilama">Tanılama</a></li>
+        </ul>
       </nav>
-      <label class="switch-row" title="Dublaj her sekmede ayrı açılıp kapanır (videodaki TR düğmesi). Bu anahtar yeni açılan YouTube sekmesinin nasıl başlayacağını belirler; açık sekmeleri değiştirmez.">
-        <span id="enabledLabel">Yeni sekmede kapalı</span>
-        <span class="switch">
-          <input type="checkbox" id="enabled">
-          <span class="slider" aria-hidden="true"></span>
-        </span>
-      </label>
-    </div>
-  </header>
+      <p class="nav-foot">Metin ve ses bu bilgisayardan çıkmaz.</p>
+    </aside>
 
-  <!-- Yalnızca motor/model hatası ya da uyarı varken görünür -->
-  <div class="strip" id="statusBar" role="status" hidden>
-    <span class="strip-text" id="status"></span>
-    <a href="#diger" class="strip-link" id="goDiag">Tanılama kopyala</a>
-  </div>
-
-  <main>
-    <!-- İndirme -->
-    <section id="indirme" class="panel" role="tabpanel" aria-labelledby="tab-indirme">
-      <div class="bar">
-        <div class="bar-info">
-          <b>Modeller</b>
-          <span class="muted" id="dlSummary"></span>
-        </div>
-        <div class="bar-act" id="prepareBox" hidden>
-          <span class="note" id="prepareNote" role="status"></span>
-          <button type="button" id="downloadAll">Tümünü indir</button>
-          <button type="button" id="prepareSelected" class="secondary">Seçili modelleri indir</button>
-        </div>
-      </div>
-      <div class="models" id="modelList">
-        <div id="modelRows" class="rows"></div>
-        <div id="punctModels" class="rows"></div>
-      </div>
-      <div class="foot">
-        <button type="button" id="clearAll" class="danger">Tüm modelleri sil</button>
-        <button type="button" id="clearTranscripts" class="secondary" disabled>Çeviri önbelleğini temizle</button>
-        <span class="note" id="storageNote" role="status"></span>
-      </div>
-    </section>
-
-    <!-- Seslendirme -->
-    <section id="seslendirme" class="panel" role="tabpanel" aria-labelledby="tab-seslendirme" hidden>
-      <div class="group">
-        <h2>Ses</h2>
-        <div class="choices" id="voiceChoice" role="radiogroup" aria-label="Ses seçimi"></div>
-        <div class="sysrow" id="presetRow" hidden>
-          <label for="preset">Supertonic sesi</label>
-          <select id="preset"></select>
-          <span id="presetFav"></span>
-          <small class="note" id="presetNote"></small>
-        </div>
-        <div class="sysrow" id="systemVoiceRow" hidden>
-          <label for="systemVoice">Sistem sesi</label>
-          <select id="systemVoice"></select>
-        </div>
-        <p class="note" id="voiceNote"></p>
-        <div class="style-row">
-          <span class="lbl" id="styleLabel">Üslup</span>
-          <div class="seg" id="styleChoice" role="radiogroup" aria-labelledby="styleLabel">
-            <label><input type="radio" name="style" value="natural"><span>Doğal</span></label>
-            <label><input type="radio" name="style" value="lively"><span>Canlı</span></label>
-            <label><input type="radio" name="style" value="calm"><span>Sakin</span></label>
-          </div>
-          <button type="button" class="small secondary" id="preview" title="Seçili ses ve üslupla kısa bir örnek cümle">Dinle</button>
-          <small id="styleNote"></small>
-        </div>
+    <main>
+      <!-- Yalnızca motor/model hatası ya da uyarı varken görünür -->
+      <div class="banner err strip" id="statusBar" role="status" hidden>
+        <span class="banner-text strip-text" id="status"></span>
+        <a href="#tanilama" class="strip-link" id="goDiag">Tanılama kopyala</a>
       </div>
 
-      <div class="group">
-        <h2>Hız ve ses seviyesi</h2>
-        <div class="slider-row">
-          <label for="ttsSpeed">Konuşma hızı</label>
-          <input type="range" id="ttsSpeed" min="0.8" max="2" step="0.05">
-          <output id="ttsSpeedOut" for="ttsSpeed"></output>
-        </div>
-        <div class="slider-row">
-          <label for="ttsVolume">Dublaj ses seviyesi</label>
-          <input type="range" id="ttsVolume" min="0" max="2" step="0.05">
-          <output id="ttsVolumeOut" for="ttsVolume"></output>
-        </div>
-        <div class="slider-row">
-          <label for="originalVolume">Orijinal ses</label>
-          <input type="range" id="originalVolume" min="0" max="1" step="0.05">
-          <output id="originalVolumeOut" for="originalVolume"></output>
-        </div>
-      </div>
-
-      <details class="adv" id="toneBlock">
-        <summary>Gelişmiş</summary>
-        <div class="slider-row">
-          <label for="pitch">Perde <small>yarım ton</small></label>
-          <input type="range" id="pitch" min="-3" max="3" step="0.5">
-          <output id="pitchOut" for="pitch"></output>
-        </div>
-        <div class="style-row">
-          <span class="lbl" id="qualityLabel">Kalite</span>
-          <div class="seg" id="qualityChoice" role="radiogroup" aria-labelledby="qualityLabel">
-            <label><input type="radio" name="quality" value="fast"><span>Hızlı</span></label>
-            <label><input type="radio" name="quality" value="high"><span>Yüksek</span></label>
-          </div>
-          <small id="qualityNote">Yüksek kalite daha yavaş hazırlanır.</small>
-        </div>
-        <div class="slider-row blend" id="blendRow" hidden title="Seçili sese ikinci bir Supertonic sesinin rengi katılır; %0 karıştırmaz.">
-          <span class="lbl-pair"><label for="blendAmount">Ses karıştırma</label>
-            <select id="blendWith" aria-label="Katılacak ses"></select></span>
-          <input type="range" id="blendAmount" min="0" max="0.9" step="0.05">
-          <output id="blendAmountOut" for="blendAmount"></output>
-        </div>
-      </details>
-
-      <details class="adv" id="speakerBlock">
-        <summary>Konuşmacı sesleri</summary>
-        <div class="speakers-head">
-          <label class="check" title="Konuşmacılar sesinden tanınır (yerel, internete bir şey gitmez): aynı kişi hep aynı sesle, kadın konuşurken kadın, erkek konuşurken erkek sesi. Yalnızca Gerçek dublaj (ses ayırma) açıkken çalışır; ayırma yokken tek ses kullanılır.">
-            <input type="checkbox" id="genderVoices">
-            <span>Kadın ve erkek sesini otomatik seç <small>(ses ayırma açıkken)</small></span>
+      <!-- 1. Genel -->
+      <section class="sec" id="genel" aria-labelledby="h-genel">
+        <h2 id="h-genel" tabindex="-1">Genel</h2>
+        <p class="lead">Dublajın nasıl başlayacağı ve ekranda ne görüneceği.</p>
+        <div class="list">
+          <label class="item">
+            <span class="item-text"><span class="item-title" id="enabledLabel">Yeni sekmede kapalı</span><span class="item-help">Yeni açılan YouTube sekmesi böyle başlar. Açık sekmeler oynatıcıdaki TR düğmesiyle açılıp kapanır.</span></span>
+            <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="enabled"></span>
           </label>
-          <label class="check">
-            <input type="checkbox" id="matchVoices">
-            <span>Konuşmacıya benzeyen ses <small>(perdesine en yakın)</small></span>
+          <label class="item">
+            <span class="item-text"><span class="item-title">Türkçe altyazıyı göster</span></span>
+            <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="showSubtitles"></span>
           </label>
-          <small class="note" id="genderNote"></small>
-          <label class="check" title="Sistem sesinde kullanılmaz.">
-            <input type="checkbox" id="speakerVoices">
-            <span id="speakerVoicesLabel">Konuşmacı değişince (&gt;&gt;) başka sesle konuş</span>
+          <label class="item">
+            <span class="item-text"><span class="item-title">İlk cümle hazır olana kadar videoyu beklet</span><span class="item-help">En fazla 25 sn. Oynat'a basarsanız beklemeden devam eder.</span></span>
+            <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="holdStart"></span>
           </label>
-          <span class="count" id="speakerCountRow" hidden>
-            <select id="speakerCount" aria-label="Ses sayısı" title="Altyazı yalnızca konuşmacının değiştiğini söyler, kim olduğunu söylemez: sesler sırayla döner. İki kişilik konuşmada 2 ses doğru eşleşir; 3–4 ses grup videoları içindir.">
-              <option value="2">2 ses</option>
-              <option value="3">3 ses</option>
-              <option value="4">4 ses</option>
-            </select>
-          </span>
-        </div>
-        <div class="trio speakers">
-          <div class="stack" id="voice2Row" hidden>
-            <label for="voice2">İkinci ses</label>
-            <select id="voice2"></select>
-            <small id="voice2Note"></small>
-          </div>
-          <div class="stack" id="voice3Row" hidden>
-            <label for="voice3">Üçüncü ses</label>
-            <select id="voice3"></select>
-            <small id="voice3Note"></small>
-          </div>
-          <div class="stack" id="voice4Row" hidden>
-            <label for="voice4">Dördüncü ses</label>
-            <select id="voice4"></select>
-            <small id="voice4Note"></small>
+          <div class="item wrapctl">
+            <span class="item-text"><label class="item-title" for="lookaheadSec">Önceden hazırlama</label><span class="item-help">Oynatma konumunun ne kadar ilerisi hazır tutulur.</span></span>
+            <span class="item-ctl"><input class="range" type="range" id="lookaheadSec" min="10" max="120" step="5"><output class="val" id="lookaheadSecOut" for="lookaheadSec"></output></span>
           </div>
         </div>
-      </details>
-    </section>
 
-    <!-- AI Model -->
-    <section id="ai-model" class="panel" role="tabpanel" aria-labelledby="tab-ai-model" hidden>
-      <div class="group">
-        <h2>Çeviri motoru</h2>
-        <div class="choices col" id="mtChoice" role="radiogroup" aria-label="Çeviri motoru"></div>
-      </div>
-      <div class="group" id="mixGroup">
-        <h2>Ses ayırma</h2>
-        <div class="opt">
-          <div class="opt-text">
-            <label for="separation" class="opt-title">Gerçek dublaj (ses ayırma)</label>
-            <small id="separationHelp">Orijinal sesten konuşma yapay zekâ ile ayrılır; müzik ve efektler kalır, Türkçe ses üstüne gelir. GPU (WebGPU) ile çalışır; model ilk kullanımda indirilir.</small>
-          </div>
-          <span class="switch">
-            <input type="checkbox" id="separation" aria-describedby="separationHelp">
-            <span class="slider" aria-hidden="true"></span>
-          </span>
+        <div class="grp">
+          <h3 id="mtHead">Çeviri</h3>
+          <div class="list choices-list" id="mtChoice" role="radiogroup" aria-labelledby="mtHead"></div>
         </div>
-        <div class="slider-row" id="prebufferRow">
-          <label for="prebufferSec">Başta önbellek süresi</label>
-          <input type="range" id="prebufferSec" min="5" max="60" step="5" aria-describedby="prebufferHelp">
-          <output id="prebufferSecOut" for="prebufferSec"></output>
-        </div>
-        <small class="hint" id="prebufferHelp">Ses ayırma için video başta en çok bu kadar bekletilebilir; ayırma yetişmezse video kısa süre bekler.</small>
-      </div>
 
-      <div class="group">
-        <h2>Otomatik altyazı</h2>
-        <label class="check">
-          <input type="checkbox" id="fixAsrPunct">
-          <span>Noktalama ve büyük harfi düzelt <small id="punctNote"></small></span>
-        </label>
-      </div>
-    </section>
-
-    <!-- Diğer -->
-    <section id="diger" class="panel" role="tabpanel" aria-labelledby="tab-diger" hidden>
-      <div class="group">
-        <h2>Genel</h2>
-        <div class="trio">
-          <div class="stack">
-            <label class="check">
-              <input type="checkbox" id="showSubtitles">
-              <span>Türkçe altyazıyı göster</span>
-            </label>
-            <label class="check">
-              <input type="checkbox" id="checkUpdates">
-              <span>Yeni sürümleri denetle</span>
+        <div class="grp">
+          <h3>Otomatik altyazı</h3>
+          <div class="list">
+            <label class="item">
+              <span class="item-text"><span class="item-title">Noktalama ve büyük harfi düzelt</span><span class="item-help" id="punctNote"></span></span>
+              <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="fixAsrPunct"></span>
             </label>
           </div>
-          <label class="check" title="Dublaj açılınca video, ilk Türkçe cümle hazır olana kadar (en fazla 25 sn) duraklatılır; baştaki cümleler atlanmaz. Oynat'a basarsanız beklemeden devam eder.">
-            <input type="checkbox" id="holdStart">
-            <span>İlk cümle hazır olana kadar videoyu beklet</span>
-          </label>
-          <div class="slider-row mini">
-            <label for="lookaheadSec">Önceden hazırlama</label>
-            <input type="range" id="lookaheadSec" min="10" max="120" step="5">
-            <output id="lookaheadSecOut" for="lookaheadSec"></output>
+        </div>
+      </section>
+
+      <!-- 2. Sesler -->
+      <section class="sec" id="sesler" aria-labelledby="h-sesler">
+        <h2 id="h-sesler" tabindex="-1">Sesler</h2>
+        <p class="lead">Ana ses, üslup ve konuşmacılara göre ses seçimi.</p>
+        <div class="voices" id="voiceChoice" role="radiogroup" aria-label="Ana ses"></div>
+        <p class="note under" id="voiceNote"></p>
+        <div class="list under" id="voiceExtra">
+          <div class="item wrapctl" id="presetRow" hidden>
+            <span class="item-text"><label class="item-title" for="preset">Supertonic sesi</label><span class="item-help" id="presetNote"></span></span>
+            <span class="item-ctl"><select class="select select-sm" id="preset"></select><span id="presetFav"></span></span>
+          </div>
+          <div class="item wrapctl" id="systemVoiceRow" hidden>
+            <span class="item-text"><label class="item-title" for="systemVoice">Sistem sesi</label></span>
+            <span class="item-ctl"><select class="select select-sm" id="systemVoice"></select></span>
           </div>
         </div>
-      </div>
 
-      <details class="group" id="autoUpdateGroup" title="Eklenti klasörden yüklü olduğu için Chrome onu kendiliğinden güncellemez. Klasörü bir kez seçerseniz yeni sürüm indirilir, bu klasöre yazılır ve eklenti yeniden yüklenir (açık YouTube sekmesi yokken).">
-        <summary><b>Otomatik güncelleme ve ayırma</b> <span class="note" id="autoUpdateNote"></span></summary>
-        <div class="au-row">
-          <span id="autoUpdateStatus"></span>
-          <button type="button" id="autoUpdatePick">Eklenti klasörünü seç</button>
-          <button type="button" id="autoUpdateNow" hidden>Şimdi güncelle</button>
-          <button type="button" id="autoUpdateOff" class="secondary" hidden>Bağlantıyı kaldır</button>
+        <div class="grp">
+          <h3>Söyleyiş</h3>
+          <div class="list">
+            <div class="item wrapctl">
+              <span class="item-text"><span class="item-title" id="styleLabel">Üslup</span><span class="item-help" id="styleNote"></span></span>
+              <span class="item-ctl">
+                <span class="seg" id="styleChoice" role="radiogroup" aria-labelledby="styleLabel">
+                  <label><input type="radio" name="style" value="natural"><span>Doğal</span></label>
+                  <label><input type="radio" name="style" value="lively"><span>Canlı</span></label>
+                  <label><input type="radio" name="style" value="calm"><span>Sakin</span></label>
+                </span>
+                <button type="button" class="btn btn-sm" id="preview" title="Seçili ses ve üslupla kısa bir örnek cümle">Dinle</button>
+              </span>
+            </div>
+            <div class="item wrapctl">
+              <span class="item-text"><label class="item-title" for="ttsSpeed">Konuşma hızı</label></span>
+              <span class="item-ctl"><input class="range" type="range" id="ttsSpeed" min="0.8" max="2" step="0.05"><output class="val" id="ttsSpeedOut" for="ttsSpeed"></output></span>
+            </div>
+            <div class="item wrapctl">
+              <span class="item-text"><label class="item-title" for="ttsVolume">Dublaj ses düzeyi</label></span>
+              <span class="item-ctl"><input class="range" type="range" id="ttsVolume" min="0" max="2" step="0.05"><output class="val" id="ttsVolumeOut" for="ttsVolume"></output></span>
+            </div>
+            <div class="item wrapctl">
+              <span class="item-text"><label class="item-title" for="originalVolume">Orijinal ses</label><span class="item-help">Dublaj konuşurken videonun kendi sesi.</span></span>
+              <span class="item-ctl"><input class="range" type="range" id="originalVolume" min="0" max="1" step="0.05"><output class="val" id="originalVolumeOut" for="originalVolume"></output></span>
+            </div>
+          </div>
         </div>
-        <div class="au-row">
-          <select id="gpuPreference" aria-label="Ekran kartı" title="Hibrit dizüstünde (dahili + harici kart) yüksek performans harici kartı seçer. Hangi kartın geldiği yanda yazar.">
-            <option value="high-performance">Kart: yüksek performans (harici)</option>
-            <option value="low-power">Kart: düşük güç (dahili)</option>
-          </select>
-          <span id="gpuNote" class="note"></span>
-          <select id="sepQuality" aria-label="Ses ayırma kalitesi" title="Yüksek: en temiz ayırma. Hızlı: hafif model, ≈ 3–5× daha hızlı, biraz daha az temiz; ayrı ekran kartı olmayan cihazlar için.">
-            <option value="high">Ayırma: yüksek kalite</option>
-            <option value="fast">Ayırma: hızlı (hafif model)</option>
-          </select>
-        </div>
-      </details>
 
-      <div class="group">
-        <h2>Sözlük <span class="note" id="glossaryNote"></span></h2>
+        <div class="grp" id="toneBlock">
+          <h3>İnce ayar</h3>
+          <div class="list">
+            <div class="item wrapctl">
+              <span class="item-text"><label class="item-title" for="pitch">Perde</label><span class="item-help">Yarım ton.</span></span>
+              <span class="item-ctl"><input class="range" type="range" id="pitch" min="-3" max="3" step="0.5"><output class="val" id="pitchOut" for="pitch"></output></span>
+            </div>
+            <div class="item wrapctl">
+              <span class="item-text"><span class="item-title" id="qualityLabel">Kalite</span><span class="item-help" id="qualityNote">Yüksek kalite daha yavaş hazırlanır.</span></span>
+              <span class="item-ctl">
+                <span class="seg" id="qualityChoice" role="radiogroup" aria-labelledby="qualityLabel">
+                  <label><input type="radio" name="quality" value="fast"><span>Hızlı</span></label>
+                  <label><input type="radio" name="quality" value="high"><span>Yüksek</span></label>
+                </span>
+              </span>
+            </div>
+            <div class="item wrapctl" id="blendRow" hidden>
+              <span class="item-text"><label class="item-title" for="blendAmount">Ses karıştırma</label><span class="item-help">Yalnız Supertonic. İkinci sesin rengi katılır; %0 karıştırmaz.</span></span>
+              <span class="item-ctl blend"><select class="select select-sm" id="blendWith" aria-label="Katılacak ses"></select><input class="range" type="range" id="blendAmount" min="0" max="0.9" step="0.05"><output class="val" id="blendAmountOut" for="blendAmount"></output></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grp" id="speakerBlock">
+          <h3>Konuşmacılar</h3>
+          <div class="list">
+            <label class="item">
+              <span class="item-text"><span class="item-title">Kadın ve erkek sesini otomatik seç</span><span class="item-help">Konuşan sesinden tanınır (yerel). Ses ayırma açıkken çalışır.</span></span>
+              <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="genderVoices"></span>
+            </label>
+            <label class="item">
+              <span class="item-text"><span class="item-title">Konuşmacıya benzeyen ses</span><span class="item-help">Perdesine en yakın indirilmiş Türkçe ses verilir.</span></span>
+              <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="matchVoices"></span>
+            </label>
+            <div class="item wrapctl">
+              <span class="item-text"><label class="item-title" for="speakerVoices" id="speakerVoicesLabel">Konuşmacı değişince (&gt;&gt;) başka sesle konuş</label><span class="item-help">Altyazıdaki &gt;&gt; işaretine göre sesler sırayla döner. Sistem sesinde kullanılmaz.</span></span>
+              <span class="item-ctl">
+                <span class="count" id="speakerCountRow" hidden>
+                  <select class="select select-sm" id="speakerCount" aria-label="Ses sayısı" title="Altyazı yalnızca konuşmacının değiştiğini söyler, kim olduğunu söylemez: sesler sırayla döner. İki kişilik konuşmada 2 ses doğru eşleşir; 3–4 ses grup videoları içindir.">
+                    <option value="2">2 ses</option>
+                    <option value="3">3 ses</option>
+                    <option value="4">4 ses</option>
+                  </select>
+                </span>
+                <input type="checkbox" class="switch" role="switch" id="speakerVoices">
+              </span>
+            </div>
+            <div class="item wrapctl" id="voice2Row" hidden>
+              <span class="item-text"><label class="item-title" for="voice2">İkinci ses</label><span class="item-help" id="voice2Note"></span></span>
+              <span class="item-ctl"><select class="select select-sm" id="voice2"></select></span>
+            </div>
+            <div class="item wrapctl" id="voice3Row" hidden>
+              <span class="item-text"><label class="item-title" for="voice3">Üçüncü ses</label><span class="item-help" id="voice3Note"></span></span>
+              <span class="item-ctl"><select class="select select-sm" id="voice3"></select></span>
+            </div>
+            <div class="item wrapctl" id="voice4Row" hidden>
+              <span class="item-text"><label class="item-title" for="voice4">Dördüncü ses</label><span class="item-help" id="voice4Note"></span></span>
+              <span class="item-ctl"><select class="select select-sm" id="voice4"></select></span>
+            </div>
+          </div>
+          <p class="note grp-note" id="genderNote"></p>
+        </div>
+      </section>
+
+      <!-- 3. Modeller ve indirme -->
+      <section class="sec" id="modeller" aria-labelledby="h-modeller">
+        <h2 id="h-modeller" tabindex="-1">Modeller ve indirme</h2>
+        <p class="lead">Modeller bir kez indirilir, tarayıcıda saklanır; sonra internetsiz çalışır.</p>
+        <div class="card summary">
+          <div class="sum-text">
+            <p class="big num" id="dlSummary"></p>
+            <p class="muted small" id="prepareNote" role="status"></p>
+          </div>
+          <div class="acts" id="prepareBox" hidden>
+            <button type="button" class="btn btn-primary" id="downloadAll">Tümünü indir</button>
+            <button type="button" class="btn" id="prepareSelected">Seçili modelleri indir</button>
+          </div>
+        </div>
+        <div class="grp">
+          <h3>Modeller</h3>
+          <div class="list models" id="modelList">
+            <div id="modelRows" class="rows"></div>
+            <div id="punctModels" class="rows"></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="list">
+            <div class="item wrapctl">
+              <span class="item-text"><span class="item-title">Çeviri önbelleği</span><span class="item-help">Çevrilen videolar saklanır; silinirse yeniden çevrilir.</span></span>
+              <span class="item-ctl"><button type="button" class="btn btn-sm" id="clearTranscripts" disabled>Çeviri önbelleğini temizle</button></span>
+            </div>
+            <div class="item">
+              <span class="item-text"><span class="item-title">Tüm modelleri sil</span><span class="item-help">Dublaj için yeniden indirmek gerekir.</span></span>
+              <span class="item-ctl"><button type="button" class="btn btn-sm btn-danger" id="clearAll" aria-label="Tüm modelleri sil">Sil</button></span>
+            </div>
+          </div>
+          <p class="note grp-note" id="storageNote" role="status"></p>
+        </div>
+      </section>
+
+      <!-- 4. Ses ayırma ve performans -->
+      <section class="sec" id="ayirma" aria-labelledby="h-ayirma">
+        <h2 id="h-ayirma" tabindex="-1">Ses ayırma ve performans</h2>
+        <p class="lead">Konuşmayı müzikten ayırma ve bu cihaza göre hız ayarları.</p>
+        <div class="grp" id="profileGrp">
+          <h3 id="profLabel">Cihaz profili</h3>
+          <div class="list">
+            <div class="profiles" id="deviceProfile" role="radiogroup" aria-labelledby="profLabel">
+              <label class="prof"><input type="radio" name="deviceProfile" value="auto"><b>Otomatik</b><small id="profAutoHint">Algılanıyor…</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="rtx"><b>Ayrı ekran kartı</b><small>NVIDIA, AMD</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="apple"><b>Apple Silicon</b><small>M1–M4</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="igpu"><b>Dahili kart</b><small>Intel</small></label>
+              <label class="prof"><input type="radio" name="deviceProfile" value="cpu"><b>İşlemci</b><small>WebGPU yok</small></label>
+            </div>
+            <div class="ptable" aria-label="Profilin ayarladıkları">
+              <div><small>Ayırma kalitesi</small><b id="profQuality">—</b></div>
+              <div><small>Ön tampon</small><b id="profPrebuffer">—</b></div>
+              <div><small>Önceden hazırlama</small><b id="profLookahead">—</b></div>
+            </div>
+          </div>
+          <p class="note grp-note" id="profNote"></p>
+          <p class="note grp-note">Profil, aşağıdaki ayarların başlangıç değerlerini belirler; her birini ayrıca değiştirebilirsiniz.</p>
+        </div>
+
+        <div class="list" id="mixGroup">
+          <label class="item">
+            <span class="item-text"><span class="item-title">Gerçek dublaj (ses ayırma)</span><span class="item-help" id="separationHelp">Orijinal sesten konuşma ayrılır; müzik ve efektler kalır. Ekran kartı (WebGPU) ile çalışır.</span></span>
+            <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="separation" aria-describedby="separationHelp"></span>
+          </label>
+          <div class="item wrapctl">
+            <span class="item-text"><label class="item-title" for="sepQuality">Ayırma kalitesi</label><span class="item-help">Hızlı: hafif model, 3–5 kat hızlı, biraz daha az temiz.</span></span>
+            <span class="item-ctl"><select class="select select-sm" id="sepQuality">
+              <option value="high">Yüksek kalite</option>
+              <option value="fast">Hızlı (hafif model)</option>
+            </select></span>
+          </div>
+          <div class="item wrapctl" id="prebufferRow">
+            <span class="item-text"><label class="item-title" for="prebufferSec">Başta ön tampon</label><span class="item-help" id="prebufferHelp">Ayırma için video başta en çok bu kadar bekleyebilir.</span></span>
+            <span class="item-ctl"><input class="range" type="range" id="prebufferSec" min="5" max="60" step="5" aria-describedby="prebufferHelp"><output class="val" id="prebufferSecOut" for="prebufferSec"></output></span>
+          </div>
+        </div>
+
+        <div class="grp">
+          <h3>Ekran kartı</h3>
+          <div class="list">
+            <div class="item wrapctl">
+              <span class="item-text"><label class="item-title" for="gpuPreference">Ekran kartı tercihi</label><span class="item-help" id="gpuNote"></span></span>
+              <span class="item-ctl"><select class="select select-sm" id="gpuPreference" title="Hibrit dizüstünde (dahili + harici kart) yüksek performans harici kartı seçer.">
+                <option value="high-performance">Yüksek performans (harici)</option>
+                <option value="low-power">Düşük güç (dahili)</option>
+              </select></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grp" id="benchBlock">
+          <h3>Hız testi</h3>
+          <div class="list">
+            <div class="item stack">
+              <div class="bench-head">
+                <span class="item-text"><span class="item-title">Bu cihazda ayırma, ses ve çeviri hızını ölçer</span><span class="item-help" id="benchHelp">1–3 dakika sürer, ekran kartını yoğun kullanır; ayırma modeli yoksa indirilir. Sonuç Tanılama raporuna eklenir.</span></span>
+                <span class="item-ctl"><button type="button" class="btn btn-sm" id="benchCopy" hidden>Sonucu kopyala</button><button type="button" class="btn btn-sm btn-primary" id="benchRun">Testi başlat</button></span>
+              </div>
+              <p class="note" id="benchNote" role="status"></p>
+              <pre class="pre scroll benchout" id="benchOut" tabindex="0" aria-label="Hız testi sonucu" hidden></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Sözlük -->
+      <section class="sec" id="sozluk" aria-labelledby="h-sozluk">
+        <h2 id="h-sozluk" tabindex="-1">Sözlük</h2>
+        <p class="lead">Çeviriyi ve okunuşu kendiniz düzeltin. <span id="glossaryNote"></span></p>
         <div class="pair">
-          <label class="stack">
-            <span><b>Çeviri düzeltmeleri</b> <small>altyazıda ve seste</small></span>
-            <textarea id="glossaryMt" rows="2" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
-          </label>
-          <label class="stack">
-            <span><b>Okunuşlar</b> <small>yalnızca seste</small></span>
-            <textarea id="glossaryTts" rows="2" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
-          </label>
-        </div>
-        <small class="hint">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Sonuna <code>*</code> koyarsanız sözcüğün ekleri korunur; <code>#</code> ile başlayan satır yorumdur.</small>
-      </div>
-
-      <div class="group">
-        <div class="diagrow">
-          <button type="button" id="copyDiag" class="secondary">Tanılama bilgisini kopyala</button>
-          <span class="note" id="diagNote"></span>
-        </div>
-        <details class="diag">
-          <summary>Kopyalanacak bilgiyi göster</summary>
-          <pre id="diagText"></pre>
-        </details>
-        <details class="diag" id="benchBlock">
-          <summary>Hız testi</summary>
-          <small class="hint" id="benchHelp">Bu cihazda ses ayırma (WebGPU / işlemci, toplu boyutları; WebGPU'da ayrıca hız sınırı ve hafif model), seslendirme ve çeviri hızını ölçer; GPU'da 1–2 dakika, işlemcide 2–3 dakika sürebilir.
-            Ses ayırma modeli indirilmemişse indirilir (67 MB, hafif model 30 MB). Ekran kartını yoğun kullanır; test sırasında bilgisayar kısa süre yavaşlayabilir.
-          Toplu boyutlar küçükten büyüğe denenir ve sürücü sınırına yaklaşılırsa durur; test yarıda kesilirse (sürücü/sekme çökerse) bir sonraki testte o boyut atlanır.
-          Sonuç (cihaz bilgisiyle) Tanılama raporuna da eklenir; paylaşmak için "Sonucu kopyala".</small>
-          <div class="diagrow">
-            <button type="button" id="benchRun">Testi başlat</button>
-            <button type="button" id="benchCopy" hidden>Sonucu kopyala</button>
-            <span class="note" id="benchNote" role="status"></span>
+          <div>
+            <label class="lbl" for="glossaryMt">Çeviri düzeltmeleri <small>altyazıda ve seste</small></label>
+            <textarea class="textarea" id="glossaryMt" rows="6" spellcheck="false" placeholder="yapay zeka => yapay zekâ&#10;Elma* => Apple*"></textarea>
           </div>
-          <pre id="benchOut" class="benchout" hidden></pre>
-        </details>
-      </div>
+          <div>
+            <label class="lbl" for="glossaryTts">Okunuşlar <small>yalnız seste</small></label>
+            <textarea class="textarea" id="glossaryTts" rows="6" spellcheck="false" placeholder="GPT => ci pi ti&#10;YouTube => yutub"></textarea>
+          </div>
+        </div>
+        <p class="muted small grp-note">Her satıra bir kural: <code>kaynak =&gt; hedef</code>. Sonuna <code>*</code> koyarsanız ekler korunur. <code>#</code> ile başlayan satır yorumdur.</p>
+      </section>
 
-      <div class="group" id="mockRow" hidden>
-        <label class="check">
-          <input type="checkbox" id="mock">
-          <span>Test motoru <small>Sahte çeviri ve bip sesi kullanır; model indirmez. Kapatınca gerçek motora dönülür.</small></span>
-        </label>
-      </div>
+      <!-- 6. Güncelleme -->
+      <section class="sec" id="guncelleme" aria-labelledby="h-guncelleme">
+        <h2 id="h-guncelleme" tabindex="-1">Güncelleme</h2>
+        <p class="lead">Eklenti klasörden yüklü olduğu için Chrome onu kendisi güncellemez.</p>
+        <div class="list" id="autoUpdateGroup">
+          <label class="item">
+            <span class="item-text"><span class="item-title">Yeni sürümleri denetle</span><span class="item-help">Yalnız sürüm numarasına bakılır; başka bir şey gönderilmez.</span></span>
+            <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="checkUpdates"></span>
+          </label>
+          <div class="item wrapctl">
+            <span class="item-text"><span class="item-title">Otomatik güncelleme <span class="muted" id="autoUpdateNote"></span></span><span class="item-help" id="autoUpdateStatus"></span></span>
+            <span class="item-ctl">
+              <button type="button" class="btn btn-sm btn-primary" id="autoUpdateNow" hidden>Şimdi güncelle</button>
+              <button type="button" class="btn btn-sm" id="autoUpdatePick">Eklenti klasörünü seç</button>
+              <button type="button" class="btn btn-sm btn-danger" id="autoUpdateOff" hidden>Bağlantıyı kaldır</button>
+            </span>
+          </div>
+        </div>
+        <p class="muted small grp-note">Klasörü bir kez seçerseniz yeni sürüm, açık YouTube sekmesi yokken klasöre yazılır ve eklenti yeniden yüklenir.</p>
+      </section>
 
-      <div class="about">
-        <button type="button" id="resetSettings" class="link">Varsayılana döndür</button>
-        <span class="sep" aria-hidden="true">·</span>
-        <a href="https://localdub.mhmmd.app/gizlilik.html" target="_blank" rel="noopener">Gizlilik</a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a href="../THIRD_PARTY_NOTICES.md" target="_blank">Üçüncü taraf bildirimleri</a>
-        <span class="sep" aria-hidden="true">·</span>
-        <span id="aboutVersion"></span>
-        <small class="credit">Metin ve ses hiçbir sunucuya gönderilmez. Ahenk Cep sesi ozgurguler'e (CC BY 4.0), EMA Lightning canberkkkkkk'a (Apache-2.0), Supertonic 3 Supertone Inc.'e (OpenRAIL-M) aittir; ses yapay zekâ ile üretilir.</small>
-      </div>
-    </section>
-  </main>
+      <!-- 7. Tanılama -->
+      <section class="sec" id="tanilama" aria-labelledby="h-tanilama">
+        <h2 id="h-tanilama" tabindex="-1">Tanılama</h2>
+        <p class="lead">Sorun bildirirken bu bilgiyi ekleyin. Video adresi ve metin içermez.</p>
+        <div class="list">
+          <div class="item wrapctl">
+            <span class="item-text"><span class="item-title">Tanılama bilgisini kopyala</span><span class="item-help">Sürüm, ayarlar, modeller, son hatalar ve hız testi.</span></span>
+            <span class="item-ctl"><span class="note" id="diagNote" role="status"></span><button type="button" class="btn btn-sm btn-primary" id="copyDiag">Kopyala</button></span>
+          </div>
+          <details class="item stack disc diag">
+            <summary><span class="item-title">Kopyalanacak bilgiyi göster</span><span class="chev" aria-hidden="true"></span></summary>
+            <pre class="pre" id="diagText"></pre>
+          </details>
+        </div>
+
+        <div class="grp">
+          <div class="list">
+            <label class="item" id="mockRow" hidden>
+              <span class="item-text"><span class="item-title">Test motoru</span><span class="item-help">Geliştirici: sahte çeviri ve bip sesi. Model indirmez.</span></span>
+              <span class="item-ctl"><input type="checkbox" class="switch" role="switch" id="mock"></span>
+            </label>
+            <div class="item">
+              <span class="item-text"><span class="item-title">Varsayılana döndür</span><span class="item-help">Ayarlar sıfırlanır; modeller ve sözlük kalır.</span></span>
+              <span class="item-ctl"><button type="button" class="btn btn-sm" id="resetSettings">Sıfırla</button></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="about">
+          <div class="links">
+            <a href="https://localdub.mhmmd.app/gizlilik.html" target="_blank" rel="noopener">Gizlilik</a>
+            <a href="../THIRD_PARTY_NOTICES.md" target="_blank">Üçüncü taraf bildirimleri</a>
+            <span id="aboutVersion"></span>
+          </div>
+          <p>Ahenk Cep sesi ozgurguler'e (CC BY 4.0), EMA Lightning canberkkkkkk'a (Apache-2.0), Supertonic 3 Supertone Inc.'e (OpenRAIL-M) aittir. Ses yapay zekâ ile üretilir.</p>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <dialog id="confirm">
     <form method="dialog">
       <p id="confirmText"></p>
-      <div class="buttons end">
-        <button value="no" class="secondary">Vazgeç</button>
-        <button value="yes" id="confirmYes">Tamam</button>
+      <div class="buttons">
+        <button value="no" class="btn">Vazgeç</button>
+        <button value="yes" class="btn btn-primary" id="confirmYes">Tamam</button>
       </div>
     </form>
   </dialog>

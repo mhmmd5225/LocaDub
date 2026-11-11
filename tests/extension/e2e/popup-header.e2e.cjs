@@ -8,17 +8,17 @@ const { launch } = require('./common.cjs');
   try {
     await opt.evaluate(() => chrome.storage.local.set({ update: { latest: { version: '9.9.9', bytes: 8262988 }, checkedAt: Date.now() } }));
     const popup = await ctx.newPage();
-    await popup.setViewportSize({ width: 320, height: 600 });
+    await popup.setViewportSize({ width: 360, height: 600 });
     await popup.goto(`chrome-extension://${id}/popup/popup.html`);
     await popup.waitForTimeout(800);
 
-    // Düzen: seçici anahtarın solunda, çakışma ve yatay taşma yok
+    // Düzen: ses seçici ve dublaj anahtarı görünür, çakışma ve yatay taşma yok (açılır pencere 360 px)
     const v = await popup.locator('#voice').boundingBox();
-    const e = await popup.locator('#enabled').evaluate((el) => el.parentElement.getBoundingClientRect().toJSON());
-    assert.ok(v.x < e.x, `seçici anahtarın soluna gelmeli (${v.x} < ${e.x})`);
-    assert.ok(v.x + v.width <= e.x, 'seçici anahtarla çakışmamalı');
+    const e = await popup.locator('#enabled').boundingBox();
+    assert.ok(v && e, 'seçici ve anahtar görünmeli');
+    assert.ok(v.y + v.height <= e.y || e.y + e.height <= v.y || v.x + v.width <= e.x || e.x + e.width <= v.x, 'seçici anahtarla çakışmamalı');
     assert.equal(await popup.getAttribute('#voice', 'aria-label'), 'Seslendirme');
-    assert.ok(await popup.evaluate(() => document.documentElement.scrollWidth) <= 320, 'yatay taşma var');
+    assert.ok(await popup.evaluate(() => document.documentElement.scrollWidth) <= 360, 'yatay taşma var');
 
     if (process.env.SHOT_DIR) {
       for (const scheme of ['light', 'dark']) {

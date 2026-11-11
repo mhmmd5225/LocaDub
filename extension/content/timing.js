@@ -86,6 +86,48 @@ export function windowIndices(sentences, t, ahead, pred = () => true) {
   return out;
 }
 
+// Tam kip ("Tüm videoyu hazırla") sırası: önce her zamanki pencere (oynatmaya en yakın, [t, t+ahead]), sonra
+// oynatma konumundan video sonuna, en son baştan oynatma konumuna kadar olanlar; pred ile süzülür.
+export function fullIndices(sentences, t, ahead, pred = () => true) {
+  const out = windowIndices(sentences, t, ahead, pred);
+  const near = new Set(out);
+  let hi = Math.max(0, indexAt(sentences, t));
+  while (hi < sentences.length && sentences[hi].start < t + ahead) hi++;
+  for (let i = hi; i < sentences.length; i++) if (pred(sentences[i], i)) out.push(i);
+  for (let i = 0; i < hi; i++) if (!near.has(i) && pred(sentences[i], i)) out.push(i);
+  return out;
+}
+
+/**
+ * Tam kip ilerlemesi. Ses: sesi hazır (bellekte ya da depoda) cümlelerin kapladığı video süresi / toplam altyazılı
+ * süre; boş çeviri ve üretilemeyen ses de "işlendi" sayılır. needAudio false (sistem sesi, ses motoru yok): yalnız çeviri.
+ * → { trDone, trTotal, auDone, auTotal, auSec, totalSec, done }
+ */
+export function fullProgress(sentences, { needAudio = true, hasAudio = (s) => !!s.audio } = {}) {
+  let trDone = 0, auDone = 0, auSec = 0, totalSec = 0;
+  for (const s of sentences) {
+    const d = Math.max(0, s.end - s.start);
+    totalSec += d;
+    if (s.tr != null) trDone++;
+    if (s.tr === '' || (s.tr && (hasAudio(s) || s.auFailed))) { auDone++; auSec += d; }
+  }
+  const trTotal = sentences.length;
+  const done = trTotal > 0 && trDone === trTotal && (!needAudio || auDone === trTotal);
+  return { trDone, trTotal, auDone, auTotal: trTotal, auSec, totalSec, done };
+}
+
+/**
+ * Kaba kalan süre (sn): çeviri ve seslendirme ayrı döngülerde paralel → ikisinin büyüğü. Ölçüm (cümle başı ms)
+ * yoksa ve o iş daha bitmediyse null (tahmin gösterilmez).
+ */
+export function fullEta({ trLeft = 0, auLeft = 0, trMs = null, auMs = null } = {}) {
+  if ((trLeft > 0 && !(trMs > 0)) || (auLeft > 0 && !(auMs > 0))) return null;
+  return Math.max(trLeft > 0 ? trLeft * trMs : 0, auLeft > 0 ? auLeft * auMs : 0) / 1000;
+}
+
+/** Üstel ortalama (ölçüm yoksa ilk değer). */
+export const ema = (prev, v, a = 0.3) => (prev == null ? v : prev + a * (v - prev));
+
 // Sıradaki cümle neyi bekliyor? → null | { phase:'translate'|'synth', done, total }
 // Yalnızca o cümle `soonSec` içinde başlıyorsa (ya da çalıyorsa) bildirilir; pencere sayaçları ilerlemeyi gösterir.
 export function prepStatus(sentences, t, ahead, { needAudio = true, soonSec = 3 } = {}) {

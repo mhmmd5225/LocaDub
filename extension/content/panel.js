@@ -1,12 +1,14 @@
 // LocaDub oynatıcı paneli: TR düğmesinin yanında canlı durum hapı (dublaj, konuşan ses, konuşanın cinsiyeti) ve tıklayınca açılan
-// cam panel (hazırlık adımları, kadın/erkek sesleri, karışım). Saf DOM; ayarları kendisi okur ve yazar.
+// koyu cam panel. Üç bölüm: Durum (tek satır + adımlar), Ses (düzeyler, kadın/erkek sesleri, konuşmacılar), Hazırlık.
+// Saf DOM; ayarları kendisi okur ve yazar.
 //
 // Görünüm modeli (content/app.js besler):
 //   panel.update({ enabled, state, detail })        TR düğmesiyle aynı durum: off | preparing | active | warn | error
 //   panel.update({ session: Session._panelState() | null })
 //     session = { notice:{text,kind}|null, steps:{ captions, mt, tts, cache }: {status,text,pct?},
 //                 speaking:{ idx, voice }|null, level: AudioNode|null, speaker:{ gender, hz }|null,
-//                 hold:{ sec, maxSec, aheadSec? }|null, separation: EventTarget|null }
+//                 hold:{ sec, maxSec, aheadSec? }|null, separation: EventTarget|null,
+//                 full:{ on, audio, trDone, trTotal, auSec, totalSec, etaSec, done, note } }  (tam kip, "Tüm videoyu hazırla")
 //   adım durumu: wait | active | done | warn | error | off
 // Ses ayırma (separation): EventTarget, 'state' olayı detail = { status, backend, model, aheadSec, cachedRanges,
 // progress, rtf, message }; yoksa bölüm "Kapalı" görünür.
@@ -23,7 +25,7 @@ const PREVIEW_TEXT = 'Merhaba! Bu ses size nasıl geldi? Videoları bu sesle Tü
 const SHORT = { 'antalia-mini': 'Antalia Mini', 'ahenk-cep': 'Ahenk Cep', 'ema-lightning': 'EMA Lightning', system: 'Sistem sesi' };
 const GENDER = { female: { sign: '♀', label: 'Kadın' }, male: { sign: '♂', label: 'Erkek' } };
 const STATE_TEXT = { off: 'Dublaj kapalı', preparing: 'Hazırlanıyor', active: 'Dublaj açık', warn: 'Dikkat', error: 'Hata' };
-const STEP_ICON = { done: '✓', warn: '!', error: '✕', off: '–', wait: '', active: '' };
+const DOT = { off: '', preparing: 'prep', active: 'ok', warn: 'warn', error: 'err' };
 const SEP_TEXT = {
   off: 'Kapalı', 'loading-model': 'Model yükleniyor', buffering: 'Arabellek', playing: 'Çalışıyor',
   waiting: 'Ayırma bekleniyor', error: 'Hata',
@@ -38,7 +40,51 @@ const ISOLATE = ['keydown', 'keyup', 'keypress', 'click', 'dblclick', 'mousedown
 const reduceMotion = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const favKey = (g) => (g === 'female' ? 'favFemale' : 'favMale');
 const fmtPitch = (p) => (p > 0 ? `+${p}` : `${p}`);
+// 220 → "3 dk 40 sn", 12 → "12 sn"
+const fmtDur = (sec) => {
+  const t = Math.max(0, Math.floor(sec));
+  if (t < 60) return `${t} sn`;
+  const m = Math.floor(t / 60), r = t % 60;
+  return r ? `${m} dk ${r} sn` : `${m} dk`;
+};
+// 1100 → "18:20", 3725 → "1:02:05"
+const fmtClock = (sec) => {
+  const t = Math.max(0, Math.round(sec)), hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = String(t % 60).padStart(2, '0');
+  return hh ? `${hh}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
+};
+const cap = (t) => (t ? t.charAt(0).toLocaleUpperCase('tr') + t.slice(1) : '');
+// önbellek adımının metninden ("12 sn ileri hazır") oynatmanın önündeki süre
+const cacheAhead = (c) => { const m = /^(\d+)\s*sn/.exec(c?.text || ''); return m ? Number(m[1]) : null; };
+const videoKey = () => location.pathname + (new URLSearchParams(location.search).get('v') || '');
 let uid = 0;
+
+// Küçük SVG simgeleri (dış dosya yok)
+const ICONS = {
+  play: ['0 0 12 12', 'M3 1.5v9l7.5-4.5z', true],
+  stop: ['0 0 12 12', 'M2.5 2.5h7v7h-7z', true],
+  close: ['0 0 14 14', 'm3 3 8 8M11 3l-8 8', false],
+  chev: ['0 0 9 14', 'm1.5 1.5 5.5 5.5-5.5 5.5', false],
+  down: ['0 0 12 8', 'm1.5 1.5 4.5 4.5 4.5-4.5', false],
+};
+function icon(name) {
+  const [vb, d, fill] = ICONS[name];
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', vb);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', `ld-ic ld-ic-${name}`);
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d);
+  if (fill) path.setAttribute('fill', 'currentColor');
+  else { path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.8'); path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round'); }
+  svg.appendChild(path);
+  return svg;
+}
+// Kaydırıcının dolu kısmı (--v)
+const fillRange = (input) => {
+  const min = Number(input.min), max = Number(input.max), v = Number(input.value);
+  input.style.setProperty('--v', `${max > min ? Math.round(((v - min) / (max - min)) * 100) : 0}%`);
+};
 
 /** Kısa ses adı: katalog etiketinden parantez atılır ("Antalia Mini (erkek, hızlı)" → "Antalia Mini"). */
 export function voiceName(id, list = []) {
@@ -62,9 +108,11 @@ function h(tag, props = {}, ...kids) {
   return el;
 }
 
-function toggle(label, onChange, extra = {}) {
+// Anahtar: metin solda, anahtar sağda (maketteki .opt satırı); hint küçük ikinci satır.
+function toggle(label, onChange, extra = {}, hint = '') {
   const input = h('input', { type: 'checkbox', role: 'switch', class: 'ld-switch-input', onchange: (e) => onChange(e.target.checked), ...extra });
-  return { input, el: h('label', { class: 'ld-switch' }, input, h('span', { class: 'ld-switch-track', 'aria-hidden': 'true' }), label ? h('span', { class: 'ld-switch-label', text: label }) : null) };
+  const text = label ? h('span', { class: 'ld-switch-label' }, label, hint ? h('small', { text: hint }) : null) : null;
+  return { input, el: h('label', { class: 'ld-switch' }, text, h('span', { class: 'ld-switch-ctl' }, input, h('span', { class: 'ld-switch-track', 'aria-hidden': 'true' }))) };
 }
 
 const analysers = new WeakMap();
@@ -95,6 +143,10 @@ export class Panel {
     this._raf = 0;
     this._waveRaf = 0;
     this._preview = null;
+    this._gTab = 'female'; // Ses bölümünde düzenlenen cinsiyet (Kadın/Erkek seçici)
+    this._more = false;    // oynarken adımların "Ayrıntı"sı açık mı
+    this._heard = new Map(); // bu videoda duyulan sesler: voice → { n, gender, hz }
+    this._heardKey = '';
     this.id = `ld-panel-${++uid}`;
     player.querySelectorAll(':scope > .' + ROOT_CLASS).forEach((n) => n.remove());
     this._build();
@@ -180,10 +232,14 @@ export class Panel {
 
   _build() {
     const isolate = (el) => { for (const ev of ISOLATE) el.addEventListener(ev, (e) => e.stopPropagation()); };
-    this.root = h('div', { class: `${ROOT_CLASS} ld-theme` });
+    this.root = h('div', {
+      class: ROOT_CLASS,
+      // Esc paneli kapatır (odak hapta ya da paneldeyken)
+      onkeydown: (e) => { if (e.key === 'Escape' && this._open) { e.preventDefault(); this.close(); } },
+    });
     isolate(this.root);
 
-    // hap
+    // hap: TR işareti (durum rengi) + kısa durum metni + ince ilerleme
     this.pillLabel = h('span', { class: 'ld-pill-label' });
     this.pillSpin = h('span', { class: 'ld-spin', 'aria-hidden': 'true' });
     this.waveBars = Array.from({ length: BARS }, () => h('i'));
@@ -192,27 +248,33 @@ export class Panel {
     this.speakerChip = h('span', { class: 'ld-speaker', hidden: true });
     this.pillBar = h('span', { class: 'ld-pill-bar', hidden: true }, h('span'));
     this.pill = h('button', {
-      type: 'button', class: 'ld-pill ld-glass', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', 'aria-controls': this.id,
+      type: 'button', class: 'ld-pill', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', 'aria-controls': this.id,
       onclick: () => (this._open ? this.close() : this.open()),
-    }, h('span', { class: 'ld-logo', 'aria-hidden': 'true', text: 'TR' }), this.pillSpin, this.pillLabel, this.now, this.speakerChip, this.pillBar);
+    }, h('span', { class: 'ld-mark', 'aria-hidden': 'true', text: 'TR' }), this.pillSpin, this.pillLabel, this.now, this.speakerChip, this.pillBar);
     this.live = h('span', { class: 'ld-sr', 'aria-live': 'polite' });
 
-    // panel
+    // başlık: işaret, ad + bu videodaki durum, ana anahtar, kapat
     this.mainSwitch = toggle('', (on) => { resumeAudio(); window.dispatchEvent(new CustomEvent('locadub-set-enabled', { detail: on })); }, { 'aria-label': 'Türkçe dublaj' });
     this.headState = h('span', { class: 'ld-head-state' });
     const head = h('div', { class: 'ld-head' },
-      h('span', { class: 'ld-logo ld-logo-l', 'aria-hidden': 'true', text: 'TR' }),
-      h('div', { class: 'ld-head-text' }, h('strong', { text: 'LocaDub' }), this.headState),
+      h('span', { class: 'ld-mark ld-mark-l', 'aria-hidden': 'true', text: 'TR' }),
+      h('div', { class: 'ld-head-text' }, h('strong', { text: 'Türkçe dublaj' }), this.headState),
       this.mainSwitch.el,
-      h('button', { type: 'button', class: 'ld-icon-btn ld-close', 'aria-label': 'Paneli kapat', title: 'Kapat (Esc)', text: '✕', onclick: () => this.close() }));
+      h('button', { type: 'button', class: 'ld-icon-btn ld-close', 'aria-label': 'Paneli kapat', title: 'Kapat (Esc)', onclick: () => this.close() }, icon('close')));
+
+    const sid = (k) => `${this.id}-${k}`;
+    const section = (key, title, extra, ...kids) => h('section', { class: 'ld-sec', 'data-sec': key, 'aria-labelledby': sid(key) },
+      h('h3', { class: 'ld-sec-title', id: sid(key) }, h('span', { text: title }), extra), ...kids);
+
+    // 1. Durum: tek satır başlık + açıklama; hazırlanırken adımlar, oynarken "Ayrıntı" altında
+    this.statusIcon = h('span', { class: 'ld-status-icon', 'aria-hidden': 'true' });
+    this.statusTitle = h('b', { class: 'ld-status-title' });
+    this.statusSub = h('span', { class: 'ld-status-sub' });
+    const status = h('div', { class: 'ld-status' }, this.statusIcon, h('div', { class: 'ld-status-text' }, this.statusTitle, this.statusSub));
     this.notice = h('div', { class: 'ld-notice', role: 'status', hidden: true });
-
-    this.nowCard = h('div', { class: 'ld-nowcard', hidden: true });
-
-    // a. durum
+    this.holdEl = h('div', { class: 'ld-hold', hidden: true }, h('span', { class: 'ld-hold-text' }), h('span', { class: 'ld-bar' }, h('span')));
     this.stepEls = {};
-    const stepDefs = [['captions', 'Altyazılar'], ['mt', 'Çeviri motoru'], ['tts', 'Ses motoru'], ['sep', 'Ses ayırma'], ['cache', 'Önbellek']];
-    const steps = h('ol', { class: 'ld-steps' }, stepDefs.map(([k, label]) => {
+    const stepLi = ([k, label]) => {
       const icon = h('span', { class: 'ld-step-icon', 'aria-hidden': 'true' });
       const meta = h('span', { class: 'ld-step-meta' });
       const bar = h('span', { class: 'ld-bar', hidden: true }, h('span'));
@@ -220,37 +282,65 @@ export class Panel {
         h('span', { class: 'ld-step-body' }, h('span', { class: 'ld-step-row' }, h('span', { class: 'ld-step-label', text: label }), meta), bar));
       this.stepEls[k] = { li, icon, meta, bar };
       return li;
-    }));
-    this.holdEl = h('div', { class: 'ld-hold', hidden: true }, h('span', { class: 'ld-hold-text' }), h('span', { class: 'ld-bar' }, h('span')));
+    };
+    this.steps = h('ol', { class: 'ld-steps', id: sid('steps') },
+      [['captions', 'Altyazılar'], ['mt', 'Çeviri'], ['tts', 'Ses'], ['sep', 'Ses ayırma']].map(stepLi));
+    this.moreBtn = h('button', {
+      type: 'button', class: 'ld-more', 'aria-expanded': 'false', 'aria-controls': sid('steps'),
+      onclick: () => { this._more = !this._more; this._schedule(); },
+    }, 'Ayrıntı', icon('down'));
 
-    // b. sesler
-    this.genderSwitch = toggle('Otomatik kadın/erkek (ses ayırma açıkken)', (on) => setSettings({ genderVoices: on }));
-    this.rows = { female: this._voiceRow('female'), male: this._voiceRow('male'), main: this._voiceRow('main') };
-    const voices = h('div', { class: 'ld-voices' }, this.rows.female.el, this.rows.male.el, this.rows.main.el);
-
-    // c. karışım
+    // 2. Ses: düzeyler, Kadın/Erkek + ses + Dinle, konuşmacılar
     this.mix = {
-      ttsVolume: this._range('Dublaj sesi', 'ttsVolume', 0, 2, 0.05, (v) => `%${Math.round(v * 100)}`),
-      originalVolume: this._range('Orijinal ses', 'originalVolume', 0, 1, 0.05, (v) => `%${Math.round(v * 100)}`,
+      ttsVolume: this._range('Dublaj sesi', 'Dublaj', '', 'ttsVolume', 0, 2, 0.05, (v) => `%${Math.round(v * 100)}`),
+      originalVolume: this._range('Orijinal ses', 'Orijinal ses', 'konuşurken', 'originalVolume', 0, 1, 0.05, (v) => `%${Math.round(v * 100)}`,
         'Türkçe konuşma sırasında videonun kendi sesi'),
     };
-    this.sepSwitch = toggle('Gerçek dublaj (ses ayırma)', (on) => setSettings({ separation: on ? 'auto' : 'off' }));
+    const tabName = `ld-gtab-${this.id}`;
+    this.gTabs = ['female', 'male'].map((g) => {
+      const input = h('input', { type: 'radio', name: tabName, value: g, onchange: (e) => { if (e.target.checked) { this._gTab = g; this._renderControls(); } } });
+      return { g, input, el: h('label', { class: 'ld-gtab' }, input, h('span', { text: GENDER[g].label })) };
+    });
+    this.gSeg = h('div', { class: 'ld-gseg', role: 'radiogroup', 'aria-label': 'Ana ses' }, this.gTabs.map((t) => t.el));
+    this.genderSwitch = toggle('Otomatik kadın/erkek', (on) => setSettings({ genderVoices: on }), {}, 'ses ayırma açıkken konuşana göre');
+    this.rows = { female: this._voiceRow('female'), male: this._voiceRow('male'), main: this._voiceRow('main') };
+    const voices = h('div', { class: 'ld-voices' }, this.gSeg, this.rows.female.el, this.rows.male.el, this.rows.main.el);
+    this.spkCount = h('span', { class: 'ld-spk-n' });
+    this.spkList = h('ul', { class: 'ld-spk' });
+    this.spkHelp = h('p', { class: 'ld-help' });
+    const speakers = h('div', { class: 'ld-speakers' },
+      h('div', { class: 'ld-spk-h' }, h('span', { text: 'Konuşmacılar' }), this.spkCount), this.spkList, this.spkHelp);
+    this.sepSwitch = toggle('Gerçek dublaj', (on) => setSettings({ separation: on ? 'auto' : 'off' }), {}, 'ses ayırma: müzik ve efektler kalır');
     this.sepSwitch.el.title = 'Orijinal sesten konuşma ayrılır, yalnızca müzik ve efektler kalır';
     this.subSwitch = toggle('Türkçe altyazı', (on) => setSettings({ showSubtitles: on }));
+    const opts = h('div', { class: 'ld-opts' }, this.genderSwitch.el, this.sepSwitch.el, this.subSwitch.el);
 
-    const section = (title, ...kids) => h('section', { class: 'ld-sec' }, h('h3', { class: 'ld-sec-title', text: title }), ...kids);
-    this.body = h('div', { class: 'ld-body' },
-      this.nowCard,
-      section('Durum', steps, this.holdEl),
-      section('Sesler', this.genderSwitch.el, voices),
-      section('Karışım', this.mix.ttsVolume.el, this.mix.originalVolume.el, this.sepSwitch.el, this.subSwitch.el));
+    // 3. Hazırlık: oynatmanın önünde hazır olan süre; "Tüm videoyu hazırla" (tam kip: çeviri ve sesler baştan sona,
+    // ses ayırma oynatmanın önünden gider)
+    const prepRows = h('ol', { class: 'ld-steps ld-prep-rows' }, [['cache', 'Dublaj sesi'], ['sepahead', 'Ses ayırma']].map(stepLi));
+    const noteId = sid('full-note');
+    this.fullBtn = h('button', {
+      type: 'button', class: 'ld-btn ld-wide ld-full-btn', 'aria-describedby': noteId, 'aria-pressed': 'false', text: 'Tüm videoyu hazırla',
+      onclick: () => window.dispatchEvent(new CustomEvent('locadub-full-mode', { detail: !this.vm.session?.full?.on })),
+    });
+    this.fullSum = h('p', { class: 'ld-full-sum', hidden: true });
+    this.fullBar = h('span', { class: 'ld-bar ld-full-bar', hidden: true }, h('span'));
+    this.fullNote = h('p', { class: 'ld-help ld-center ld-full-note', id: noteId, 'aria-live': 'polite' });
+    this.sepNote = h('p', { class: 'ld-help ld-center ld-sep-note', text: 'Ses ayırma oynatırken ilerler.' });
+    const full = h('div', { class: 'ld-full' }, this.fullBtn, this.fullSum, this.fullBar);
+    const note = h('div', {}, this.fullNote, this.sepNote);
+
+    this.secStatus = section('status', 'Durum', null, status, this.notice, this.holdEl, this.moreBtn, this.steps);
+    this.secVoice = section('voice', 'Ses', null, this.mix.ttsVolume.el, this.mix.originalVolume.el, voices, speakers, opts);
+    this.secPrep = section('prep', 'Hazırlık', null, prepRows, full, note);
+    this.body = h('div', { class: 'ld-body' }, this.secStatus, this.secVoice, this.secPrep);
     const foot = h('div', { class: 'ld-foot' },
-      h('button', { type: 'button', class: 'ld-link', text: 'Tüm ayarlar →', onclick: () => sendBg({ type: 'options.open' }) }));
+      h('button', { type: 'button', class: 'ld-link', onclick: () => sendBg({ type: 'options.open' }) }, 'Tüm ayarlar', icon('chev')),
+      h('span', { class: 'ld-foot-hint', text: 'Esc kapatır' }));
 
     this.panel = h('div', {
-      id: this.id, class: 'ld-panel ld-glass', role: 'dialog', 'aria-label': 'LocaDub dublaj paneli', hidden: true, tabindex: '-1',
-      onkeydown: (e) => { if (e.key === 'Escape') { e.preventDefault(); this.close(); } },
-    }, head, this.notice, this.body, foot);
+      id: this.id, class: 'ld-panel', role: 'dialog', 'aria-label': 'LocaDub dublaj paneli', hidden: true, tabindex: '-1',
+    }, head, this.body, foot);
     this.root.append(this.pill, this.panel, this.live);
   }
 
@@ -258,7 +348,10 @@ export class Panel {
     const isMain = kind === 'main';
     const title = isMain ? 'Ses' : GENDER[kind].label;
     const select = h('select', { class: 'ld-select', 'aria-label': `${title} sesi`, onchange: (e) => this._pickVoice(kind, e.target.value) });
-    const play = h('button', { type: 'button', class: 'ld-icon-btn ld-play', 'aria-label': `${title} sesini dinle`, title: 'Dinle', text: '▶', onclick: () => this._previewRow(kind, play) });
+    const play = h('button', {
+      type: 'button', class: 'ld-icon-btn ld-play', 'aria-label': `${title} sesini dinle`, 'data-label': `${title} sesini dinle`, title: 'Dinle',
+      onclick: () => this._previewRow(kind, play),
+    }, icon('play'));
     const name = `ld-style-${this.id}-${kind}`;
     const radios = STYLE_IDS.map((id) => {
       const input = h('input', { type: 'radio', name, value: id, onchange: (e) => { if (e.target.checked) this._setTone(kind, { style: id }); } });
@@ -269,26 +362,28 @@ export class Panel {
     const pitch = h('input', {
       type: 'range', class: 'ld-range', min: String(PITCH_RANGE[0]), max: String(PITCH_RANGE[1]), step: String(PITCH_STEP),
       'aria-label': `${title} perdesi (yarım ton)`,
-      oninput: (e) => { pitchVal.textContent = fmtPitch(Number(e.target.value)); },
+      oninput: (e) => { pitchVal.textContent = fmtPitch(Number(e.target.value)); fillRange(e.target); },
       onchange: (e) => this._setTone(kind, { pitch: Number(e.target.value) }),
     });
     const note = h('div', { class: 'ld-row-note', hidden: true });
-    const sign = isMain ? h('span', { class: 'ld-gsign', 'aria-hidden': 'true', text: '♪' }) : h('span', { class: 'ld-gsign', 'aria-hidden': 'true', text: GENDER[kind].sign });
     const el = h('div', { class: 'ld-vrow', 'data-kind': kind },
-      h('div', { class: 'ld-vrow-top' }, sign, h('span', { class: 'ld-vrow-title', text: title }), select, play),
+      h('div', { class: 'ld-vrow-top' }, isMain ? h('span', { class: 'ld-vrow-title', text: title }) : null, select, play),
       h('div', { class: 'ld-vrow-tone' }, seg, h('label', { class: 'ld-pitch', title: 'Perde (yarım ton)' }, h('span', { class: 'ld-pitch-l', text: 'Perde' }), pitch, pitchVal)),
       note);
     return { el, select, play, radios, pitch, pitchVal, note };
   }
 
-  _range(label, key, min, max, step, fmt, tip) {
+  _range(aria, label, hint, key, min, max, step, fmt, tip) {
     const val = h('output', { class: 'ld-val' });
     const input = h('input', {
-      type: 'range', class: 'ld-range', min: String(min), max: String(max), step: String(step), 'aria-label': label,
-      oninput: (e) => { val.textContent = fmt(Number(e.target.value)); },
+      type: 'range', class: 'ld-range', min: String(min), max: String(max), step: String(step), 'aria-label': aria,
+      oninput: (e) => { val.textContent = fmt(Number(e.target.value)); fillRange(e.target); },
       onchange: (e) => setSettings({ [key]: Number(e.target.value) }),
     });
-    return { input, val, fmt, el: h('label', { class: 'ld-mixrow', title: tip }, h('span', { class: 'ld-mix-l', text: label }), input, val) };
+    return {
+      input, val, fmt,
+      el: h('label', { class: 'ld-mixrow', title: tip }, h('span', { class: 'ld-mix-l' }, label, hint ? h('small', { text: hint }) : null), input, val),
+    };
   }
 
   // ---- ses listesi ----
@@ -378,7 +473,7 @@ export class Panel {
       const audio = new Audio(url);
       audio.volume = Math.min(1, s.ttsVolume);
       this._preview = { audio, url, btn };
-      btn.textContent = '■';
+      btn.replaceChildren(icon('stop'));
       btn.setAttribute('aria-label', 'Örneği durdur');
       audio.onended = () => this._stopPreview();
       await audio.play();
@@ -397,8 +492,8 @@ export class Panel {
     if (!p) return;
     p.audio.pause();
     URL.revokeObjectURL(p.url);
-    p.btn.textContent = '▶';
-    p.btn.setAttribute('aria-label', 'Sesi dinle');
+    p.btn.replaceChildren(icon('play'));
+    p.btn.setAttribute('aria-label', p.btn.dataset.label || 'Sesi dinle');
   }
 
   _say(text) { this.live.textContent = text; }
@@ -413,14 +508,18 @@ export class Panel {
     this.genderSwitch.input.checked = s.genderVoices && !sys;
     this.genderSwitch.input.disabled = sys;
     const auto = s.genderVoices && s.separation !== 'off' && !sys; // ayırma kapalıyken tek ses
-    this.rows.female.el.hidden = !auto;
-    this.rows.male.el.hidden = !auto;
+    // otomatikte Kadın/Erkek seçici hangi satırın düzenlendiğini belirler; değilse tek ses satırı
+    this.gSeg.hidden = !auto;
+    for (const t of this.gTabs) t.input.checked = t.g === this._gTab;
+    this.rows.female.el.hidden = !auto || this._gTab !== 'female';
+    this.rows.male.el.hidden = !auto || this._gTab !== 'male';
     this.rows.main.el.hidden = auto;
     for (const kind of auto ? ['female', 'male'] : ['main']) this._renderRow(kind);
     for (const [k, r] of Object.entries(this.mix)) {
       if (document.activeElement === r.input) continue;
       r.input.value = String(s[k]);
       r.val.textContent = r.fmt(s[k]);
+      fillRange(r.input);
     }
     this.sepSwitch.input.checked = s.separation !== 'off';
     this.subSwitch.input.checked = s.showSubtitles;
@@ -454,6 +553,7 @@ export class Panel {
     if (document.activeElement !== r.pitch) {
       r.pitch.value = String(cur.pitch);
       r.pitchVal.textContent = fmtPitch(cur.pitch);
+      fillRange(r.pitch);
     }
     r.pitch.disabled = !!cur.system;
     const missing = !mock && def && def.cached === false && cur.voice !== 'system';
@@ -537,6 +637,7 @@ export class Panel {
       this.speakerChip.title = tip;
       this.speakerChip.setAttribute('aria-label', tip);
     }
+    this._track(sp, vg, spk);
 
     // hap metni
     let label = STATE_TEXT[st];
@@ -550,16 +651,25 @@ export class Panel {
     const pTitle = sp ? `Şu an konuşan: ${name}${vg ? ` (${GENDER[vg].label.toLocaleLowerCase('tr')})` : ''}` : label;
     this.pill.title = `${pTitle} — panel için tıklayın`;
     this.pill.setAttribute('aria-label', `LocaDub: ${pTitle}. Paneli ${this._open ? 'kapat' : 'aç'}`);
-    const holdPct = catchUp ? catchUp.pct : hold ? this._holdPct(hold) : 0;
-    this.pillBar.hidden = !hold && !catchUp;
+    // ince ilerleme: yalnız gerçek bir oran varsa (bekletme, ayırma yetişmesi, model indirme)
+    const dl = st === 'preparing' ? this._downloadPct() : null;
+    const holdPct = catchUp ? catchUp.pct : hold ? this._holdPct(hold) : dl ?? 0;
+    this.pillBar.hidden = !hold && !catchUp && dl == null;
     this.pillBar.firstChild.style.width = `${Math.round(holdPct * 100)}%`;
 
     if (!this._open) return;
-    this.headState.textContent = sp ? `Konuşuyor · ${name}` : catchUp ? label : (enabled ? STATE_TEXT[st] + (detail && st !== 'active' ? ` · ${detail}` : '') : STATE_TEXT.off);
+    this.headState.textContent = enabled ? 'Bu videoda açık' : 'Bu videoda kapalı';
+    this.secVoice.hidden = !enabled;
+    this.secPrep.hidden = !enabled;
+    this._renderStatus(st, detail, S, catchUp, hold);
     this.notice.hidden = !notice;
     if (notice) { this.notice.textContent = notice.text; this.notice.dataset.kind = notice.kind || 'info'; }
-    this._renderNowCard(sp, name, vg, spk);
     this._renderSteps(S);
+    // adımlar: hazırlanırken / uyarıda görünür, oynarken "Ayrıntı" altında
+    const forced = st !== 'active' || !!catchUp || !!hold;
+    this.moreBtn.hidden = !enabled || forced;
+    this.moreBtn.setAttribute('aria-expanded', String(this._more));
+    this.steps.hidden = !enabled || !(forced || this._more);
     this.holdEl.hidden = !hold;
     if (hold) {
       const ahead = hold.aheadSec != null ? ` · ${Math.floor(hold.aheadSec)}/${this.settings?.prebufferSec ?? 20} sn hazır` : '';
@@ -568,6 +678,107 @@ export class Panel {
         : `Video bekletiliyor: ${Math.ceil(hold.sec)} sn (en çok ${Math.round(hold.maxSec)} sn)${ahead}`;
       this.holdEl.lastChild.firstChild.style.width = `${Math.round(holdPct * 100)}%`;
     }
+    this._renderSpeakers(sp);
+    this._renderFull(S?.full || null);
+  }
+
+  // Tam kip: düğme (başlat/durdur), tek satır ilerleme ("Çeviri 412/493 · Ses 18:20 / 42:10"), kalan süre, not
+  _renderFull(f) {
+    const on = !!f?.on;
+    // bitince düğme "Durdur" demesin: hazırlananlar kalır, basınca yalnız kip kapanır
+    this.fullBtn.textContent = on ? (f.done ? 'Hazır · kipi kapat' : 'Durdur') : 'Tüm videoyu hazırla';
+    this.fullBtn.setAttribute('aria-pressed', String(on));
+    this.fullBtn.disabled = !f || !f.trTotal;
+    this.fullBtn.dataset.on = on ? 'true' : 'false';
+    const show = !!f && f.trTotal > 0 && (on || f.done);
+    this.fullSum.hidden = !show;
+    if (show) {
+      let text;
+      if (f.done) text = f.audio ? 'Video hazır: çeviri ve sesler tamam' : 'Video hazır: çeviri tamam';
+      else {
+        text = `Çeviri ${f.trDone}/${f.trTotal}` + (f.audio ? ` · Ses ${fmtClock(f.auSec)} / ${fmtClock(f.totalSec)}` : '');
+        if (Number.isFinite(f.etaSec) && f.etaSec > 0) text += ` · ≈ ${fmtDur(Math.max(1, f.etaSec))} kaldı`;
+      }
+      this.fullSum.textContent = text;
+      this.fullSum.dataset.done = f.done ? 'true' : 'false';
+    }
+    const bar = show && !f.done;
+    this.fullBar.hidden = !bar;
+    if (bar) {
+      const tr = f.trDone / f.trTotal;
+      const pct = f.audio && f.totalSec > 0 ? (tr + f.auSec / f.totalSec) / 2 : tr;
+      this.fullBar.firstChild.style.width = `${Math.round(Math.min(1, pct) * 100)}%`;
+    }
+    const note = f?.note || (show ? '' : 'Çeviri ve sesleri baştan sona hazırlar.');
+    this.fullNote.textContent = note;
+    this.fullNote.hidden = !note;
+    this.sepNote.hidden = this.settings?.separation === 'off';
+  }
+
+  // Durum satırı: simge (nokta / dönen), başlık, açıklama
+  _renderStatus(st, detail, S, catchUp, hold) {
+    let kind = DOT[st], title = STATE_TEXT[st], sub = '';
+    if (st === 'off') sub = 'Videonun kendi sesi çalıyor. Açmak için yukarıdaki anahtar.';
+    else if (catchUp) {
+      kind = 'warn';
+      title = 'Ses ayırma geride kalıyor';
+      sub = 'Bu cihazda ayırma oynatmadan yavaş. Video kısa aralarla bekleyebilir.';
+    } else if (st === 'preparing') sub = detail ? `${cap(detail)}.` : 'İlk Türkçe cümle hazırlanıyor.';
+    else if (st === 'warn' || st === 'error') sub = detail ? `${cap(detail)}.` : '';
+    else if (st === 'active') {
+      const ahead = cacheAhead(S?.steps?.cache);
+      sub = ahead > 0 ? `Oynatmanın önünde ${fmtDur(ahead)} hazır.` : 'Sıradaki cümle hazırlanıyor.';
+    }
+    if (hold && !catchUp) title = 'Video bekletiliyor';
+    const spin = (st === 'preparing' && !catchUp) || (!!hold && !catchUp);
+    this.statusIcon.className = `ld-status-icon ${spin ? 'ld-spinner' : `ld-dot ${kind}`}`;
+    this.statusTitle.textContent = title;
+    this.statusSub.textContent = sub;
+    this.statusSub.hidden = !sub;
+  }
+
+  // Model indirme oranı (çeviri/ses modeli indiriliyorsa), yoksa null
+  _downloadPct() {
+    const ps = ['mt', 'tts'].map((k) => this.progress[k]).filter((p) => p && p.total && !p.cached);
+    if (!ps.length) return null;
+    const loaded = ps.reduce((a, p) => a + p.loaded, 0), total = ps.reduce((a, p) => a + p.total, 0);
+    return Math.min(1, Math.max(0, loaded / total));
+  }
+
+  // Bu videoda duyulan sesler (konuşmacılar): sırayla numaralanır; ölçülen konuşanın cinsiyeti/perdesi eklenir.
+  _track(sp, vg, spk) {
+    const key = videoKey();
+    if (key !== this._heardKey || !this.vm.enabled) { this._heard.clear(); this._heardKey = key; }
+    if (!sp) return;
+    let e = this._heard.get(sp.voice);
+    if (!e) { e = { n: this._heard.size + 1, gender: null, hz: null }; this._heard.set(sp.voice, e); }
+    // cinsiyet sesin kendisinden; ölçülen perde yalnız cinsiyet tutuyorsa (ölçüm bir önceki cümleye ait olabilir)
+    e.gender = vg || e.gender || spk?.gender || null;
+    if (spk?.hz && (!e.gender || spk.gender === e.gender)) e.hz = spk.hz;
+  }
+
+  _renderSpeakers(sp) {
+    const list = [...this._heard.entries()];
+    this.spkCount.textContent = list.length ? `${list.length} ses` : '';
+    const sig = list.map(([v, e]) => `${v}:${e.gender}:${e.hz}`).join('|') + `#${sp?.voice || ''}`;
+    if (this.spkList.dataset.sig !== sig) {
+      this.spkList.dataset.sig = sig;
+      this.spkList.replaceChildren(...list.slice(-6).map(([voice, e]) => {
+        const now = sp?.voice === voice;
+        return h('li', { class: now ? 'ld-spk-now' : null, 'data-voice': voice },
+          h('span', { class: 'ld-av', 'aria-hidden': 'true', text: String(e.n) }),
+          h('span', { class: 'ld-who' }, e.gender ? GENDER[e.gender].label : 'Konuşmacı', e.hz ? h('small', { text: `${e.hz} Hz` }) : null),
+          h('span', { class: 'ld-to' },
+            now ? h('span', { class: 'ld-mini-wave', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')) : null,
+            h('span', { class: 'ld-to-name', text: voiceName(voice, this.voices) }),
+            now ? h('span', { class: 'ld-sr', text: ' (şu an konuşuyor)' }) : null));
+      }));
+    }
+    this.spkList.hidden = !list.length;
+    this.spkHelp.hidden = !!list.length;
+    this.spkHelp.textContent = this.settings?.separation === 'off' || !this.settings?.genderVoices
+      ? 'Konuşan sesler oynatma başlayınca burada görünür.'
+      : 'Konuşmacılar ses ayırma başlayınca tanınır.';
   }
 
   // Ayırma dublajın gerisinde mi: 'waiting' ya da video bekletilirken 'buffering'. { etaSec, pct, aheadSec, needSec } | null
@@ -585,32 +796,12 @@ export class Panel {
     return Math.min(1, hold.sec / (hold.maxSec || 25));
   }
 
-  _renderNowCard(sp, name, vg, spk) {
-    const c = this.nowCard;
-    c.hidden = !this.vm.enabled;
-    if (c.hidden) return;
-    const sig = `${sp?.voice || ''}|${vg}|${spk?.gender || ''}|${spk?.hz || ''}`;
-    if (c.dataset.sig === sig) return;
-    c.dataset.sig = sig;
-    const gtxt = vg ? GENDER[vg].label : '';
-    c.dataset.gender = vg || '';
-    c.replaceChildren(...[
-      h('span', { class: 'ld-nowcard-dot', 'aria-hidden': 'true' }),
-      h('span', { class: 'ld-nowcard-text' },
-        h('span', { class: 'ld-nowcard-k', text: sp ? 'Şu an konuşan' : 'Sessiz' }),
-        h('span', { class: 'ld-nowcard-v', text: sp ? `${name}${gtxt ? ` · ${gtxt}` : ''}` : 'Sıradaki cümle bekleniyor' })),
-      spk ? h('span', { class: 'ld-nowcard-spk', 'data-gender': spk.gender, title: 'Videodan ölçülen konuşan' },
-        `${GENDER[spk.gender].sign} ${spk.hz ? `${spk.hz} Hz` : GENDER[spk.gender].label}`) : null,
-    ].filter(Boolean));
-  }
-
   _renderSteps(S) {
     const steps = S?.steps || {};
     const pct = (p) => (p && p.total ? p.loaded / p.total : null);
     const set = (k, { status = 'wait', text = '', bar = null } = {}) => {
       const e = this.stepEls[k];
       e.li.dataset.status = status;
-      e.icon.textContent = STEP_ICON[status] ?? '';
       e.meta.textContent = text;
       e.bar.hidden = bar == null;
       if (bar != null) e.bar.firstChild.style.width = `${Math.round(Math.min(1, Math.max(0, bar)) * 100)}%`;
@@ -627,8 +818,22 @@ export class Panel {
       set(k, f != null && !p.cached ? { status: 'active', text: `indiriliyor %${Math.floor(f * 100)}`, bar: f } : base);
     }
     set('sep', this._sepStep());
+    // Hazırlık: oynatmanın önünde hazır dublaj sesi ve ayrılmış ses
     const c = steps.cache || { status: 'wait', text: '—' };
-    set('cache', { ...c, bar: c.pct ?? null });
+    const n = cacheAhead(c);
+    set('cache', { ...c, text: n != null ? `oynatmanın önünde ${fmtDur(n)} hazır` : c.text, bar: c.pct ?? null });
+    set('sepahead', this._sepAhead());
+  }
+
+  // Ses ayırmanın oynatmanın önünde hazır olan süresi (tüm video için önceden ayırma yok)
+  _sepAhead() {
+    const d = this.sep;
+    if (this.settings?.separation === 'off' || !this._sepTarget || !d?.status || d.status === 'off') return { status: 'off', text: 'Kapalı' };
+    const status = SEP_STATUS[d.status] || 'wait';
+    if (d.status === 'error') return { status, text: 'Hata' };
+    if (!Number.isFinite(d.aheadSec)) return { status, text: SEP_TEXT[d.status] || d.status };
+    const need = Number.isFinite(d.needSec) && d.needSec > 0 ? d.needSec : this.settings?.prebufferSec || 20;
+    return { status: status === 'done' ? 'done' : status, text: `oynatmanın önünde ${fmtDur(d.aheadSec)} hazır`, bar: Math.min(1, d.aheadSec / need) };
   }
 
   _sepStep() {
