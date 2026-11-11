@@ -7,7 +7,8 @@
 //   panel.update({ session: Session._panelState() | null })
 //     session = { notice:{text,kind}|null, steps:{ captions, mt, tts, cache }: {status,text,pct?},
 //                 speaking:{ idx, voice }|null, level: AudioNode|null, speaker:{ gender, hz }|null,
-//                 hold:{ sec, maxSec, aheadSec? }|null, separation: EventTarget|null }
+//                 hold:{ sec, maxSec, aheadSec? }|null, separation: EventTarget|null,
+//                 full:{ on, audio, trDone, trTotal, auSec, totalSec, etaSec, done, note } }  (tam kip, "Tüm videoyu hazırla")
 //   adım durumu: wait | active | done | warn | error | off
 // Ses ayırma (separation): EventTarget, 'state' olayı detail = { status, backend, model, aheadSec, cachedRanges,
 // progress, rtf, message }; yoksa bölüm "Kapalı" görünür.
@@ -45,6 +46,11 @@ const fmtDur = (sec) => {
   if (t < 60) return `${t} sn`;
   const m = Math.floor(t / 60), r = t % 60;
   return r ? `${m} dk ${r} sn` : `${m} dk`;
+};
+// 1100 → "18:20", 3725 → "1:02:05"
+const fmtClock = (sec) => {
+  const t = Math.max(0, Math.round(sec)), hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = String(t % 60).padStart(2, '0');
+  return hh ? `${hh}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
 };
 const cap = (t) => (t ? t.charAt(0).toLocaleUpperCase('tr') + t.slice(1) : '');
 // önbellek adımının metninden ("12 sn ileri hazır") oynatmanın önündeki süre
@@ -309,11 +315,20 @@ export class Panel {
     this.subSwitch = toggle('Türkçe altyazı', (on) => setSettings({ showSubtitles: on }));
     const opts = h('div', { class: 'ld-opts' }, this.genderSwitch.el, this.sepSwitch.el, this.subSwitch.el);
 
-    // 3. Hazırlık: oynatmanın önünde hazır olan süre; tüm video için hazırlık yakında
+    // 3. Hazırlık: oynatmanın önünde hazır olan süre; "Tüm videoyu hazırla" (tam kip: çeviri ve sesler baştan sona,
+    // ses ayırma oynatmanın önünden gider)
     const prepRows = h('ol', { class: 'ld-steps ld-prep-rows' }, [['cache', 'Dublaj sesi'], ['sepahead', 'Ses ayırma']].map(stepLi));
     const noteId = sid('full-note');
-    const full = h('button', { type: 'button', class: 'ld-btn ld-wide', disabled: true, 'aria-disabled': 'true', 'aria-describedby': noteId, text: 'Tüm videoyu hazırla' });
-    const note = h('p', { class: 'ld-help ld-center', id: noteId, text: 'Yakında: çeviri ve sesleri baştan sona hazırlar' });
+    this.fullBtn = h('button', {
+      type: 'button', class: 'ld-btn ld-wide ld-full-btn', 'aria-describedby': noteId, 'aria-pressed': 'false', text: 'Tüm videoyu hazırla',
+      onclick: () => window.dispatchEvent(new CustomEvent('locadub-full-mode', { detail: !this.vm.session?.full?.on })),
+    });
+    this.fullSum = h('p', { class: 'ld-full-sum', hidden: true });
+    this.fullBar = h('span', { class: 'ld-bar ld-full-bar', hidden: true }, h('span'));
+    this.fullNote = h('p', { class: 'ld-help ld-center ld-full-note', id: noteId, 'aria-live': 'polite' });
+    this.sepNote = h('p', { class: 'ld-help ld-center ld-sep-note', text: 'Ses ayırma oynatırken ilerler.' });
+    const full = h('div', { class: 'ld-full' }, this.fullBtn, this.fullSum, this.fullBar);
+    const note = h('div', {}, this.fullNote, this.sepNote);
 
     this.secStatus = section('status', 'Durum', null, status, this.notice, this.holdEl, this.moreBtn, this.steps);
     this.secVoice = section('voice', 'Ses', null, this.mix.ttsVolume.el, this.mix.originalVolume.el, voices, speakers, opts);
@@ -664,6 +679,39 @@ export class Panel {
       this.holdEl.lastChild.firstChild.style.width = `${Math.round(holdPct * 100)}%`;
     }
     this._renderSpeakers(sp);
+    this._renderFull(S?.full || null);
+  }
+
+  // Tam kip: düğme (başlat/durdur), tek satır ilerleme ("Çeviri 412/493 · Ses 18:20 / 42:10"), kalan süre, not
+  _renderFull(f) {
+    const on = !!f?.on;
+    this.fullBtn.textContent = on ? 'Durdur' : 'Tüm videoyu hazırla';
+    this.fullBtn.setAttribute('aria-pressed', String(on));
+    this.fullBtn.disabled = !f || !f.trTotal;
+    this.fullBtn.dataset.on = on ? 'true' : 'false';
+    const show = !!f && f.trTotal > 0 && (on || f.done);
+    this.fullSum.hidden = !show;
+    if (show) {
+      let text;
+      if (f.done) text = f.audio ? 'Video hazır: çeviri ve sesler tamam' : 'Video hazır: çeviri tamam';
+      else {
+        text = `Çeviri ${f.trDone}/${f.trTotal}` + (f.audio ? ` · Ses ${fmtClock(f.auSec)} / ${fmtClock(f.totalSec)}` : '');
+        if (Number.isFinite(f.etaSec) && f.etaSec > 0) text += ` · ≈ ${fmtDur(Math.max(1, f.etaSec))} kaldı`;
+      }
+      this.fullSum.textContent = text;
+      this.fullSum.dataset.done = f.done ? 'true' : 'false';
+    }
+    const bar = show && !f.done;
+    this.fullBar.hidden = !bar;
+    if (bar) {
+      const tr = f.trDone / f.trTotal;
+      const pct = f.audio && f.totalSec > 0 ? (tr + f.auSec / f.totalSec) / 2 : tr;
+      this.fullBar.firstChild.style.width = `${Math.round(Math.min(1, pct) * 100)}%`;
+    }
+    const note = f?.note || (show ? '' : 'Çeviri ve sesleri baştan sona hazırlar.');
+    this.fullNote.textContent = note;
+    this.fullNote.hidden = !note;
+    this.sepNote.hidden = this.settings?.separation === 'off';
   }
 
   // Durum satırı: simge (nokta / dönen), başlık, açıklama

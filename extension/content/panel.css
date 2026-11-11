@@ -548,3 +548,10 @@
   .ld-mini-wave i { height: 70%; }
   .ld-spin, .ld-spinner { border-right-color: currentColor; }
 }
+
+/* Hazırlık: tüm video (tam kip) */
+.ld-full-btn[data-on="true"] { background: var(--ldp-fill-hover); }
+.ld-full-sum { margin-top: 8px; color: var(--ldp-ink); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.ld-full-sum[data-done="true"] { color: var(--ldp-ok); }
+.ld-full-bar { margin-top: 6px; }
+.ld-sep-note { margin-top: 4px; }

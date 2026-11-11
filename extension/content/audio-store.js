@@ -132,11 +132,11 @@ export function createAudioStore(cacheStorage, { limit = STORE_LIMIT_BYTES, now 
         await load();
         const body = pcmBytes(pcm);
         const c = await cache();
-        const plan = planEviction(index, { video, incoming: body.length, limit });
+        const old = index.videos[video]?.items[i]; // aynı cümlenin eski kaydı (yerine yazılır)
+        const plan = planEviction(index, { video, incoming: body.length - (old ? old[1] : 0), limit });
         for (const id of plan.evict) await dropVideo(c, id);
         if (plan.deny) { saveSoon(); throw new Error('ses deposu sınırı aşıldı'); }
         const v = index.videos[video] ||= { at: now(), bytes: 0, items: {} };
-        const old = v.items[i];
         if (old && old[0] !== hash) await c.delete(entryUrl(video, i, old[0]));
         await c.put(entryUrl(video, i, hash), new Response(body, { headers: { 'content-type': 'application/octet-stream', 'x-sr': String(sampleRate) } }));
         v.bytes += body.length - (old ? old[1] : 0);

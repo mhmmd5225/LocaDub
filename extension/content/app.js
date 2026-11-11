@@ -652,7 +652,8 @@ class Session {
     // tam kip: depo yazılamıyorsa yalnız bellekte tutulabilen aralık (_evict sınırları)
     const st = !this._store.broken;
     const far = st
-      ? fullIndices(S, t, settings.lookaheadSec, (s) => free(s) && !s.noAudio && !this._checkStored(s))
+      // bellekte olup depoda olmayan (tam kipten önce hazırlanmış) cümleler de yazılır: bellekten atılınca yeniden gerekmesin
+      ? fullIndices(S, t, settings.lookaheadSec, (s) => s.tr && !s.auPending && !s.auFailed && !s.noAudio && !this._checkStored(s))
       : windowIndices(S, t, settings.lookaheadSec + KEEP_AHEAD_EXTRA_SEC, free);
     if (!far.length) return false;
     await this.synth(far[0], { store: st, storeOnly: st });
@@ -717,6 +718,7 @@ class Session {
 
   // Ham PCM (base64 int16) → çalınacak ses (blob URL); sessizse boş işaretlenir.
   _setPcm(s, pcmBase64, sampleRate, { speed, voice, key }) {
+    if (s.audio?.url && s.i !== this.playingIdx) URL.revokeObjectURL(s.audio.url);
     if (!pcmBase64) { s.audio = { empty: true, voice, key }; s.noAudio = true; return; }
     const sr = sampleRate || 22050;
     const i16 = trimSilenceInt16(decodePcmBase64ToInt16(pcmBase64), sr);
@@ -1299,7 +1301,9 @@ class Session {
   // Tam kip özeti (panel): { on, audio, trDone, trTotal, auSec, totalSec, etaSec, done, note }
   _fullState(sys) {
     const needAudio = !sys && !this.ttsBroken;
-    const p = fullProgress(this.sentences, { needAudio, hasAudio: (s) => !!(s.audio || s.stored || s.noAudio) });
+    // tam kipte (depo yazılabiliyorsa) yalnız diskteki ses sayılır: bellektekiler atılınca kaybolur
+    const disk = this.fullMode && !this._store.broken;
+    const p = fullProgress(this.sentences, { needAudio, hasAudio: (s) => !!(s.stored || s.noAudio || (!disk && s.audio)) });
     const etaSec = this.fullMode && !p.done
       ? fullEta({ trLeft: p.trTotal - p.trDone, auLeft: needAudio ? p.auTotal - p.auDone : 0, trMs: this._rate.trMs, auMs: this._rate.auMs })
       : null;
